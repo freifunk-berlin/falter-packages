@@ -1,0 +1,84 @@
+{
+        "luci-mod-falter": {
+                "description": "Provides access to config files and scripts",
+                "read": {
+                        "cgi-io": [
+				"exec"
+			],
+                        "uci": [
+                                "profile_*",
+                                "system",
+                                "ffwizard",
+                                "dhcp",
+                                "olsrd",
+                                "olsrd6",
+                                "firewall",
+                                "freifunk",
+                                "wireless",
+                                "network",
+                                "qos",
+                                "luci_statistics",
+                                "openvpn"
+
+                        ],
+                        "files" : {
+                                "/etc/config/ffwizard": [
+                                        "read"
+                                ],
+                                "/etc/luci-uploads/cbid.ffuplink.1.cert":
+[
+                                        "read"
+                                ],
+                                "/etc/openvpn/ffuplink.crt": [
+                                        "read"
+                                ],
+                                "/etc/luci-uploads/cbid.ffuplink.1.key":
+[
+                                        "read"
+                                ],
+                                "/etc/openvpn/ffuplink.key": [
+                                        "read"
+                                ],
+                                "/usr/libexec/rpcd/ffwizard-berlin": [
+                                        "exec"
+                                ]
+                        }
+                },
+                "write": {
+                        "uci": [
+                                "profile_*",
+                                "system",
+                                "ffwizard",
+                                "dhcp",
+                                "olsrd",
+                                "olsrd6",
+                                "firewall",
+                                "freifunk",
+                                "wireless",
+                                "network",
+                                "qos",
+                                "luci_statistics",
+                                "openvpn"
+                        ],
+                        "files" : {
+                                "/etc/config/ffwizard": [
+                                        "write"
+                                ],
+                                "/etc/luci-uploads/cbid.ffuplink.1.cert":
+[
+                                        "write"
+                                ],
+                                "/etc/openvpn/ffuplink.crt": [
+                                        "write"
+                                ],
+                                "/etc/luci-uploads/cbid.ffuplink.1.key":
+[
+                                        "write"
+                                ],
+                                "/etc/openvpn/ffuplink.key": [
+                                        "write"
+                                ]
+                        }
+                }
+        }
+}
