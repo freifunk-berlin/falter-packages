@@ -16,7 +16,7 @@ function index()
 
 	page          = node("freifunk")
 	page.title    = _("Freifunk")
-	page.target   = call("freifunk", "index")
+	page.target   = template("freifunk/index")
 	page.order    = 5
 	page.setuser  = "nobody"
 	page.setgroup = "nogroup"
