@@ -10,7 +10,7 @@ define Package/falter-berlin-freifunk-defaults
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin freifunk default configuration
-  URL:=http://github.com/freifunk-berlin/packages_berlin
+  URL:=http://github.com/Freifunk-Spalter/packages
   PKGARCH:=all
 endef
 

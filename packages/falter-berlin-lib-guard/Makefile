@@ -9,7 +9,7 @@ define Package/falter-berlin-lib-guard
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin guard function
-  URL:=http://github.com/freifunk-berlin/packages_berlin
+  URL:=http://github.com/Freifunk-Spalter/packages
   PKGARCH:=all
 endef
 
