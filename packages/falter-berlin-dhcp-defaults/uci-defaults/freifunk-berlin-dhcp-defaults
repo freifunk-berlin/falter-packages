@@ -1,0 +1,28 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+guard "dhcp"
+
+# quieten down dnsmasq a bit (do not log lease-mgmt)
+uci set dhcp.@dnsmasq[0].quietdhcp=1
+
+# on IPv6-islands we also should give a default-route to the clients,
+# so they can also reach IPv6-neighbours. 
+uci set dhcp.dhcp.ra_default=1
+
+# add dns entry frei.funk
+uci set dhcp.frei_funk=domain
+uci set dhcp.frei_funk.name=frei.funk
+uci set dhcp.frei_funk.ip=192.168.42.1
+
+# add dns entry frei.funk for ipv6
+router_ula=$(uci get network.globals.ula_prefix | sed -e 's/\/48/1/')
+uci set dhcp.frei_funk_ipv6=domain
+uci set dhcp.frei_funk_ipv6.name=frei.funk
+uci set dhcp.frei_funk_ipv6.ip=$router_ula
+
+# don't send default-route to clients to prevent them sending pakets
+# to us, that we can't forward now
+uci add_list dhcp.lan.dhcp_option='3'
+
+uci commit dhcp

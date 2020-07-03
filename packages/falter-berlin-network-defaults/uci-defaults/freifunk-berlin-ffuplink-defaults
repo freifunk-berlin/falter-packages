@@ -1,0 +1,17 @@
+#!/bin/sh
+
+. /lib/functions/freifunk-berlin-network.sh
+. /lib/functions/guard.sh
+guard "ffberlin_uplink"
+
+# create ffberlin-uplink file an fill with basic settings
+uci import ffberlin-uplink <<EOF
+EOF
+
+uci set ffberlin-uplink.preset=settings
+uci set ffberlin-uplink.preset.current="undefined"
+uci set ffberlin-uplink.uplink=settings
+uci set ffberlin-uplink.uplink.auth=none
+uci commit ffberlin-uplink
+
+create_ffuplink

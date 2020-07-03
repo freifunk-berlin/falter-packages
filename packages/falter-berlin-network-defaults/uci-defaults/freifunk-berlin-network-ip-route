@@ -1,0 +1,6 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+guard "iproute"
+
+echo 120 ffuplink >>/etc/iproute2/rt_tables

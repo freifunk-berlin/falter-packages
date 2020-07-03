@@ -1,0 +1,15 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+# remove the sta interface, leaving only wan
+uci del pingcheck.@interface\[1\]
+
+# set the host to the anycast host livecheck.berlin.freifunk.net
+uci set pingcheck.@default\[0\].host=livecheck.berlin.freifunk.net
+
+# set the default timeout to 60 seconds
+uci set pingcheck.@default\[0\].timeout=60
+
+uci commit pingcheck
+

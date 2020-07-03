@@ -1,0 +1,147 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+guard "olsrd"
+
+# reset olsrd config
+uci import olsrd <<EOF
+EOF
+
+# add txtinfo plugin - needed for collectd-mod-txtinfo
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.accept=0.0.0.0
+uci set olsrd.$PLUGIN.library=olsrd_txtinfo
+uci set olsrd.$PLUGIN.port=2006
+
+# add arprefresh plugin
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.library=olsrd_arprefresh
+
+# add nameservice plugin
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.library=olsrd_nameservice
+uci set olsrd.$PLUGIN.suffix=.olsr
+uci set olsrd.$PLUGIN.hosts_file=/tmp/hosts/olsr
+uci set olsrd.$PLUGIN.latlon_file=/var/run/latlon.js
+uci set olsrd.$PLUGIN.services_file=/var/etc/services.olsr
+
+# add jsoninfo plugin
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.accept=0.0.0.0
+uci set olsrd.$PLUGIN.library=olsrd_jsoninfo
+uci set olsrd.$PLUGIN.ignore=0
+
+# add watchdog plugin
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.library=olsrd_watchdog
+uci set olsrd.$PLUGIN.file=/var/run/olsrd.watchdog
+uci set olsrd.$PLUGIN.interval=30
+
+# add dyngw plain plugin - it is ipv4 only
+PLUGIN="$(uci add olsrd LoadPlugin)"
+uci set olsrd.$PLUGIN.library=olsrd_dyn_gw
+uci add_list olsrd.$PLUGIN.Ping=46.182.19.48      # dns.digitalcourage.de
+uci add_list olsrd.$PLUGIN.Ping=80.67.169.40      # www.fdn.fr/actions/dns
+uci add_list olsrd.$PLUGIN.Ping=194.150.168.168   # dns.as250.net
+uci set olsrd.$PLUGIN.ignore=0
+
+# set olsrd defaults
+OLSRD="$(uci add olsrd olsrd)"
+uci set olsrd.$OLSRD.IpVersion=4
+uci set olsrd.$OLSRD.FIBMetric=flat
+uci set olsrd.$OLSRD.AllowNoInt=yes
+uci set olsrd.$OLSRD.TcRedundancy=2
+uci set olsrd.$OLSRD.NatThreshold=0.75
+uci set olsrd.$OLSRD.LinkQualityAlgorithm=etx_ff
+uci set olsrd.$OLSRD.SmartGateway=yes
+uci set olsrd.$OLSRD.SmartGatewayThreshold=50
+uci set olsrd.$OLSRD.Pollrate=0.025
+uci set olsrd.$OLSRD.RtTable=111
+uci set olsrd.$OLSRD.RtTableDefault=112
+uci set olsrd.$OLSRD.RtTableTunnel=113
+uci set olsrd.$OLSRD.RtTableTunnelPriority=100000
+uci set olsrd.$OLSRD.RtTableDefaultOlsrPriority=20000
+
+# set InterfaceDefaults parameters
+INTERFACES="$(uci add olsrd InterfaceDefaults)"
+uci set olsrd.$INTERFACES.MidValidityTime=500.0
+uci set olsrd.$INTERFACES.TcInterval=2.0
+uci set olsrd.$INTERFACES.HnaValidityTime=125.0
+uci set olsrd.$INTERFACES.HelloValidityTime=125.0
+uci set olsrd.$INTERFACES.TcValidityTime=500.0
+uci set olsrd.$INTERFACES.Ip4Broadcast=255.255.255.255
+uci set olsrd.$INTERFACES.MidInterval=25.0
+uci set olsrd.$INTERFACES.HelloInterval=3.0
+uci set olsrd.$INTERFACES.HnaInterval=10.0
+
+uci commit olsrd
+
+
+##########
+# OLSRD6 #
+##########
+
+# reset olsrd6 config
+uci import olsrd6 <<EOF
+EOF
+
+# add txtinfo plugin - needed for collectd-mod-olsrd
+PLUGIN="$(uci add olsrd6 LoadPlugin)"
+uci set olsrd6.$PLUGIN.accept=0::
+uci set olsrd6.$PLUGIN.library=olsrd_txtinfo
+uci set olsrd6.$PLUGIN.port=2006
+uci set olsrd6.$PLUGIN.ipv6only=true
+
+# add nameservice plugin
+PLUGIN="$(uci add olsrd6 LoadPlugin)"
+uci set olsrd6.$PLUGIN.library=olsrd_nameservice
+uci set olsrd6.$PLUGIN.suffix=.olsr
+uci set olsrd6.$PLUGIN.hosts_file=/tmp/hosts/olsr.ipv6
+uci set olsrd6.$PLUGIN.latlon_file=/var/run/latlon.js.ipv6
+uci set olsrd6.$PLUGIN.services_file=/var/etc/services.olsr.ipv6
+
+# add jsoninfo plugin
+PLUGIN="$(uci add olsrd6 LoadPlugin)"
+uci set olsrd6.$PLUGIN.accept=0::
+uci set olsrd6.$PLUGIN.library=olsrd_jsoninfo
+uci set olsrd6.$PLUGIN.ignore=0
+uci set olsrd6.$PLUGIN.ipv6only=true
+
+# add watchdog plugin
+PLUGIN="$(uci add olsrd6 LoadPlugin)"
+uci set olsrd6.$PLUGIN.library=olsrd_watchdog
+uci set olsrd6.$PLUGIN.file=/var/run/olsrd6.watchdog
+uci set olsrd6.$PLUGIN.interval=30
+
+# set olsrd defaults
+OLSRD="$(uci add olsrd6 olsrd)"
+uci set olsrd6.$OLSRD.IpVersion=6
+uci set olsrd6.$OLSRD.FIBMetric=flat
+uci set olsrd6.$OLSRD.AllowNoInt=yes
+uci set olsrd6.$OLSRD.TcRedundancy=2
+uci set olsrd6.$OLSRD.LinkQualityAlgorithm=etx_ffeth
+uci set olsrd6.$OLSRD.Pollrate=0.025
+uci set olsrd6.$OLSRD.RtTable=111
+uci set olsrd6.$OLSRD.RtTableDefault=112
+uci set olsrd6.$OLSRD.RtTablePriority=1000
+uci set olsrd6.$OLSRD.RtTableDefaultOlsrPriority=20000
+
+# set InterfaceDefaults parameters
+INTERFACES="$(uci add olsrd6 InterfaceDefaults)"
+uci set olsrd6.$INTERFACES.MidValidityTime=500.0
+uci set olsrd6.$INTERFACES.TcInterval=2.0
+uci set olsrd6.$INTERFACES.HnaValidityTime=125.0
+uci set olsrd6.$INTERFACES.HelloValidityTime=125.0
+uci set olsrd6.$INTERFACES.TcValidityTime=500.0
+uci set olsrd6.$INTERFACES.MidInterval=25.0
+uci set olsrd6.$INTERFACES.HelloInterval=3.0
+uci set olsrd6.$INTERFACES.HnaInterval=10.0
+
+uci commit olsrd6
+
+# add routing tables
+tables="/etc/iproute2/rt_tables"
+test -d /etc/iproute2/ || mkdir -p /etc/iproute2/
+grep -q "111 olsr" $tables || echo "111 olsr" >> $tables
+grep -q "112 olsr-default" $tables || echo "112 olsr-default" >> $tables
+grep -q "113 olsr-tunnel" $tables || echo "113 olsr-tunnel" >> $tables

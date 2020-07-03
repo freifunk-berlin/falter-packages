@@ -1,0 +1,23 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+guard "network"
+
+# change default ip to avoid collision with user's local network
+uci set network.lan.ipaddr=192.168.42.1
+
+# do not use dns servers provided by dhcp - we maintain a static list of 
+# dns servers instead
+uci set network.wan.peerdns=0
+uci set network.wan6.peerdns=0
+
+# setup wan as bridge
+uci set network.wan.type=bridge
+
+# add tunl0 interface - tunl0 is the ipip tunnel interface for the olsr
+# SmartGateway plugin
+uci set network.tunl0=interface
+uci set network.tunl0.ifname=tunl0
+uci set network.tunl0.proto=none
+
+uci commit network

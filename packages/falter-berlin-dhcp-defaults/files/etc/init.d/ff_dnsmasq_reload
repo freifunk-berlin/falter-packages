@@ -1,0 +1,14 @@
+#!/bin/sh /etc/rc.common
+
+START=88
+
+boot() {
+	test -f /etc/crontabs/root || touch /etc/crontabs/root
+
+	grep -q 'killall -HUP dnsmasq' /etc/crontabs/root || {
+		echo "*/5 * * * *	killall -HUP dnsmasq" >> /etc/crontabs/root
+	}
+
+	/etc/init.d/cron restart &
+}
+

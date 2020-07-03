@@ -1,0 +1,15 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+
+# change default hostname
+if [ $(uci get system.@system[0].hostname) = OpenWrt ]; then
+  uci set system.@system[0].hostname=gib-mir-einen-namen
+  uci commit system
+fi
+
+guard "system"
+
+uci set system.ntp.use_dhcp='0'
+
+uci commit system

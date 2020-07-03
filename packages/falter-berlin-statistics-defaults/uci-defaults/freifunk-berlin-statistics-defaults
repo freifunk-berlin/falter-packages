@@ -1,0 +1,81 @@
+#!/bin/sh
+
+. /lib/functions/guard.sh
+guard "luci_statistics"
+
+# reset luci_statistics config
+uci import luci_statistics <<EOF
+EOF
+
+# mod_ping and collectd_rrdtool use a lot of RAM, disable on 32MB routers
+if [ "$(cat /proc/meminfo |grep MemTotal:|awk {'print $2'})" -gt "65536" ]; then
+  HAVE_PLENTY_RAM=1
+else
+  HAVE_PLENTY_RAM=0
+fi
+
+# rrdtool
+uci set luci_statistics.rrdtool=statistics
+uci set luci_statistics.rrdtool.default_timespan=1hour
+uci set luci_statistics.rrdtool.image_width=600
+uci set luci_statistics.rrdtool.image_path=/tmp/rrdimg
+
+# collectd
+uci set luci_statistics.collectd=statistics
+uci set luci_statistics.collectd.BaseDir=/var/run/collectd
+uci set luci_statistics.collectd.Include=/etc/collectd/conf.d
+uci set luci_statistics.collectd.PIDFile=/var/run/collectd.pid
+uci set luci_statistics.collectd.PluginDir=/usr/lib/collectd
+uci set luci_statistics.collectd.TypesDB=/usr/share/collectd/types.db
+uci set luci_statistics.collectd.Interval=30
+uci set luci_statistics.collectd.ReadThreads=2
+
+# mod ping
+uci set luci_statistics.collectd_ping=statistics
+uci set luci_statistics.collectd_ping.enable=$HAVE_PLENTY_RAM
+uci set luci_statistics.collectd_ping.TTL=127
+uci set luci_statistics.collectd_ping.Interval=10
+uci set luci_statistics.collectd_ping.Hosts=ping.berlin.freifunk.net
+
+# mod interface
+uci set luci_statistics.collectd_interface=statistics
+uci set luci_statistics.collectd_interface.Interfaces=ffuplink
+uci set luci_statistics.collectd_interface.enable=1
+
+# mod load
+uci set luci_statistics.collectd_load=statistics
+uci set luci_statistics.collectd_load.enable=1
+
+# collectd_rrdtool
+uci set luci_statistics.collectd_rrdtool=statistics
+uci set luci_statistics.collectd_rrdtool.enable=$HAVE_PLENTY_RAM
+uci set luci_statistics.collectd_rrdtool.DataDir=/tmp/rrd
+uci set luci_statistics.collectd_rrdtool.RRARows=100
+uci set luci_statistics.collectd_rrdtool.RRASingle=1
+uci set luci_statistics.collectd_rrdtool.RRATimespans="1hour 1day 1week 1month 1year"
+
+# mod memory
+uci set luci_statistics.collectd_memory=statistics
+uci set luci_statistics.collectd_memory.enable=1
+
+# mod olsrd - depends on olsrd-plugin-txtinfo
+uci set luci_statistics.collectd_olsrd=statistics
+uci set luci_statistics.collectd_olsrd.enable=1
+uci set luci_statistics.collectd_olsrd.Port=2006
+uci set luci_statistics.collectd_olsrd.Host=127.0.0.1
+
+# mod iwinfo
+uci set luci_statistics.collectd_iwinfo=statistics
+uci set luci_statistics.collectd_iwinfo.enable=1
+
+# mod uptime
+uci set luci_statistics.collectd_uptime=statistics
+uci set luci_statistics.collectd_uptime.enable=1
+
+# network - push data to monitor server
+NETWORK="$(uci add luci_statistics collectd_network_server)" 
+uci set luci_statistics.$NETWORK.host=monitor.berlin.freifunk.net
+uci set luci_statistics.collectd_network=statistics
+uci set luci_statistics.collectd_network.enable=1
+
+uci commit luci_statistics

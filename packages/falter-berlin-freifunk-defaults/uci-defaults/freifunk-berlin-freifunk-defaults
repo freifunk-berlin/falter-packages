@@ -1,0 +1,23 @@
+#!/bin/sh
+
+uci set freifunk.community.name='berlin'
+uci set freifunk.community.homepage='http://berlin.freifunk.net'
+
+uci set freifunk.wifi_device=defaults
+uci set freifunk.wifi_device.diversity='1'
+uci set freifunk.wifi_device.disabled='0'
+uci set freifunk.wifi_device.country='DE'
+uci set freifunk.wifi_device.channel='13'
+uci delete freifunk.wifi_device.distance
+
+uci set freifunk.wifi_device_5=defaults
+uci set freifunk.wifi_device_5.diversity='1'
+uci set freifunk.wifi_device_5.disabled='0'
+uci set freifunk.wifi_device_5.country='DE'
+
+uci set freifunk.olsr_interface=defaults
+uci set freifunk.olsr_interface.Ip4Broadcast='255.255.255.255'
+
+uci set freifunk.dhcp.leasetime='5m'
+
+uci commit freifunk
