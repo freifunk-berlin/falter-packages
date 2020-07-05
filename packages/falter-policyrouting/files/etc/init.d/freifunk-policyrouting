@@ -1,11 +1,11 @@
 #!/bin/sh /etc/rc.common
 
 START=15
-. $IPKG_INSTROOT/lib/functions/network.sh
-. $IPKG_INSTROOT/lib/functions.sh
+. /lib/functions/network.sh
+. /lib/functions.sh
 
 proto="4"
-[ -f /proc/net/ipv6_route ] && proto="4 6"
+#[ -f /proc/net/ipv6_route ] && proto="4 6"
 [ -f /etc/config/olsrd ] && cfgs="olsrd"
 [ -f /etc/config/olsrd6 ] && cfgs="$cfgs olsrd6"
 
@@ -103,6 +103,8 @@ add_lookup_rule() {
 	name=${1/-/_}
 	lookup=$2
 	prio=$3
+	in=$4
+	name=$name"_"${in:-allif}"_"
 
 	if [ -z "$name" -o -z "$lookup" -o -z "$prio" ]; then
 		logger -s -t policyrouting "Missing parameters for add_rule!"
@@ -113,21 +115,57 @@ add_lookup_rule() {
 			else
 				rule="rule"
 			fi
-
-			uci batch <<- EOF
-				set network.${name}ipv${p}="$rule"
-				set network.${name}ipv${p}.lookup="$lookup"
-				set network.${name}ipv${p}.priority="$prio"
-			EOF
+			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
+				uci batch <<- EOF
+					set network.${name}ipv${p}="$rule"
+					set network.${name}ipv${p}.lookup="$lookup"
+					set network.${name}ipv${p}.priority="$prio"
+					set network.${name}ipv${p}.in="$in"
+				EOF
+				uci commit network
+			fi
 		done
 	fi
 }
 
-del_lookup_rule() {
+add_action_rule() {
 	name=${1/-/_}
+	action=$2
+	prio=$3
+	in=$4
+	name=$name"_"${in:-allif}"_"
+
+	if [ -z "$name" -o -z "$action" -o -z "$prio" ]; then
+		logger -s -t policyrouting "Missing parameters for add_action!"
+	else
+		for p in $proto; do
+			if [ "$p" = "6" ]; then
+				rule="rule6"
+			else
+				rule="rule"
+			fi
+			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
+				uci batch <<- EOF
+					set network.${name}ipv${p}="$rule"
+					set network.${name}ipv${p}.action="$action"
+					set network.${name}ipv${p}.priority="$prio"
+					set network.${name}ipv${p}.in="$in"
+				EOF
+				uci commit network
+			fi
+		done
+	fi
+}
+
+
+del_rule() {
+	name=${1/-/_}
+	in=$2
+	name=$name"_"${in:-allif}"_"
 	for p in $proto; do
 		uci -q delete network.${name}ipv${p}
 	done
+	uci commit network
 }
 
 start() {
@@ -135,7 +173,7 @@ start() {
 		logger -s -t policyrouting "Starting policy routing."
 		rt_tables
 		olsrd_intalltables
-		disable_dyngw
+		#disable_dyngw
 
 		add_lookup_rule olsr olsr 1000
 		add_lookup_rule localnets localnets 2000
@@ -143,6 +181,26 @@ start() {
 		if [ "$fallback" = 1 ]; then
 			add_lookup_rule olsr-default olsr-default 100000
 		fi
+		networks=""
+		for z in $zones; do
+			network_zone="$(uci -q get firewall.zone_${z}.network)"
+			if [ -z "$network_zone" ]; then
+				network_zone="$z"
+			fi
+			networks="$networks $network_zone"
+		done
+
+		sgw="$(uci -q get olsrd.@olsrd[0].SmartGateway)"
+		for n in $networks; do
+			# only add route for tunnel if smart gateway is enabled
+			if [ "$sgw" = "yes" ]; then
+				add_lookup_rule olsr-tunnel olsr-tunnel 19999 $n
+			fi
+			add_lookup_rule olsr-default olsr-default 20000 $n
+			if [ "$strict" != 0 ]; then
+				add_action_rule olsr-default_unreachable unreachable 20001 $n
+			fi
+		done
 	fi
 	uci commit network
 	if [ ! "$1" = "noservicerestart" ]; then
@@ -153,20 +211,33 @@ start() {
 stop() {
 	logger -s -t policyrouting "Stopping policy routing"
 	olsrd_rmtables
-	del_lookup_rule olsr-default
-	del_lookup_rule olsr
-	del_lookup_rule localnets
-	uci commit network
+	del_rule olsr-default
+	del_rule olsr
+	del_rule localnets
+	networks=""
+	for z in $zones; do
+		network_zone="$(uci -q get firewall.zone_${z}.network)"
+		if [ -z "$network_zone" ]; then
+			network_zone="$z"
+		fi
+		networks="$networks $network_zone"
+	done
+
+	sgw=$(uci -q get olsrd.@olsrd[0].SmartGateway)
+	for n in $networks; do
+		if [ "$sgw" = "yes" ]; then
+			del_rule olsr-tunnel $n
+		fi
+		del_rule olsr-default $n
+		if [ "$strict" != 0 ]; then
+			del_rule olsr-default_unreachable $n
+		fi
+	done
 	restart_services
 	echo "Hint: To completely disable freifunk-policyrouting set enable=0 in /etc/config/freifunk-policyrouting."
 }
 
 restart() {
 	logger -s -t policyrouting "Restarting policy routing"
-	olsrd_rmtables
-	del_lookup_rule olsr-default
-	del_lookup_rule olsr
-	del_lookup_rule localnets
-	uci commit network
 	start
 }
