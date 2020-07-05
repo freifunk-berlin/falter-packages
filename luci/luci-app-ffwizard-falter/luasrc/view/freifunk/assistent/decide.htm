@@ -1,0 +1,55 @@
+<%+header%>
+
+<link href="/freifunk/assistent/assistent.css" rel="stylesheet" />
+
+<div class="section">
+  <h3>Freifunk-Assistent</h3>
+
+  <div class="info alert-message">
+    <p class="success">
+Als n&auml;chstes kommen die Einstellungen für das Freifunk-Netzwerk.
+Halte die IPs bereit, die du &uuml;ber den Wizard von <a target="blank"
+href="https://config.berlin.freifunk.net/">config.berlin.freifunk.net</a>
+bekommen hast.
+    </p>
+  </div>
+
+  <div class="tile">
+    <div style="text-align: center; margin: 10px">
+      <a class="cbi-button cbi-button-save" href="<%=luci.dispatcher.build_url("admin/freifunk/assistent/optionalConfigs")%>?sharenet=0">
+        Am Freifunk-Netz teilnehmen
+      </a>
+    </div>
+    <div class="alert-message">
+      <p class="info">
+        Erweitere das Freifunk-Netz. Du ben&ouml;tigst dazu eine
+        WLAN-Verbindung zu einem anderen Freifunk-Router.
+        Du kannst auf der <a target="blank"
+        href="https://berlin.freifunk.net/network/map/">Freifunk-Karte</a>
+        nachschauen, wer in deiner N&auml;he ist, und sie kontaktieren,
+        damit ihr die Verbindung optimal ausrichten k&ouml;nnt.
+      </p>
+    </div>
+  </div>
+
+  <div class="tile">
+    <div style="text-align: center; margin: 10px">
+      <a class="cbi-button cbi-button-save" href="<%=luci.dispatcher.build_url("/admin/freifunk/assistent/sharedInternet")%>">
+        Am Freifunk-Netz teilnehmen und Internet teilen
+      </a>
+    </div>
+    <div class="alert-message">
+      <p class="info">
+        Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk freigibst.
+        Diese Option ist sowohl mit als auch ohne Verbindung zu anderen Freifunk-Routern sinnvoll.
+      </p>
+    </div>
+  </div>
+
+<div class="clear"></div>
+</div>
+<div class="cbi-page-actions">
+  <a class="cbi-button cbi-button-apply" href="<%=luci.dispatcher.build_url("admin/freifunk/assistent/generalInfo")%>">Back</a>
+  <a class="cbi-button cbi-button-apply" href="<%=luci.dispatcher.build_url("admin/freifunk/assistent/cancel")%>">Cancel</a>
+</div>
+<%+footer%>

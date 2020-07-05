@@ -1,0 +1,40 @@
+#!/bin/sh
+
+THIS_UPLINKNAME="tunnelberlin_openvpn"
+
+. /lib/functions/guard.sh
+
+# always set correct masquerading, regardless of guard
+uci set firewall.zone_ffuplink.masq=1
+uci commit firewall
+
+current_preset=$(uci get ffberlin-uplink.preset.current)
+if [ ${current_preset} != ${THIS_UPLINKNAME} ]; then
+  # do not track preset when it was 'undefined', aka never configured
+  if [ ${current_preset} != "undefined" ]; then
+    logger -t "ffuplink" "uplink-preset has been changed."
+    uci set ffberlin-uplink.preset.previous=${current_preset}
+  fi
+  uci set ffberlin-uplink.preset.current=${THIS_UPLINKNAME}
+  # call uci-default of package freifunk-berlin-openvpn-files again to recreate initial config
+  sh /rom/etc/uci-defaults/freifunk-berlin-z90_openvpn
+fi
+uci commit ffberlin-uplink
+
+guard "tunnelberlin_openvpn"
+
+uci set openvpn.ffuplink.proto=udp4
+uci set openvpn.ffuplink.dev_type=tun
+uci set openvpn.ffuplink.persist_key=1
+uci set openvpn.ffuplink.keepalive="10 60"
+uci set openvpn.ffuplink.remote_cert_tls=server
+uci set openvpn.ffuplink.comp_lzo="no"
+uci set openvpn.ffuplink.script_security=2
+uci set openvpn.ffuplink.cipher="none"
+uci set openvpn.ffuplink.mssfix=1300
+uci add_list openvpn.ffuplink.remote="tunnel-gw.berlin.freifunk.net 1194"
+uci set openvpn.ffuplink.ca="/etc/openvpn/tunnel-berlin-ca.crt"
+uci set openvpn.ffuplink.extra_certs="/etc/openvpn/tunnel-berlin-extra.crt"
+uci set openvpn.ffuplink.cert="/etc/openvpn/ffuplink.crt"
+uci set openvpn.ffuplink.key="/etc/openvpn/ffuplink.key"
+uci commit openvpn.ffuplink

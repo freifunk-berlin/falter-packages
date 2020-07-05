@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# enable freifunk-policyrouting by default
+uci set freifunk-policyrouting.pr.enable=1
+# disable fallback because olsr is managing the fallback rule anyway
+uci set freifunk-policyrouting.pr.fallback=0
+uci set freifunk-policyrouting.pr.zones="freifunk"
+uci commit freifunk-policyrouting

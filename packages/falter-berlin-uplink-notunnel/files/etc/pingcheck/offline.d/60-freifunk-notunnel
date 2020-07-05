@@ -1,0 +1,15 @@
+#!/bin/sh
+
+[ "$INTERFACE" = wan ] || exit
+
+. /lib/functions.sh
+
+config_load ffberlin-uplink
+config_get ffuplink preset current
+
+[ "$ffuplink" = notunnel ] || exit
+
+# Internet connectivity via WAN is up, start the ffuplink interface
+logger -t freifunk-pingcheck "WAN is down, stopping ffuplink"
+ifdown ffuplink
+

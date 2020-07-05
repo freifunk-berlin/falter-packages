@@ -1,0 +1,10 @@
+{
+        "unauthenticated": {
+                "description": "Access some status information without login",
+                "read": {
+                        "ubus": {
+                                "ffwizard-berlin": [ "has_root-pass" ]
+                        }
+                }
+        }
+}

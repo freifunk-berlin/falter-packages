@@ -1,0 +1,24 @@
+#!/bin/sh
+# Copyright (C) 2016 OpenWrt.org
+
+. /lib/functions.sh
+. /usr/share/libubox/jshn.sh
+
+case "$1" in
+  list)
+    echo '{ "has_root-pass": {} }'
+  ;;
+  call)
+    case "$2" in
+      has_root-pass)
+USER=root
+# taken from http://serverfault.com/a/240961
+grep ${USER} /etc/shadow | awk -F":" '{ if ($2 == "!" || $2 == "") \
+                printf "{ \"password_is_set\" : \"no\" }";\
+        else \
+                printf "{ \"password_is_set\" : \"yes\" }"\
+        }'
+      ;;
+    esac
+  ;;
+esac

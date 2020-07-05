@@ -1,0 +1,22 @@
+#!/bin/sh
+
+[ "$INTERFACE" = wan ] || exit
+
+. /lib/functions.sh
+
+config_load ffberlin-uplink
+config_get ffuplink preset current
+
+[ "$ffuplink" = notunnel ] || exit
+
+# Make sure ffuplink is not already up
+. /usr/share/libubox/jshn.sh
+json_load "$(ubus call network.interface.ffuplink status)"
+json_select $1
+json_get_vars up
+[ "$up" == "0" ] || exit
+
+# Internet connectivity via WAN is up, start the ffuplink interface
+# In the case where ffuplink is set disabled '1', then ifup dies quietly
+logger -t freifunk-pingcheck "WAN is up, starting ffuplink"
+ifup ffuplink

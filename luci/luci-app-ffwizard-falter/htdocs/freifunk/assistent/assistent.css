@@ -1,0 +1,19 @@
+.container .alert-message.warning {
+	display:none;
+}
+
+.tile {
+	float:left;
+	width:50%;
+}
+.tile .alert-message {
+	margin:5px;
+}
+
+.clear {
+	clear:both;
+}
+
+#map {
+  margin-top:20px;
+}

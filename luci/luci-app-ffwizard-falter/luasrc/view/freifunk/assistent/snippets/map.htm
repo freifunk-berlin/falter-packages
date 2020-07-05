@@ -1,0 +1,73 @@
+<script type="text/javascript">
+var initMap = function() {
+  // create map container
+  var map = document.createElement('div');
+  map.style['height'] = '300px';
+  map.style['margin-top'] = '20px';
+  map.id = 'map';
+  document.getElementById('cbi-ffwizward-1-lon').appendChild(map);
+
+  // init leaflet
+  var map = L.map('map').setView([52.51706, 13.38924], 12);
+  var osmUrl='//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osm = new L.TileLayer(osmUrl, {
+    minZoom: 8,
+    maxZoom: 18,
+    attribution: osmAttrib
+  }).addTo(map);
+
+  // init click handler
+  var popup = L.popup();
+  var inputLat = document.getElementById('cbid.ffwizward.1.lat');
+  var inputLng = document.getElementById('cbid.ffwizward.1.lon');
+  function onMapClick(e) {
+      popup.setLatLng(e.latlng)
+           .setContent(e.latlng.lat.toString() + ', ' + e.latlng.lng.toString())
+           .openOn(map);
+      inputLat.value = e.latlng.lat;
+      inputLng.value = e.latlng.lng;
+  }
+  map.on('click', onMapClick);
+}
+
+
+function loadScript(url, callback){
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+
+    if (script.readyState){  //IE
+        script.onreadystatechange = function(){
+            if (script.readyState == 'loaded' ||
+                    script.readyState == 'complete'){
+                script.onreadystatechange = null;
+                callback();
+            }
+        };
+    } else {  //Others
+        script.onload = callback;
+    }
+
+    script.src = url;
+    document.getElementsByTagName('body')[0].appendChild(script);
+}
+
+function loadCss(url) {
+  var link = document.createElement('link');
+  link.href = url;
+  link.rel = 'stylesheet';
+  link.type = 'text/css';
+  document.getElementsByTagName('head')[0].appendChild(link);
+}
+
+window.addEventListener('load', function load(event){
+  loadScript('//cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js', function() {
+    loadCss('//cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css');
+    try {
+      L;
+      initMap();
+    } catch(e) {}
+  });
+});
+
+</script>
