@@ -11,6 +11,7 @@ PKG_NAME:=luci-app-falter-owm
 PKG_VERSION:=2020.06.27
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
+PKG_BUILD_DEPENDS += lua/host luci-base/host LUCI_CSSTIDY:csstidy/host LUCI_SRCDIET:luasrcdiet/host $(LUCI_BUILD_DEPENDS)
 
 include $(INCLUDE_DIR)/package.mk
 
