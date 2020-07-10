@@ -15,7 +15,7 @@ define Package/falter-common
   CATEGORY:=LuCI
   SUBMENU:=9. Freifunk
   TITLE:=Falter common files
-  DEPENDS:=+uci
+  EXTRA_DEPENDS:=uci
 endef
 
 define Package/falter-common/description
@@ -31,7 +31,7 @@ define Package/falter-common-olsr
   CATEGORY:=LuCI
   SUBMENU:=9. Freifunk
   TITLE:=Falter common files for olsr-v1
-  DEPENDS:=falter-common +olsrd +micrond +libuci-lua
+  EXTRA_DEPENDS:=falter-common, olsrd, micrond, libuci-lua
 endef
 
 define Package/falter-common-olsr/description

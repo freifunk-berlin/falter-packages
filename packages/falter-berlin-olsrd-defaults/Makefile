@@ -10,7 +10,7 @@ define Package/falter-berlin-olsrd-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin olsrd default configuration
   URL:=http://github.com/Freifunk-Spalter/packages
-  DEPENDS+= +olsrd +falter-berlin-lib-guard
+  EXTRA_DEPENDS+=olsrd, falter-berlin-lib-guard
   PKGARCH:=all
 endef
 

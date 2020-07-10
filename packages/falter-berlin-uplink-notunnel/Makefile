@@ -11,7 +11,7 @@ define Package/$(PKG_NAME)
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin no tunnel files
   URL:=http://github.com/freifunk-berlin/packages_berlin
-  DEPENDS+=+falter-berlin-lib-guard +kmod-veth +falter-berlin-network-defaults +pingcheck
+  EXTRA_DEPENDS:=falter-berlin-lib-guard, kmod-veth, falter-berlin-network-defaults, pingcheck
   PROVIDES:=falter-berlin-uplink
   PKGARCH:=all
 endef

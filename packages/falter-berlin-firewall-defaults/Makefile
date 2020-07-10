@@ -10,7 +10,7 @@ define Package/falter-berlin-firewall-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin firewall default configuration
   URL:=http://github.com/freifunk-berlin/packages_berlin
-  DEPENDS+= +firewall +falter-berlin-lib-guard
+  EXTRA_DEPENDS:=firewall, falter-berlin-lib-guard
   PKGARCH:=all
 endef
 

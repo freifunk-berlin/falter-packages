@@ -10,7 +10,7 @@ define Package/falter-berlin-network-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin network default configuration
   URL:=http://github.com/Freifunk-Spalter/packages
-  DEPENDS+= +falter-berlin-lib-guard +iwinfo +pingcheck
+  EXTRA_DEPENDS:=falter-berlin-lib-guard, iwinfo, pingcheck
   PKGARCH:=all
 endef
 
