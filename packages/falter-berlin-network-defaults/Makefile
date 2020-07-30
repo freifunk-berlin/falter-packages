@@ -39,6 +39,8 @@ define Package/falter-berlin-network-defaults/install
 	$(CP) ./pingcheck/online.d/* $(1)/etc/pingcheck/online.d/
 	$(INSTALL_DIR) $(1)/etc/pingcheck/offline.d
 	$(CP) ./pingcheck/offline.d/* $(1)/etc/pingcheck/offline.d/
+	$(INSTALL_DIR) $(1)/etc/pingcheck/panic.d
+	$(CP) ./pingcheck/panic.d/* $(1)/etc/pingcheck/panic.d/
 endef
 
 $(eval $(call BuildPackage,falter-berlin-network-defaults))

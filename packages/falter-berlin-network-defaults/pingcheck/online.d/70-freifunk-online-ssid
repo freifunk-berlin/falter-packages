@@ -1,0 +1,17 @@
+#!/bin/bash
+
+[ "$GLOBAL" = ONLINE ] || exit
+
+# check if no internet ssids exist
+[ $(uci show wireless | grep -o 'no-internet.freifunk.net' | wc -l) -gt 0 ] || exit
+
+# iterate over dhcp sections and change ssid
+for i in `uci show wireless | grep "dhcp-" | grep -o "wireless.@wifi-iface\[\d\]"` ; do
+  uci set $i.ssid=$(uci get freifunk.community.ssid)
+done
+
+# commit to config files
+uci commit
+
+# apply to wifi
+wifi reconf

@@ -11,5 +11,7 @@ uci set pingcheck.@default\[0\].host=livecheck.berlin.freifunk.net
 # set the default timeout to 60 seconds
 uci set pingcheck.@default\[0\].timeout=60
 
-uci commit pingcheck
+# activate panic.d scripts
+uci set pingcheck.@default\[0\].panic='1'
 
+uci commit pingcheck

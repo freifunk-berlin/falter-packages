@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# panic.d does not get GLOBAL, but offline.d gets it
+# [ "$GLOBAL" = OFFLINE ] || exit
+
+# iterate over dhcp sections
+for i in `uci show wireless | grep "dhcp-" | grep -o "wireless.@wifi-iface\[\d\]"` ; do
+  uci set $i.ssid='no-internet.freifunk.net'
+done
+
+# commit to config files
+uci commit
+
+# apply to wifi
+wifi reconf
