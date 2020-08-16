@@ -1,13 +1,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-tunneldigger
-PKG_VERSION:=1
+PKG_SOURCE_DATE:=2020-08-10
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=git://github.com/wlanslovenija/tunneldigger.git
-PKG_SOURCE_DATE:=2017-12-13
-PKG_SOURCE_VERSION:=d7db350011076d6a83855d412885a29a7d142b6e
+PKG_SOURCE_URL:=https://github.com/wlanslovenija/tunneldigger.git
+PKG_SOURCE_VERSION:=b8fd97efbacfc0ec5d67b153bc83eb5dbc1cb1f9
+PKG_MIRROR_HASH:=46ab3898a94e92e0d157ecb7e07b523454c3802dd4cf6c64f7f80c5a99922297
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
