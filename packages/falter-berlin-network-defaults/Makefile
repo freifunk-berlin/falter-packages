@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-network-defaults
-PKG_VERSION:=1
+PKG_VERSION:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,7 +10,7 @@ define Package/falter-berlin-network-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin network default configuration
   URL:=http://github.com/Freifunk-Spalter/packages
-  EXTRA_DEPENDS:=falter-berlin-lib-guard, iwinfo, pingcheck
+  EXTRA_DEPENDS:=falter-berlin-lib-guard, pingcheck
   PKGARCH:=all
 endef
 
