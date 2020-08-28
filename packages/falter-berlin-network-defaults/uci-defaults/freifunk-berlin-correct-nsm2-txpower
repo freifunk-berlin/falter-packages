@@ -4,7 +4,7 @@
 # see https://github.com/freifunk-berlin/firmware/issues/381
 #
 
-[ ! $(which iwinfo) ] && exit 0
+[ ! $(command -v iwinfo) ] && exit 0
 iwinfo|grep -q 'NanoStation M2\|NanoStation Loco M2' || exit 0
 
 . /lib/functions/guard.sh
