@@ -1,0 +1,182 @@
+#!/bin/ash
+
+#load functions
+. /usr/share/libubox/jshn.sh
+. /usr/share/autoupdate/lib/libautoupdate.sh
+
+#load config file
+CLIENT_NAME=$(uci -q get autoupdate.backup.client_name)
+CLIENT_USER=$(uci -q get autoupdate.backup.client_user)
+CLIENT_PATH=$(uci -q get autoupdate.backup.client_path)
+
+ROUTER=$(uci -q get autoupdate.router.model)
+TYPE=$(uci -q get autoupdate.router.type)
+AUTO=$(uci -q get autoupdate.automode.automode)
+BRANCH=$(uci -q get autoupdate.automode.branch)
+
+JSON_LINK_SERVER=$(uci -q get autoupdate.internal.json_link_server)
+#LOG_FILE=$(uci -q get autoupdate.internal_settings.log_file)
+LAST_UPGR=$(uci -q get autoupdate.internal.last_upgr)
+#give domain name without slash on the end!
+DOMAIN=$(uci -q get autoupdate.internal.send_string_url)
+MIN_CERTS=$(uci -q get autoupdate.internal.minimum_signatures)
+
+#####################
+#                   #
+#   Programm Part   #
+#                   #
+#####################
+
+case $1 in
+-a)
+    ### automatic backup ###
+    if [ "$AUTO" = "on" -o "$AUTO" = "true" -o "$AUTO" = "1" -o "$AUTO" = "yes" ]; then
+        get_branch
+        #check for right configuration of source
+        if [ -z $JSON_LINK ]; then
+            echo "Cannot get a valid upgrade-branch. Did you used valid settings in /etc/config/autoupdate?"
+            logger -t "autoupdate" "ERROR: Cannot get upgrade-branch. Possibly wrong settings."
+        fi
+        get_def
+        if [ ! -e $PATH_JSON ]; then
+            echo "Link definition file cannot be downloaded. Internet connection might be lost."
+            logger -t "autoupdate" "ERROR: Link definition file cannot be downloaded."
+            exit 1
+        fi
+        verify_def
+        chk_upgr
+        do_auto_backup
+        get_router
+        get_type
+        get_link
+        get_bin
+        if [ ! -e $PATH_BIN ]; then
+            echo "sysupgrade.bin cannot be downloaded. Internet connection might be lost."
+            logger -t "autoupdate" "ERROR: sysupgrade.bin cannot be downloaded."
+            exit 1
+        fi
+        write_update_date
+        sysupgrade $PATH_BIN
+        logger -t "autoupdate" "ERROR: Update failed."
+        exit 1
+    fi
+
+    if [ "$AUTO" != "on" -o "$AUTO" != "true" -o "$AUTO" != "1" -o "$AUTO" != "yes" ]; then
+        echo "Automatic mode is set off in config file. Set it on in /etc/config/autoupdate "
+        exit 1
+    fi
+    ;;
+
+-m)
+    ### manual backup ###
+
+    get_branch
+    if [ -z $JSON_LINK ]; then
+        echo "Cannot get a valid upgrade-branch. Did you used valid settings in /etc/config/autoupdate?"
+        logger -t "autoupdate" "ERROR: Cannot get upgrade-branch. Possibly wrong settings."
+    fi
+
+    echo "Get the link definition file for $BRANCH ..."
+    get_def
+
+    if [ ! -e $PATH_JSON ]; then
+        echo "Link definition file cannot be downloaded. Internet connection might be lost."
+        echo ""
+        exit 1
+    else
+        echo "Completed."
+    fi
+
+    verify_def
+
+    #Check for upgrades
+    chk_upgr
+    #fetch router and tunnel-type
+    get_router
+    get_type
+
+    echo ""
+    echo "Router model is: $ROUTER"
+    echo "Routers uplink type is: $TYPE"
+    echo ""
+
+    read -p "Is that right? (y/n): " C
+    if [ "$C" = "n" ]; then
+        echo "Auto recognition failed. Please download the right firmware yourself."
+        echo ""
+        exit 1
+    fi
+
+    if [ "$C" != "y" -a "$C" != "n" ]; then
+        echo "Error: Input is neither 'y' nor 'n'"
+        until [ "$C" = "y" -o "$C" = "n" ]; do
+            read -p "Please give a valid value (y/n): " C
+            if [ "$C" = "n" ]; then
+                echo "Auto recognition failed. Please download the right firmware yourself."
+                exit 1
+            fi
+        done
+    fi
+
+    #get the right download link from json-file
+    get_link
+
+    echo "Get firmware file..."
+    wget $LINK -O $PATH_BIN
+
+    #check: was there a file downloaded?
+    if [ ! -f $PATH_BIN ]; then
+        echo "I didn't get a file at the given address..."
+        exit 1
+    fi
+
+    echo ""
+    read -p "Please confirm the upgrade by typing 'yes': " B
+    if [ "$B" != "yes" ]; then
+        echo "ERROR: Input is not 'yes'."
+        echo "You may upgrade your Router manually using:"
+        echo ""
+        echo "sysupgrade $PATH_BIN"
+        echo ""
+        echo "Extiting programm..."
+        exit 1
+    fi
+
+    echo ""
+    echo "Start flashing the image now."
+    write_update_date
+
+    sysupgrade $PATH_BIN
+    ;;
+
+-r)
+    remote_backup
+    ;;
+
+-s)
+    commit_routerstring
+    ;;
+
+-p)
+    get_router
+    get_type
+    echo ""
+    echo "router-string:  $ROUTER"
+    echo "uplink-type:    $TYPE"
+    echo ""
+    ;;
+
+*)
+    echo -e "
+Usage: autoupdate <option>
+
+Options:
+  -a	automatic mode
+  -m	manual mode (requires user interaction)
+
+  -p    print router-string and uplink-type
+  -r	do a remote backup
+  -s	send routerstring to the developers. (for maintenance of definition files)
+"
+    ;;
+esac

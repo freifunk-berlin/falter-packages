@@ -1,0 +1,10 @@
+unter /etc/init.d/sysfixtime ist ein script, dass beim Start die Systemzeit einstellt. Dazu liest es von allen Dateien
+unter /etc den Timestamp(Unixtime) ein und setzt die Uhrzeit auf den aktuellsten stamp.
+
+Lösungsansätze:
+* unmittelbar vor Update eine Datei unter /etc anlegen. <- die "Ausfallzeit" ist vernachlässigbar, da der Router kaum länger
+als drei Minuten mit dem sysupgrade beschäftigt sein wird. Also wird das upgrade-datum definitiv stimmen. Es müsste sichergestellt sein, dass sysfixtime schon gelaufen ist, bevor last_upgr gesetzt wird.
+
+* last_upgrade direkt vor sysupgrade setzen <- Blöd, falls Abfrage oder Sysupgrade fehlschlägt.
+
+* 

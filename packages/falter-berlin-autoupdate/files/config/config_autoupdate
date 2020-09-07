@@ -1,0 +1,19 @@
+config settings 'backup'
+        option client_name 'complete-hostname'
+        option client_user 'user'
+        option client_path '/complete/path/to/your/backups/'
+
+config settings 'router'
+        option model 'auto'
+        option type 'auto'
+
+config settings 'automode'
+        option automode 'false'
+        option branch 'release'
+
+config settings 'internal'
+        option json_link_server 'http://freifunk.pcfw.eu/'
+        option log_file '/root/autoupdate.log'
+        option send_string_url 'http://freifunk.pcfw.eu'
+        option minimum_signatures '4'
+        option last_upgr '1000000000'
