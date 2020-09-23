@@ -1,0 +1,10 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@olsrd2[-1]
+	add ucitrack olsrd2
+	set ucitrack.@olsrd2[-1].init=olsrd2
+	commit ucitrack
+EOF
+
+exit 0

@@ -1,0 +1,21 @@
+<h3><%:Legend%>:</h3>
+<ul>
+	<li><strong>Metric: </strong><%:Link metric as reported by OLSRD2%></li>
+	<li><strong>Link Status: </strong><%:Link status as reported by OLSRD2%></li>
+	<li style="list-style: none">
+	<ul>
+		<li><strong><span style="color:#00cc00"><%:Symmetric%></span></strong>:<%:Both link ends can hear each other%></li>
+		<li><strong><span style="color:#bb3333"><%:Heard%></span></strong>:<%:We only heard the other link end but they don&#39;t seem to be able to hear us%></li>
+	</ul>
+	</li>
+	<li><strong>SNR: </strong><%:Signal Noise Ratio in dB%></li>
+	<li style="list-style: none">
+	<ul>
+		<li><strong><span style="color:#00cc00"><%:Green%></span></strong>:<%:Very good (SNR > 30)%></li>
+		<li><strong><span style="color:#ffcb05"><%:Yellow%></span></strong>:<%:Good (30 > SNR > 20)%></li>
+		<li><strong><span style="color:#ff6600"><%:Orange%></span></strong>:<%:Still usable (20 > SNR > 5)%></li>
+		<li><strong><span style="color:#bb3333"><%:Red%></span></strong>:<%:Bad (SNR < 5)%></li>
+	</ul>
+	</li>
+</ul>
+

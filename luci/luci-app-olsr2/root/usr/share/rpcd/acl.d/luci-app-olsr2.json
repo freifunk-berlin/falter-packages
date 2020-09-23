@@ -1,0 +1,11 @@
+{
+	"luci-app-olsr2": {
+		"description": "Grant UCI access for luci-app-olsr2",
+		"read": {
+			"uci": [ "luci_olsr2", "olsrd2" ]
+		},
+		"write": {
+			"uci": [ "luci_olsr2", "olsrd2" ]
+		}
+	}
+}
