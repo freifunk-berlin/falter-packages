@@ -16,15 +16,15 @@ function index()
     entry({"admin", "freifunk"}, firstchild(), "Freifunk", 5).dependent=false
   end
   entry({"admin", "freifunk", "assistent"}, call("prepare"), "Freifunkassistent", 1).dependent=false
-  entry({"admin", "freifunk", "assistent", "changePassword"}, form("freifunk/assistent/changePassword"), "",1)
-  entry({"admin", "freifunk", "assistent", "generalInfo"}, form("freifunk/assistent/generalInfo"), "", 1)
-  entry({"admin", "freifunk", "assistent", "decide"}, template("freifunk/assistent/decide"), "", 2)
-  entry({"admin", "freifunk", "assistent", "sharedInternet"}, form("freifunk/assistent/shareInternet"), "", 10)
-  entry({"admin", "freifunk", "assistent", "wireless"}, form("freifunk/assistent/wireless"), "", 20)
-  entry({"admin", "freifunk", "assistent", "optionalConfigs"}, form("freifunk/assistent/optionalConfigs"), "", 20)
-  entry({"admin", "freifunk", "assistent", "applyChanges"}, call("commit"), "", 100)
-  entry({"admin", "freifunk", "assistent", "reboot"}, template("freifunk/assistent/reboot"), "", 101)
-  entry({"admin", "freifunk", "assistent", "cancel"}, call("reset"), "", 102)
+  entry({"admin", "freifunk", "assistent", "changePassword"}, form("freifunk/assistent/changePassword"), nil,1)
+  entry({"admin", "freifunk", "assistent", "generalInfo"}, form("freifunk/assistent/generalInfo"), nil, 1)
+  entry({"admin", "freifunk", "assistent", "decide"}, template("freifunk/assistent/decide"), nil, 2)
+  entry({"admin", "freifunk", "assistent", "sharedInternet"}, form("freifunk/assistent/shareInternet"), nil, 10)
+  entry({"admin", "freifunk", "assistent", "wireless"}, form("freifunk/assistent/wireless"), nil, 20)
+  entry({"admin", "freifunk", "assistent", "optionalConfigs"}, form("freifunk/assistent/optionalConfigs"), nil, 20)
+  entry({"admin", "freifunk", "assistent", "applyChanges"}, call("commit"), nil, 100)
+  entry({"admin", "freifunk", "assistent", "reboot"}, template("freifunk/assistent/reboot"), nil, 101)
+  entry({"admin", "freifunk", "assistent", "cancel"}, call("reset"), nil, 102)
 end
 
 function prepare()
