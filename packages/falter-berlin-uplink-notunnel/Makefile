@@ -1,38 +1,29 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=falter-berlin-uplink-notunnel-files
+PKG_NAME:=falter-berlin-uplink-notunnel
 PKG_VERSION:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/$(PKG_NAME)
-  SECTION:=falter-berlin
-  CATEGORY:=falter-berlin
-  TITLE:=Freifunk Berlin no tunnel files
-  URL:=http://github.com/freifunk-berlin/packages_berlin
-  EXTRA_DEPENDS:=falter-berlin-lib-guard, kmod-veth, falter-berlin-network-defaults, pingcheck
-  PROVIDES:=falter-berlin-uplink
-  PKGARCH:=all
+Build/Compile=
+
+define Package/falter-berlin-uplink-notunnel
+	SECTION:=falter-berlin
+	CATEGORY:=falter-berlin
+	TITLE:=Freifunk Berlin no tunnel files
+	URL:=http://github.com/freifunk-berlin/packages_berlin
+	EXTRA_DEPENDS:=falter-berlin-lib-guard, kmod-veth, falter-berlin-network-defaults, pingcheck
+	PROVIDES:=falter-berlin-uplink
+	PKGARCH:=all
 endef
 
-define Package/$(PKG_NAME)/description
-  Freifunk Berlin files to setup a uplink without any
-  tunnel.
-  upstream traffic will be directly routed via your network
+define Package/falter-berlin-uplink-notunnel/description
+  Freifunk Berlin files to setup a uplink without any tunnel.
+  Upstream traffic will be directly routed via your network.
 endef
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-endef
-
-define Build/Configure
-endef
-
-define Build/Compile
-endef
-
-define Package/$(PKG_NAME)/install
+define Package/falter-berlin-uplink-notunnel/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(CP) ./uci-defaults/* $(1)/etc/uci-defaults
 	$(INSTALL_DIR) $(1)/etc/pingcheck/online.d
@@ -41,4 +32,4 @@ define Package/$(PKG_NAME)/install
 	$(CP) ./files/etc/pingcheck/offline.d/* $(1)/etc/pingcheck/offline.d
 endef
 
-$(eval $(call BuildPackage,$(PKG_NAME)))
+$(eval $(call BuildPackage,falter-berlin-uplink-notunnel))
