@@ -5,6 +5,12 @@ source /lib/functions/semver.sh
 source /etc/openwrt_release
 source /lib/functions/guard.sh
 
+if [ -f /etc/freifunk_release ]; then 
+  source /etc/freifunk_release
+  DISTRIB_ID="Freifunk Berlin"
+  DISTRIB_RELEASE=$FREIFUNK_RELEASE
+fi
+
 # possible cases: 
 # 1) firstboot with kathleen --> uci system.version not defined
 # 2) upgrade from kathleen --> uci system.version defined
