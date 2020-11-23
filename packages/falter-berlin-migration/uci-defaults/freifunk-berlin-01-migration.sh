@@ -527,6 +527,27 @@ r1_1_0_statistics_server() {
     uci set luci_statistics.\@collectd_network_server\[0\].host=monitor.berlin.freifunk.net
 }
 
+r1_1_0_openwrt_19_07_updates() {
+  log "performing updates to openwrt 19.07."
+  uci set dhcp.@dnsmasq[0].nonwildcard="1"
+  uci set dhcp.odhcpd.loglevel="4"
+  uci set luci.main.uvuspath="/ubus/"
+  uci set luci.apply="internal"
+  uci set luci.apply.rollback="90"
+  uci set luci.apply.holdoff="4"
+  uci set luci.apply.timeout="5"
+  uci set luci.apply.display="1.5"
+  uci set luci.diag.dns="openwrt.org"
+  uci set luci.diag.ping="openwrt.org"
+  uci set luci.diag.route="openwrt.org"
+  rpcd=i$(uci add rpcd rpcd)
+  uci set rpcd.@rpcd[-1].socket="/var/run/ubus.sock"
+  uci set rpcd.@rpcd[-1].timeout="30"
+  uci add_list uhttpd.main.lua_prefix="/cgi-bin/luci=/usr/lib/lua/luci/sgi/uhttpd.lua"
+}
+
+
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -599,6 +620,7 @@ migrate () {
     r1_1_0_remove_olsrd_garbage_collection
     r1_1_0_firewall_remove_advanced
     r1_1_0_statistics_server
+    r1_1_0_openwrt_19_07_updates
   fi
 
   # overwrite version with the new version
