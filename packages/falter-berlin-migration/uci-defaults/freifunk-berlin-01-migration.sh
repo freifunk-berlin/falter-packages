@@ -520,6 +520,13 @@ r1_1_0_firewall_remove_advanced() {
   config_foreach firewall_remove_advanced advanced
 }
 
+r1_1_0_statistics_server() {
+  log "Setting the statistcs server to \"monitor.berlin.freifunk.net\"."
+  local result=$(uci -q get luci_statistics.\@collectd_network_server\[0\].host)
+  [ $? -eq 0 ] && [ $result == "77.87.48.12" ] && \
+    uci set luci_statistics.\@collectd_network_server\[0\].host=monitor.berlin.freifunk.net
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -591,6 +598,7 @@ migrate () {
     r1_1_0_update_uplink_notunnel_name
     r1_1_0_remove_olsrd_garbage_collection
     r1_1_0_firewall_remove_advanced
+    r1_1_0_statistics_server
   fi
 
   # overwrite version with the new version
