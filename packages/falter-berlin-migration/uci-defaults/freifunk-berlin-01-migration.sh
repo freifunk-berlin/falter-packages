@@ -63,6 +63,29 @@ else
   exit 0
 fi
 
+migrate_profiles() {
+  # migrate to the latest /etc/config/profile_* and /etc/config/freifunk
+  log "Updating Community-Profiles."
+  cp /rom/etc/config/profile_* /etc/config
+
+  log "Importing updates to /etc/config/freifunk"
+  CONTACT=$(uci show freifunk.contact)
+  COMMUNITY=$(uci show freifunk.community)
+  cp /rom/etc/config/freifunk /etc/config
+  OLDIFS=$IFS
+  IFS=$'\n'
+  for i in $CONTACT $COMMUNITY; do
+    key=$(echo $i | cut -d = -f 1)
+    val=$(echo $i | cut -d = -f 2)
+    val=$(echo $val | sed s/\'//g)
+    if [ $val != "defaults" ] ; then
+      uci set $key=${val}
+    fi
+  done
+  IFS=$OLDIFS
+  uci commit freifunk
+}
+
 update_openvpn_remote_config() {
   # use dns instead of ips for vpn servers (introduced with 0.1.0)
   log "Setting openvpn.ffvpn.remote to vpn03.berlin.freifunk.net"
@@ -499,6 +522,9 @@ r1_1_0_firewall_remove_advanced() {
 
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
+
+  # always use the most recent profiles
+  migrate_profiles
 
   if semverLT ${OLD_VERSION} "0.1.0"; then
     update_openvpn_remote_config
