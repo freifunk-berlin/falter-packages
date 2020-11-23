@@ -499,7 +499,7 @@ r1_1_0_update_dns_entry() {
   }
   reset_cb
   config_load network
-  config_foreach network_interface_delete_dns Interface
+  config_foreach network_interface_delete_dns interface
   uci set network.loopback.dns="$(uci get "profile_$(uci get freifunk.community.name).interface.dns")"
 }
 
