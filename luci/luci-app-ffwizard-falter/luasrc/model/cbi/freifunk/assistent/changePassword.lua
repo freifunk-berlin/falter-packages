@@ -1,12 +1,5 @@
 local uci = require "luci.model.uci".cursor()
 
-local fftools = require "luci.tools.freifunk.assistent.tools"
-
--- check to see if the pw is already set
-if uci:get("ffwizard","settings","runbefore") and fftools.hasRootPass() then
-  luci.http.redirect(luci.dispatcher.build_url("admin/status/overview"))
-end
-
 f = SimpleForm("ffwizward", "", "")
 --change button texts
 f.submit = "Next"
