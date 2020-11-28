@@ -16,15 +16,25 @@ function index()
     entry({"admin", "freifunk"}, firstchild(), "Freifunk", 5).dependent=false
   end
   entry({"admin", "freifunk", "assistent"}, call("prepare"), "Freifunkassistent", 1).dependent=false
-  entry({"admin", "freifunk", "assistent", "changePassword"}, form("freifunk/assistent/changePassword"), nil,1)
-  entry({"admin", "freifunk", "assistent", "generalInfo"}, form("freifunk/assistent/generalInfo"), nil, 1)
-  entry({"admin", "freifunk", "assistent", "decide"}, template("freifunk/assistent/decide"), nil, 2)
+  entry({"admin", "freifunk", "assistent", "startWizard"}, form("freifunk/assistent/startWizard"), nil, 1)
+  entry({"admin", "freifunk", "assistent", "changePassword"}, form("freifunk/assistent/changePassword"), nil,5)
+  entry({"admin", "freifunk", "assistent", "generalInfo"}, form("freifunk/assistent/generalInfo"), nil, 6)
+  entry({"admin", "freifunk", "assistent", "decide"}, template("freifunk/assistent/decide"), nil, 7)
   entry({"admin", "freifunk", "assistent", "sharedInternet"}, form("freifunk/assistent/shareInternet"), nil, 10)
   entry({"admin", "freifunk", "assistent", "wireless"}, form("freifunk/assistent/wireless"), nil, 20)
   entry({"admin", "freifunk", "assistent", "optionalConfigs"}, form("freifunk/assistent/optionalConfigs"), nil, 20)
   entry({"admin", "freifunk", "assistent", "applyChanges"}, call("commit"), nil, 100)
   entry({"admin", "freifunk", "assistent", "reboot"}, template("freifunk/assistent/reboot"), nil, 101)
   entry({"admin", "freifunk", "assistent", "cancel"}, call("reset"), nil, 102)
+
+  -- add the upgrades
+  local upgradesDir = "/usr/lib/lua/luci/model/cbi/freifunk/upgrades/"
+  for upgrade in nixio.fs.glob(upgradesDir.."*") do
+    local upgradeName = string.gsub(upgrade,upgradesDir,"")
+    upgradeName = string.gsub(upgradeName,".lua","")
+    entry({"admin", "freifunk", "upgrades", upgradeName}, form("freifunk/upgrades/"..upgradeName), nil, 500)
+  end
+
 end
 
 function prepare()
@@ -35,7 +45,7 @@ function prepare()
     uci:commit("ffwizard")
   end
   if not uci:get("ffwizard","settings","runbefore") and not fftools.hasRootPass() then
-    luci.http.redirect(luci.dispatcher.build_url("admin/freifunk/assistent/changePassword"))
+    luci.http.redirect(luci.dispatcher.build_url("admin/freifunk/assistent/startWizard"))
   else
     luci.http.redirect(luci.dispatcher.build_url("admin/freifunk/assistent/generalInfo"))
   end
