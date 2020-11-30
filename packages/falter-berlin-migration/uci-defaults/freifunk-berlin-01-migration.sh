@@ -546,7 +546,23 @@ r1_1_0_openwrt_19_07_updates() {
   uci add_list uhttpd.main.lua_prefix="/cgi-bin/luci=/usr/lib/lua/luci/sgi/uhttpd.lua"
 }
 
+r1_1_0_wifi_iface_names() {
+  local count=0
+  wifi_set_name() {
+    local config=${1}
+    # skip if there is already a name for this section
+    [ $(echo ${config%%[0-9]*}) != "cfg" ] && return
 
+    # determine a name for this section
+    local ifname=$(uci -q get wireless.${config}.ifname)
+    [ "X${ifname}X" == "XX" ] && ifname="wifinet${count}"
+    ifname=$(echo $ifname | sed -e 's/-/_/g')
+    uci -q rename wireless.$config=$ifname
+    let "count=count+1"
+  }
+  config_load wireless
+  config_foreach wifi_set_name wifi-iface
+}
 
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
@@ -621,6 +637,7 @@ migrate () {
     r1_1_0_firewall_remove_advanced
     r1_1_0_statistics_server
     r1_1_0_openwrt_19_07_updates
+    r1_1_0_wifi_iface_names
   fi
 
   # overwrite version with the new version
