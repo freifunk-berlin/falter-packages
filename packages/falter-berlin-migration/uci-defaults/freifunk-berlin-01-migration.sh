@@ -564,6 +564,28 @@ r1_1_0_wifi_iface_names() {
   config_foreach wifi_set_name wifi-iface
 }
 
+r1_1_0_ffwizard() {
+  log "adding new fields to ffwizard"
+  uci set ffwizard.upgrade="upgrade"
+
+  # add the new meshmode_$device field to settings
+  handle_wifi_iface() {
+    local config=$1
+    local mode=''
+    local device=''
+    config_get mode $config mode
+    config_get device $config device
+    [ $mode == "mesh" ] && mode="80211s"
+    [ $mode != "adhoc" ] && [ $mode != "80211s" ] && return
+
+    uci set ffwizard.settings.meshmode_${device}=${mode}
+  }
+
+  reset_cb
+  config_load wireless
+  config_foreach handle_wifi-iface wifi-iface
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -638,6 +660,7 @@ migrate () {
     r1_1_0_statistics_server
     r1_1_0_openwrt_19_07_updates
     r1_1_0_wifi_iface_names
+    r1_1_0_ffwizard
   fi
 
   # overwrite version with the new version
