@@ -98,6 +98,17 @@ function commit()
     uci:save("system")
   end
 
+  -- set the lastUpgrade
+  local upgradesDir = "/usr/lib/lua/luci/model/cbi/freifunk/upgrades/"
+  local upgradeName = ""
+  for upgrade in nixio.fs.glob(upgradesDir.."*") do
+    upgradeName = string.gsub(upgrade,upgradesDir,"")
+    upgradeName = string.gsub(upgradeName,".lua","")
+  end
+  uci:set("ffwizard", "upgrade", "upgrade")
+  uci:set("ffwizard", "upgrade", "lastUpgrade", upgradeName)
+  uci:save("ffwizard")
+
   firewall.configureFirewall()
 
   olsr.configureOLSR()
