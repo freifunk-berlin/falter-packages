@@ -531,7 +531,7 @@ r1_1_0_openwrt_19_07_updates() {
   log "performing updates to openwrt 19.07."
   uci set dhcp.@dnsmasq[0].nonwildcard="1"
   uci set dhcp.odhcpd.loglevel="4"
-  uci set luci.main.uvuspath="/ubus/"
+  uci set luci.main.ubuspath="/ubus/"
   uci set luci.apply="internal"
   uci set luci.apply.rollback="90"
   uci set luci.apply.holdoff="4"
