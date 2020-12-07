@@ -176,6 +176,7 @@ function main.write(self, section, value)
       end
       local ifconfig = tools.getMergedConfig(mergeList, "defaults", ifaceSection)
       local ifnameMesh = calcifcfg(device).."-"..ifconfig.mode.."-"..pre
+      local secName = calcifcfg(device).."_"..ifconfig.mode.."_"..pre
       ifconfig.device = device
       ifconfig.network = calcnif(device)
       ifconfig.ifname = ifnameMesh
@@ -183,7 +184,7 @@ function main.write(self, section, value)
         ifconfig.ssid = uci:get(community, "ssidscheme", devconfig.channel)
         ifconfig.bssid = uci:get(community, "bssidscheme", devconfig.channel)
       end
-      uci:section("wireless", "wifi-iface", nil, ifconfig)
+      uci:section("wireless", "wifi-iface", secName, ifconfig)
       if statistics_installed then
         tools.statistics_interface_add("collectd_iwinfo", ifnameMesh)
         tools.statistics_interface_add("collectd_interface", ifnameMesh)
@@ -202,7 +203,8 @@ function main.write(self, section, value)
       --WIRELESS CONFIG ap
       if vap == "1" then
         local ifnameAp = calcifcfg(device).."-dhcp-"..pre
-        uci:section("wireless", "wifi-iface", nil, {
+        local secName = calcifcfg(device).."_dhcp_"..pre
+        uci:section("wireless", "wifi-iface", secName, {
           device=device,
           mode="ap",
           encryption="none",
