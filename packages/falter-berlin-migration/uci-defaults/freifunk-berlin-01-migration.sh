@@ -544,6 +544,36 @@ r1_1_0_openwrt_19_07_updates() {
   uci set rpcd.@rpcd[-1].socket="/var/run/ubus.sock"
   uci set rpcd.@rpcd[-1].timeout="30"
   uci add_list uhttpd.main.lua_prefix="/cgi-bin/luci=/usr/lib/lua/luci/sgi/uhttpd.lua"
+  uci set defaults.default.system="1"
+  uci del system.ntp.server
+  uci add_list system.ntp.server="0.openwrt.pool.ntp.org"
+  uci add_list system.ntp.server="1.openwrt.pool.ntp.org"
+  uci add_list system.ntp.server="2.openwrt.pool.ntp.org"
+  uci add_list system.ntp.server="3.openwrt.pool.ntp.org"
+  uci set system.ntp.use_dhcp="0"
+  uci set uhttpd.defaults.key_type="rsa"
+  uci set uhttpd.defaults.ec_curve="P-256"
+  uci set uhttpd.defaults.commonname="Freifunk-Falter"
+  uci commit uhttpd
+  /etc/init.d/uhttpd restart
+
+  function handle_ucitrack_system() {
+    local config=${1}
+    uci set ucitrack.${config}.exec="/etc/init.d/log reload"
+    uci add_list ucitrack.${config}.affects="dhcp"
+  }
+  reset_cb
+  config_load ucitrack
+  config_foreach handle_ucitrack_system system
+
+  function handle_ucitrack_fstab() {
+    local config=${1}
+    uci delete ucitrack.${config}.init
+    uci set ucitrack.${config}.exec="/sbin/block mount"
+  }
+  reset_cb
+  config_load ucitrack
+  config_foreach handle_ucitrack_fstab fstab
 }
 
 r1_1_0_wifi_iface_names() {
