@@ -4,6 +4,20 @@ local uci = require "luci.model.uci".cursor()
 
 module("luci.tools.freifunk.assistent.tools", package.seeall)
 
+function wifi_get_mesh_modes(device)
+	local modes = {}
+	local phy = string.gsub(device, "radio", "phy")
+	local iwOutput = sys.exec("iw phy "..phy.." info | grep -A1 \"valid interface combination\" | tail -1")
+	if string.find(iwOutput, "mesh point") then
+		modes["80211s"] = true;
+	end
+	if string.find(iwOutput, "IBSS") then
+		modes["adhoc"] = true;
+	end
+
+	return modes
+end
+
 -- Deletes all references of a wifi device
 function wifi_delete_ifaces(device)
 	local cursor = uci.cursor()
