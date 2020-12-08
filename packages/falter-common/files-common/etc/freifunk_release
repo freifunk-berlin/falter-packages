@@ -1,0 +1,3 @@
+FREIFUNK_RELEASE='1.2.0-snapshot'
+FREIFUNK_OPENWRT_BASE='master'
+
