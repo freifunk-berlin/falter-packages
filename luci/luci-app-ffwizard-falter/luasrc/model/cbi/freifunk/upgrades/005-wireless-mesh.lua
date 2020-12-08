@@ -40,10 +40,18 @@ uci:foreach("wireless", "wifi-device",
             ((ifaceSection["mode"] == "adhoc") and "Ad-Hoc" or "802.11s") ..
             "</strong>. The current default setup is 802.11s.  Please select " ..
             " how to use this device in the future. "))
-        meshmode.widget="radio"
-        meshmode:value("80211s", "802.11s")
-        meshmode:value("adhoc", translate("Ad-Hoc (outdated)"))
-        meshmode.default = "80211s" -- ifaceSection["mode"]
+        meshmode.widget = "radio"
+        local supportedModes = fftools.wifi_get_mesh_modes(device)
+        if supportedModes["80211s"] == true then
+          meshmode:value("80211s", "802.11s")
+          meshmode.default = "80211s"
+        end
+        if supportedModes["adhoc"] == true then
+          meshmode:value("adhoc", translate("Ad-Hoc (outdated)"))
+          if supportedModes["80211s"] ~= true then
+            meshmode.default = "adhoc"
+          end
+        end
         wifi_tbl[device]["oldmeshmode"] = ifaceSection["mode"]
         wifi_tbl[device]["newmeshmode"] = meshmode
       end)
