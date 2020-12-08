@@ -39,7 +39,7 @@ uci:foreach("wireless", "wifi-device",
             translate("The " .. devicename .. " device is currently set to <strong>" .. 
             ((ifaceSection["mode"] == "adhoc") and "Ad-Hoc" or "802.11s") ..
             "</strong>. The current default setup is 802.11s.  Please select " ..
-            " how to use this device in the future. "))
+            "how to use this device in the future. "))
         meshmode.widget = "radio"
         local supportedModes = fftools.wifi_get_mesh_modes(device)
         if supportedModes["80211s"] == true then
