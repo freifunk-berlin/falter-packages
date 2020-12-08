@@ -57,9 +57,19 @@ uci:foreach("wireless", "wifi-device",
     end
     wifi_tbl[device]["meship"] = meship
 
+    local supportedModes = tools.wifi_get_mesh_modes(device)
     local meshmode = f:field(ListValue, "mode_" .. device, "Mesh Mode", "")
-    meshmode:value("80211s", "802.11s")
-    meshmode:value("adhoc", "Ad-Hoc (veraltet)")
+    meshmode.widget = "radio"
+    if supportedModes["80211s"] == true then
+      meshmode:value("80211s", "802.11s")
+      meshmode.default = "80211s"
+    end
+    if supportedModes["adhoc"] == true then
+      meshmode:value("adhoc", "Ad-Hoc (veraltet)")
+      if supportedModes["80211s"] ~= true then
+        meshmode.default = "adhoc"
+      end
+    end
     function meshmode.cfgvalue(self, section)
       return uci:get("ffwizard", "settings", "meshmode_" .. device)
     end
