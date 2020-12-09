@@ -98,6 +98,11 @@ function index()
 	page.title  = _("Index Page")
 	page.order  = 25
 
+	page        = node("admin", "freifunk", "wireless-mesh")
+	page.target = cbi("freifunk/wireless-mesh", {hideapplybtn=true})
+	page.title  = _("Wireless Mesh")
+	page.order  = 30
+
 	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
 	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
 	entry({"admin", "freifunk", "profile_error"}, template("freifunk/profile_error"))
