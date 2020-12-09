@@ -88,15 +88,15 @@ function index()
 	page.title  = _("Profile (Expert)")
 	page.order  = 20
 
-	page        = node("admin", "freifunk", "Index-Page")
-	page.target = cbi("freifunk/user_index")
-	page.title  = _("Index Page")
-	page.order  = 50
-
 	page        = node("admin", "freifunk", "contact")
 	page.target = cbi("freifunk/contact")
 	page.title  = _("Contact")
 	page.order  = 15
+
+	page        = node("admin", "freifunk", "Index-Page")
+	page.target = cbi("freifunk/user_index")
+	page.title  = _("Index Page")
+	page.order  = 25
 
 	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
 	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
