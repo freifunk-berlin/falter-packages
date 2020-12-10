@@ -3,11 +3,14 @@ local uci = require "luci.model.uci".cursor()
 
 f = SimpleForm("wireless", translate("Update Wireless-Mesh Settings"),
   translate("The wireless interfaces which are built into the router can " ..
-    "mesh with other routers using either Ad-Hoc or 802.11s.  <strong> " ..
-    "802.11s is now the standard used.</strong>  But not all routers (or " ..
-    "their drivers) support this new standard.  Also, if this router " ..
-    "currently meshes with Ad-Hoc then changing it to 802.11s would cause " ..
-    "connectivity loss.  Please select which protocol to use."))
+    "mesh with other routers using either Ad-Hoc or 802.11s. <strong>" ..
+    "802.11s is now the standard used.</strong> Some routers (or " ..
+    "their drivers) might not support this new standard. Also, if this " ..
+    "router currently meshes with Ad-Hoc then changing it to 802.11s would " ..
+    "cause connectivity loss. Please contact your mesh neighbors to switch " ..
+    "to 802.11s collectively. Please select which protocol to use. <em>The " ..
+    "menu entry <strong>Freifunk->Wireless Mesh</strong> can be visited at " ..
+    "a later time to change these settings.</em>"))
 
 local wifi_tbl = {}
 
