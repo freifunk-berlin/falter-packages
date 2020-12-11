@@ -11,8 +11,9 @@ uci set network.lan.ipaddr=192.168.42.1
 uci set network.wan.peerdns=0
 uci set network.wan6.peerdns=0
 
-# setup wan as bridge
+# setup wan as bridge and default to dhcp (prevents 'missing protocol')
 uci set network.wan.type=bridge
+uci set network.wan.proto=dhcp
 
 # add tunl0 interface - tunl0 is the ipip tunnel interface for the olsr
 # SmartGateway plugin
