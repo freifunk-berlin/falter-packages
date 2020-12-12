@@ -78,4 +78,9 @@ uci set luci_statistics.$NETWORK.host=monitor.berlin.freifunk.net
 uci set luci_statistics.collectd_network=statistics
 uci set luci_statistics.collectd_network.enable=1
 
+# mod dhcpleases
+uci set luci_statistics.collectd_dhcpleases=statistics
+uci set luci_statistics.collectd_dhcpleases.enable=0
+uci set luci_statistics.collectd_dhcpleases.Path=/tmp/dhcp.leases
+
 uci commit luci_statistics
