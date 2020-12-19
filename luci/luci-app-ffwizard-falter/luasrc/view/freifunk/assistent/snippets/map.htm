@@ -19,8 +19,8 @@ var initMap = function() {
 
   // init click handler
   var popup = L.popup();
-  var inputLat = document.getElementById('cbid.ffwizward.1.lat');
-  var inputLng = document.getElementById('cbid.ffwizward.1.lon');
+  var inputLat = document.getElementById('widget.cbid.ffwizward.1.lat');
+  var inputLng = document.getElementById('widget.cbid.ffwizward.1.lon');
   function onMapClick(e) {
       popup.setLatLng(e.latlng)
            .setContent(e.latlng.lat.toString() + ', ' + e.latlng.lng.toString())
