@@ -77,6 +77,21 @@ function get_version()
 	if _G.DISTRIB_REVISION then
 		distrev = _G.DISTRIB_REVISION
 	end
+
+        -- override with values from /etc/freifunk_release if possible          
+        if nixio.fs.access("/etc/freifunk_release") then                        
+                dofile("/etc/freifunk_release")                                 
+                if _G.FREIFUNK_DISTRIB_ID then                                  
+                        distname = _G.FREIFUNK_DISTRIB_ID             
+                end                                                             
+                if _G.FREIFUNK_RELEASE then                           
+                        distrel = _G.FREIFUNK_RELEASE                      
+                end                                                             
+                if _G.FREIFUNK_REVISION then                                    
+                        distrev = _G.FREIFUNK_REVISION                       
+                end                                                             
+        end                                                                     
+
 	version['distname'] = distname
 	version['distrevision'] = distrev
 	return version
