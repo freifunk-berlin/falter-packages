@@ -60,7 +60,6 @@ define Build/Configure
 endef
 
 define Build/Compile
-	$(MAKE) -C $(PKG_BUILD_DIR)/luasrc
 endef
 
 define Package/luci-app-falter-owm-cmd/postinst
