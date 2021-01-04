@@ -48,8 +48,11 @@ endef
 define Build/Compile
 endef
 
+FALTER_REVISION:=$(shell git -C $(TOPDIR)/feeds/falter rev-parse --short HEAD)
+
 define Package/falter-common/install
 	$(CP) ./files-common/* $(1)/
+	$(SED) 's,%R,$(FALTER_REVISION),g' $(1)/etc/freifunk_release
 endef
 
 define Package/falter-common-olsr/install
