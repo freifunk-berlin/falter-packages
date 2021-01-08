@@ -64,15 +64,16 @@ end
 --         	(DISTRIB_REVISION)
 function get_version()
 	local distname = ""
+	local distrel = ""
 	local distrev = ""
 	local version = {}
 
 	dofile("/etc/openwrt_release")
 	if _G.DISTRIB_ID then
-		distname = _G.DISTRIB_ID .. " "
+		distname = _G.DISTRIB_ID
 	end
 	if _G.DISTRIB_RELEASE then
-		distname = distname .. _G.DISTRIB_RELEASE
+		distrel = _G.DISTRIB_RELEASE
 	end
 	if _G.DISTRIB_REVISION then
 		distrev = _G.DISTRIB_REVISION
@@ -92,7 +93,7 @@ function get_version()
                 end                                                             
         end                                                                     
 
-	version['distname'] = distname
+	version['distname'] = distname .. " " .. distrel
 	version['distrevision'] = distrev
 	return version
 end
