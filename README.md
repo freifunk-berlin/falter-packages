@@ -10,3 +10,4 @@ Just add following line to `feeds.conf`
 
 TESTCHANGE for BUILDBOT!!11!!!!!
 asdfasdfa
+sadfasdfas
