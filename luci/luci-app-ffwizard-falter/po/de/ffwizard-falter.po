@@ -1,0 +1,96 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+"Last-Translator: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Language: de\n"
+
+#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/ffwizard-berlin.json:3
+msgid "Access some status information without login"
+msgstr "Greife auf manche Status-Informationen ohne Login zu"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:53
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:54
+msgid "Ad-Hoc (outdated)"
+msgstr "Ad-Hoc (veraltet)"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:24
+msgid "Confirmation"
+msgstr "Bestätigen"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
+msgid "Local Certificate"
+msgstr "Lokales Zertifikat"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
+msgid "Local Key"
+msgstr "Lokaler Schlüssel"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
+msgid "Password"
+msgstr "Passwort"
+
+#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
+msgid "Super user access role"
+msgstr "Administratorenzugriff"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:43
+msgid "The"
+msgstr "Das"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:8
+msgid ""
+"The wireless interfaces which are built into the router can mesh with other "
+"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
+"used.</strong> Some routers (or their drivers) might not support this new "
+"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
+"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
+"to switch to 802.11s collectively. Please select which protocol to use."
+msgstr ""
+"Der Router kann mit anderen Routern entweder über Ad-Hoc oder 802.11s "
+"meshen. <strong>802.11s ist der aktuelle Standard.</strong> Einige Router "
+"(bzw. ihre Treiber) unterstützen diesen neuen Standard möglicherweise nicht. "
+"Wenn dieser Router derzeit über Ad-Hoc mesht, würde die Änderung auf 802.11s "
+"zu Verbindungsverlusten führen. Bitte wende dich an deine Mesh-Nachbarn, um "
+"gemeinsam zu 802.11s zu wechseln. Bitte wähle aus, welches Protokoll "
+"verwendet werden soll."
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:5
+msgid ""
+"The wireless interfaces which are built into the router can mesh with other "
+"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
+"used.</strong> Some routers (or their drivers) might not support this new "
+"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
+"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
+"to switch to 802.11s collectively. Please select which protocol to use. "
+"<em>The menu entry <strong>Freifunk->Wireless Mesh</strong> can be visited "
+"at a later time to change these settings.</em>"
+msgstr ""
+"Der Router kann mit anderen Routern entweder über Ad-Hoc oder 802.11s "
+"meshen. <strong>802.11s ist der aktuelle Standard.</strong> Einige Router "
+"(bzw. ihre Treiber) unterstützen diesen neuen Standard möglicherweise nicht. "
+"Wenn dieser Router derzeit über Ad-Hoc mesht, würde die Änderung auf 802.11s "
+"zu Verbindungsverlusten führen. Bitte wende dich an deine Mesh-Nachbarn, um "
+"gemeinsam zu 802.11s zu wechseln. Bitte wähle aus, welches Protokoll "
+"verwendet werden soll. <em>Du kannst diese Änderungen auch später über die "
+"Seite <strong>Freifunk->WLAN-Mesh-Einstellungen</strong> vornehmen.</em>"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
+msgid "Update Wireless-Mesh Settings"
+msgstr "Aktualisiere WLAN-Mesh Einstellungen"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:7
+msgid "Wireless Mesh Settings"
+msgstr "WLAN-Mesh-Einstellungen"
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:4
+msgid "Wireless-Mesh Settings"
+msgstr "WLAN-Mesh-Einstellungen"

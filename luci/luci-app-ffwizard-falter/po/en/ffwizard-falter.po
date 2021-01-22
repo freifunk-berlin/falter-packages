@@ -1,0 +1,70 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/ffwizard-berlin.json:3
+msgid "Access some status information without login"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:53
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:54
+msgid "Ad-Hoc (outdated)"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:24
+msgid "Confirmation"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
+msgid "Local Certificate"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
+msgid "Local Key"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
+msgid "Password"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
+msgid "Super user access role"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:43
+msgid "The"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:8
+msgid ""
+"The wireless interfaces which are built into the router can mesh with other "
+"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
+"used.</strong> Some routers (or their drivers) might not support this new "
+"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
+"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
+"to switch to 802.11s collectively. Please select which protocol to use."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:5
+msgid ""
+"The wireless interfaces which are built into the router can mesh with other "
+"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
+"used.</strong> Some routers (or their drivers) might not support this new "
+"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
+"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
+"to switch to 802.11s collectively. Please select which protocol to use. "
+"<em>The menu entry <strong>Freifunk->Wireless Mesh</strong> can be visited "
+"at a later time to change these settings.</em>"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
+msgid "Update Wireless-Mesh Settings"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:7
+msgid "Wireless Mesh Settings"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:4
+msgid "Wireless-Mesh Settings"
+msgstr ""
