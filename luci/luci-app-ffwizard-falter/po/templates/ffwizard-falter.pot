@@ -10,8 +10,111 @@ msgstr ""
 msgid "Ad-Hoc (outdated)"
 msgstr ""
 
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:10
+msgid ""
+"Als naechstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte die "
+"IPs bereit, die du ueber den Wizard von config.berlin.freifunk.net bekommen "
+"hast."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:19
+msgid "Am Freifunk-Netz teilnehmen"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:36
+msgid "Am Freifunk-Netz teilnehmen und Internet teilen"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:16
+msgid ""
+"Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
+"erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist er "
+"auch unter dem Namen <em>frei.funk</em> zu erreichen."
+msgstr ""
+
 #: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:24
 msgid "Confirmation"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:13
+msgid ""
+"Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
+"Freifunk-Netzwerkes. Die noetige Angabe solltest du von config.berlin."
+"freifunk.net bekommen haben. Dabei wird die CIDR-Schreibweise benutzt "
+"(Beispiel: 10.42.42.42/28)."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/shareBandwidth.htm:3
+msgid ""
+"Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des kuerzesten "
+"Wegs und der hoechsten Bandbreite weiter. Dazu muss bekannt sein, wieviel "
+"Bandbreite ins Internet du auf deinem Knoten zur Verfuegung stellen kannst "
+"und willst. Typische Gesamtbandbreiten sind z.B. bei <em>DSL 6000</em> 6.0 "
+"Mbit/s Download und 0.5 Mbit/s Upload oder bei <em>VDSL 50000</em> 50.0 Mbit/"
+"s Download und 10.0 Mbit/s Upload. Am besten testest du z.B. unter speedof."
+"me mehrmals, wieviel Bandbreite dir tatsaechlich zur Verfuegung steht. Dann "
+"gib hier an, wieviel du mit deinen Nachbarn teilen moechtest. Sei "
+"grosszuegig, aber nicht ueberbieten. :-)"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:3
+msgid ""
+"Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> "
+"lassen, sofern sich nicht in unmittelbarer Naehe ein weiterer Access Point "
+"mit der gleichen SSID befindet. Auf diese Weise koennen sich Gaeste z.B. mit "
+"ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk verbinden, "
+"ohne spezielle Einstellungen fuer jeden einzelnen Router vornehmen zu "
+"muessen. <br/>Diese Einstellung bezieht sich auf den WLAN-AP, <em>nicht</em> "
+"das Adhoc-Netzwerk, das fuer das Freifunk-Meshing benutzt wird."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:11
+msgid ""
+"Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu gestartet. "
+"Am besten, du machst dir kurz einen Kaffee oder einen Tee :D und sobald alle "
+"Lichter wieder blinken, bist du Freifunkerin!"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:24
+msgid ""
+"Erweitere das Freifunk-Netz. Du benoetigst dazu eine WLAN-Verbindung zu "
+"einem anderen Freifunk-Router. Du kannst auf der Freifunk-Karte nachschauen, "
+"wer in deiner Naehe ist, und sie kontaktieren, damit ihr die Verbindung "
+"optimal ausrichten koennt."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:22
+msgid ""
+"Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im Freifunk-"
+"Hauptmenu unter <em>Services</em> ansehen, sobald dein Router neugestartet "
+"hat."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/welcome.htm:3
+msgid ""
+"Herzlichen Glueckwunsch! <br/>Du hast deinen Router erfolgreich mit der "
+"Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim Einrichten "
+"deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
+"Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
+">Aendere hier zunaechst dein Password. Bitte waehle ein sicheres Passwort, "
+"da der Router nach aussen sichtbar ist. Spaeter findest du diese Option im "
+"Bereich <em>System &gt; Administration.</em>"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/meshipinfo.htm:3
+msgid ""
+"Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
+"berlin.freifunk.net bekommen hast. Ueber diese Adresse(n) verbindet sich "
+"dein Router mit anderen Freifunk-Routern in deiner Naehe. Spaeter kannst du "
+"dir die Einstellungen unter <em>Network &gt; Interfaces und Network &gt; "
+"Wireless</em> anschauen."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpninfo.htm:3
+msgid ""
+"Im Folgenden wird dein Schluessel zum Tunnel/VPN gebraucht. Du entpackst die "
+"Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und deinen "
+"Schlüssel hoch."
 msgstr ""
 
 #: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
@@ -24,6 +127,10 @@ msgstr ""
 
 #: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
 msgid "Password"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpncertreupload.htm:3
+msgid "Schluessel loeschen und erneut hochladen"
 msgstr ""
 
 #: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
@@ -57,8 +164,41 @@ msgid ""
 "at a later time to change these settings.</em>"
 msgstr ""
 
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:41
+msgid ""
+"Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
+"freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu anderen "
+"Freifunk-Routern sinnvoll."
+msgstr ""
+
 #: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
 msgid "Update Wireless-Mesh Settings"
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/enableStats.htm:3
+msgid ""
+"Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-"
+"Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der "
+"Oberflaeche des Routers angezeigt sowie an monitor.berlin.freifunk.net "
+"geschickt. Es werden keine Statistiken erhoben, wenn du den Haken nicht "
+"setzt. Du kannst die Statistiken spaeter ueber Administration &gt; "
+"Statistics &gt; Collectd einschalten. Auf Routern mit nur 4MB ROM steht das "
+"Monitoring nicht zur Verfuegung. Auf Routern mit nur 32MB RAM werden die "
+"Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in der "
+"Router-Oberflaeche."
+msgstr ""
+
+#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/generalInfo.htm:3
+msgid ""
+"Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
+"Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
+"Karte angezeigt. So koennen dich andere Freifunkerinnen finden und dich "
+"ansprechen, falls sie Ihren Router mit deinem verbinden moechten. <br/>Falls "
+"du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
+"ueberspringen oder einzelne Felder leerlassen. <br/>Den (eindeutigen) Namen "
+"dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst diese "
+"Daten auch später noch ändern, indem du nur diese Seite des Assistenten "
+"benutzt."
 msgstr ""
 
 #: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:7
