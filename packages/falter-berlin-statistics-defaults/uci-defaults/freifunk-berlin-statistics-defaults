@@ -57,6 +57,7 @@ uci set luci_statistics.collectd_rrdtool.RRATimespans="1hour 1day 1week 1month 1
 # mod memory
 uci set luci_statistics.collectd_memory=statistics
 uci set luci_statistics.collectd_memory.enable=1
+uci set luci_statistics.collectd_memory.ValuesAbsolute=1
 
 # mod olsrd - depends on olsrd-plugin-txtinfo
 uci set luci_statistics.collectd_olsrd=statistics
