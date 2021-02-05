@@ -616,6 +616,11 @@ r1_1_0_ffwizard() {
   config_foreach handle_wifi-iface wifi-iface
 }
 
+r1_1_0_statistics() {
+  log "adding new options to luci_statistics"
+  uci -q set luci_statistics.collectd_memory.ValuesAbsolute=1
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -691,6 +696,7 @@ migrate () {
     r1_1_0_openwrt_19_07_updates
     r1_1_0_wifi_iface_names
     r1_1_0_ffwizard
+    r1_1_0_statistics
   fi
 
   # overwrite version with the new version
