@@ -115,6 +115,11 @@ function main.write(self, section, value)
     --share internet was not enabled before, set to false now
     uci:set("ffwizard", "settings", "sharenet", "0")
     uci:save("ffwizard")
+    --in case the wizard has been re-ran, ensure ffuplink is disabled
+    uci:set("network", "ffuplink", "disabled", "1")
+  else
+    --sharenet was enabled, therefore enable the ffuplink network interface
+    uci:set("network", "ffuplink", "disabled", "0")
   end
 
   -- store wizard data to fill fields if wizard is rerun
