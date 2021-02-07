@@ -23,6 +23,12 @@ fi
 # set set auth-type required for this uplink-type, e.g. for freifunk-wizard
 uci set ffberlin-uplink.uplink.auth=none
 
+# disable tunneldigger for ffuplink, if tunneldigger was the previous setup
+if [ ${current_preset} == "tunnelberlin_tunneldigger" ]; then
+  uci set tunneldigger.ffuplink.enabled=0
+  uci commit tunneldigger
+fi
+
 macaddr=$(uci -q get ffberlin-uplink.uplink.macaddr)
 if [ -z "$macaddr" ]; then
   macaddr=$(generate_random_mac_hex "fe")
