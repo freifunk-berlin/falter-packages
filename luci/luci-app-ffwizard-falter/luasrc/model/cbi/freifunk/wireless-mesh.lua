@@ -132,8 +132,8 @@ function write_wireless(section)
       if ( newmeshmode == "adhoc" ) then
         local community = "profile_"..uci:get("freifunk", "community", "name")
         local devChannel = uci:get("wireless", device, "channel")
-        ifconfig.ssid = uci:get(community, "ssidscheme", devconfig.channel)
-        ifconfig.bssid = uci:get(community, "bssidscheme", devconfig.channel)
+        ifconfig.ssid = uci:get(community, "ssidscheme", devChannel)
+        ifconfig.bssid = uci:get(community, "bssidscheme", devChannel)
       end
 
       local newSectionName = string.gsub(name, mode, newmeshmode)
