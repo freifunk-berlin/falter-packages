@@ -15,3 +15,6 @@ uci set ffberlin-uplink.uplink.auth=none
 uci commit ffberlin-uplink
 
 create_ffuplink
+uci set network.ffuplink.disabled=1
+uci commit network.ffuplink
+
