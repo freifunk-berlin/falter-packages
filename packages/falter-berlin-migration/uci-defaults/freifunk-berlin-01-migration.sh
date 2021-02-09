@@ -621,6 +621,17 @@ r1_1_0_statistics() {
   uci -q set luci_statistics.collectd_memory.ValuesAbsolute=1
 }
 
+r1_1_0_sharenet_setup() {
+  local sharenet=$(uci get ffwizard.settings.sharenet)
+  if [ 1 -ne $sharenet ]; then
+    log "disabling ffuplink because sharenet is not set to 1"
+    uci set network.ffuplink.disabled=1
+  else
+    log "enabling ffuplink because sharenet is set to 1"
+    uci set network.ffuplink.disabled=0
+  fi
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -697,6 +708,7 @@ migrate () {
     r1_1_0_wifi_iface_names
     r1_1_0_ffwizard
     r1_1_0_statistics
+    r1_1_0_nosharenet_setup
   fi
 
   # overwrite version with the new version
