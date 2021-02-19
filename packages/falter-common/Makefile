@@ -16,6 +16,7 @@ define Package/falter-common
   SUBMENU:=9. Freifunk
   TITLE:=Falter common files
   EXTRA_DEPENDS:=uci
+  PKGARCH:=all
 endef
 
 define Package/falter-common/description
@@ -32,6 +33,7 @@ define Package/falter-common-olsr
   SUBMENU:=9. Freifunk
   TITLE:=Falter common files for olsr-v1
   EXTRA_DEPENDS:=falter-common, olsrd, micrond, libuci-lua, lua
+  PKGARCH:=all
 endef
 
 define Package/falter-common-olsr/description
