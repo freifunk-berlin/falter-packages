@@ -48,7 +48,7 @@ endef
 define Build/Compile
 endef
 
-FALTER_REVISION:=$(shell git -C $(TOPDIR)/feeds/falter rev-parse --short HEAD)
+FALTER_REVISION:=$(shell git -C $(TOPDIR)/feeds/falter describe --exact-match --tags 2> /dev/null || git -C $(TOPDIR)/feeds/falter rev-parse --short HEAD)
 
 define Package/falter-common/install
 	$(CP) ./files-common/* $(1)/
