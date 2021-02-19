@@ -16,6 +16,7 @@ define Package/falter-policyrouting
   SUBMENU:=9. Freifunk
   TITLE:=Freifunk policy routing addon
   EXTRA_DEPENDS:=ip
+  PKGARCH:=all
 endef
 
 define Package/falter-policyrouting/description
