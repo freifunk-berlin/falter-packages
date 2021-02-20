@@ -18,8 +18,8 @@
                                 "network",
                                 "qos",
                                 "luci_statistics",
-                                "openvpn"
-
+                                "openvpn",
+                                "tunneldigger"
                         ],
                         "files" : {
                                 "/etc/config/ffwizard": [
@@ -58,7 +58,8 @@
                                 "network",
                                 "qos",
                                 "luci_statistics",
-                                "openvpn"
+                                "openvpn",
+                                "tunneldigger"
                         ],
                         "files" : {
                                 "/etc/config/ffwizard": [
