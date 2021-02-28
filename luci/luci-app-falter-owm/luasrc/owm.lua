@@ -303,8 +303,10 @@ function get()
 		root.freifunk[pname] = s
 	end)
 
-	root.latitude = position["latitude"] --owm
-	root.longitude = position["longitude"] --owm                                                        
+	if position ~= nil then
+		root.latitude = position["latitude"] --owm
+		root.longitude = position["longitude"] --owm                                                        
+	end                                                       
 													
 	root.links = fetch_olsrd_neighbors({})                                                                        
 	root.olsr = fetch_olsrd()                                                                      
