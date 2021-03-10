@@ -4,10 +4,10 @@
 
 HOSTNAME=$(uci -q get system.@system[0].hostname)".olsr"
 IPADDR=$(uci -q get network.dhcp.ipaddr)
-UPTIME=$(uptime | cut -d ',' -f 0 | cut -d ' ' -f 4-)
-FREEFL=$(df -h | grep " /overlay" | sed -E -e s/[[:space:]]+/\;/g | cut -d';' -f4 )
-SYS_LOAD=$(uptime | sed -e 's/average: /;/g' | cut -d';' -f2)
-CLIENTS=$(wc -l /tmp/dhcp.leases | cut -d' ' -f1)
+UPTIME=$(uptime | cut -d ',' -f 0 | cut -d ' ' -f 4-) 2&> /dev/null
+FREEFL=$(df -h | grep " /overlay" | sed -E -e s/[[:space:]]+/\;/g | cut -d';' -f4 ) 2&> /dev/null
+SYS_LOAD=$(cat /proc/loadavg | cut -d' ' -f 1-3) 2&> /dev/null
+CLIENTS=$(wc -l /tmp/dhcp.leases | cut -d' ' -f1) 2&> /dev/null
 
 printf \
 " Host.............................: $HOSTNAME
