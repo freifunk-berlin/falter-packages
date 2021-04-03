@@ -8,6 +8,12 @@ if [ $(uci get system.@system[0].hostname) = OpenWrt ]; then
   uci commit system
 fi
 
+# led: set rssid_wlan0 to wlan0-mesh-2, workaround for high cpu load bug (https://github.com/Freifunk-Spalter/packages/issues/142)
+if [ $(uci get system.@rssid[0].dev) = wlan0 ]; then
+  uci set system.@rssid[0].dev=wlan0-mesh-2
+  uci commit system
+fi
+
 guard "system"
 
 uci set system.ntp.use_dhcp='0'
