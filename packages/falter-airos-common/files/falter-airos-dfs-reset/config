@@ -1,0 +1,6 @@
+#config device 'NAME'
+#	option target 'TARGETIP'
+#	option username 'ubnt'
+#	option daytime_limit '0-7'
+#	option password ''
+# ..
