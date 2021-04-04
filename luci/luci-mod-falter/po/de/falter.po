@@ -1,0 +1,611 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: Martin Hübner <martin.hubner@web.de>\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: de\n"
+"X-Generator: Poedit 2.4.2\n"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:54
+msgid "Ad-Hoc (outdated)"
+msgstr "Ad-Hoc (veraltet)"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:108
+msgid "BBB-VPN (bbbdigger)"
+msgstr "BBB-VPN (bbbdigger)"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:4
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:7
+msgid "BBB-VPN (bbbdigger) Settings"
+msgstr "BBB-VPN (bbbdigger) Einstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:254
+msgid "BSSID"
+msgstr "BSSID"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:20
+msgid "Bad (ETX > 10)"
+msgstr "Schlecht (ETX > 10)"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:78
+msgid "Basic Settings"
+msgstr "Grundeinstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:22
+#: luci/luci-mod-falter/luasrc/view/freifunk/profile_error.htm:8
+msgid "Basic settings"
+msgstr "Grundeinstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:22
+msgid "Basic settings are incomplete. Please go to"
+msgstr "Die Grundeinstellungen sind unvollständig. Bitte gehe zu"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:23
+msgid "Basic system settings"
+msgstr "Grundlegende Systemeinstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:252
+msgid "Bitrate"
+msgstr "Bitrate"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:255
+msgid "Channel"
+msgstr "Kanal"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:43
+msgid "Client network size"
+msgstr "Client-Netzwerk-Größe"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:10
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:13
+msgid "Community"
+msgstr "Community"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile_expert.lua:13
+msgid "Community profile"
+msgstr "Community-Profil"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:13
+msgid "Community settings"
+msgstr "Community-Einstellungen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:23
+msgid "Conntecting to the BBB-VPN"
+msgstr "Mit BBB-VPN verbinden"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:34
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:93
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:5
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:29
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:23
+msgid "Contact"
+msgstr "Kontakt"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:29
+msgid "Contact information is incomplete. Please go to"
+msgstr "Die Kontaktinformationen sind unvollständig. Bitte gehe zu"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:44
+msgid "Coordinates"
+msgstr "Koordinaten"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:21
+msgid "Country code"
+msgstr "Ländercode"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:324
+msgid "Default routes"
+msgstr "Default-Routen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:9
+msgid "Disable default content"
+msgstr "Standardinhalt deaktivieren"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:38
+msgid "Diversity is enabled for device"
+msgstr "Diversität ist für aktiviert für Gerät"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:12
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:35
+msgid "E-Mail"
+msgstr "E-Mail"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:32
+msgid "ESSID"
+msgstr "ESSID"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:4
+msgid "Edit index page"
+msgstr "Willkommensseite überarbeiten"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:47
+msgid "Enable IPv6"
+msgstr "IPv6 aktivieren"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:64
+msgid "Enable a virtual access point (VAP) by default if possible."
+msgstr "Falls möglich, aktiviere standardmäßig Virtual Access Point (VAP)"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/profile_error.htm:7
+msgid "Error"
+msgstr "Fehler"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:80
+msgid "Find your coordinates with OpenStreetMap"
+msgstr "Koordinaten mit OpenStreetMap finden"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:18
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:68
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:69
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:73
+msgid "Freifunk"
+msgstr "Freifunk"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:15
+msgid "Freifunk Overview"
+msgstr "Freifunk-Übersicht"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:335
+msgid "Gateway"
+msgstr "Gateway"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:39
+msgid "Go to"
+msgstr "Gehe zu"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:18
+msgid "Good (2 < ETX < 4)"
+msgstr "Gut (2 < ETX < 4)"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:17
+msgid "Green"
+msgstr "Grün"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:56
+msgid "Hello and welcome in the network of"
+msgstr "Herzlich willkommen im Netzwerk von"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:90
+msgid "Hide OpenStreetMap"
+msgstr "OpenStreetMap verstecken"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:11
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:19
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:30
+msgid "Homepage"
+msgstr "Homepage"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:31
+msgid "Hostname"
+msgstr "Hostname"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:50
+msgid "IPv6 Config"
+msgstr "IPv6 Konfiguration"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:59
+msgid "IPv6 Prefix"
+msgstr "IPv6-Präfix"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:59
+msgid "IPv6 network in CIDR notation."
+msgstr "IPv6-Netz in CIDR-Notation."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:9
+msgid "If selected then the default content element is not shown."
+msgstr ""
+"Wenn diese Option ausgewählt ist, wird das Standardelement nicht angezeigt."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:74
+msgid "If you are interested in our project then contact the local community"
+msgstr ""
+"Wenn du an unserem Projekt interessiert bist, wende dich an deine lokale "
+"Community"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:98
+msgid "Index Page"
+msgstr "Hauptseite"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:258
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:334
+msgid "Interface"
+msgstr "Schnittstelle"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:78
+msgid ""
+"Internet access depends on technical and organisational conditions and may "
+"or may not work for you."
+msgstr ""
+"Der Zugang zum Internet hängt von technischen und organisatorischen "
+"Gegebenheiten ab. Er kann für dich funktionieren, muss aber nicht."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:66
+msgid "It is operated by"
+msgstr "Er wird betrieben von"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:39
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:67
+msgid "Latitude"
+msgstr "Breitengrad"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:15
+msgid "Legend"
+msgstr "Legende"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:228
+msgid "Load"
+msgstr "Last"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:230
+msgid "Local Time"
+msgstr "Lokale Zeit"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:35
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:41
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:43
+msgid "Location"
+msgstr "Standort"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:43
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:71
+msgid "Longitude"
+msgstr "Längengrad"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:111
+msgid "Map"
+msgstr "Karte"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:24
+msgid "Map Error"
+msgstr "Kartenfehler"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:229
+msgid "Memory"
+msgstr "Speicher"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:35
+msgid "Mesh prefix"
+msgstr "Mesh-Präfix"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:336
+msgid "Metric"
+msgstr "Metrik"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:256
+msgid "Mode"
+msgstr "Modus"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:227
+msgid "Model"
+msgstr "Modell"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:333
+msgid "Network"
+msgstr "Netzwerk"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:39
+msgid "Network for client DHCP addresses"
+msgstr "Netzwerk für Client-DHCP Adressen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:9
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:28
+msgid "Nickname"
+msgstr "Sptzname"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:329
+msgid "No default routes known."
+msgstr "Keine Default-Routen bekannt."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:14
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:50
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:76
+msgid "Notice"
+msgstr "Beachte"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:51
+msgid "OLSR"
+msgstr "OLSR"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:57
+msgid "OLSR2"
+msgstr "OLSR2"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:26
+msgid "Operator"
+msgstr "Betreiber"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:19
+msgid "Orange"
+msgstr "Orange"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:28
+msgid "Overview"
+msgstr "Übersicht"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:242
+msgid "Package libiwinfo required!"
+msgstr "Benötige Paket libiwinfo!"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:13
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:36
+msgid "Phone"
+msgstr "Telefon"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:5
+msgid "Please fill in your contact details below."
+msgstr "Bitte trage deine Kontaktdaten ein."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:70
+msgid "Please set your contact information"
+msgstr "Bitte trage deine Kontaktdaten ein"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:257
+msgid "Power"
+msgstr "Strom"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:83
+msgid "Profile"
+msgstr "Profil"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:88
+msgid "Profile (Expert)"
+msgstr "Profil (Experte)"
+
+#: luci/luci-mod-falter/root/usr/share/rpcd/acl.d/luci-mod-falter.json:3
+msgid "Provides access to config files and scripts"
+msgstr "Bietet Zugriff auf Konfigurationsdateien und Skripte"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:10
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:29
+msgid "Realname"
+msgstr "Name"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:20
+msgid "Red"
+msgstr "Rot"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:253
+msgid "SSID"
+msgstr "SSID"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:80
+msgid ""
+"Select your location with a mouse click on the map. The map will only show "
+"up if you are connected to the Internet."
+msgstr ""
+"Wähle deinen Standort durch einen Klick auf die Karte. Du kannst die Karte "
+"nur sehen, wenn du mit dem Internet verbunden bist."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:89
+msgid "Show OpenStreetMap"
+msgstr "OpenStreetMap anzeigen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:44
+msgid "Show on map"
+msgstr "Auf Karte zeigen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:251
+msgid "Signal"
+msgstr "Signal"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
+msgid "Splash"
+msgstr "Splash"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:64
+msgid "Statistics"
+msgstr "Statistiken"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:39
+msgid "Status"
+msgstr "Status"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:19
+msgid "Still usable (4 < ETX < 10)"
+msgstr "Noch gebrauchbar (4 < ETX < 10)"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:224
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:226
+msgid "System"
+msgstr "System"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:257
+msgid "TX"
+msgstr "TX"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:43
+msgid "The"
+msgstr "Das"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:243
+msgid ""
+"The <em>libiwinfo</em> package is not installed. You must install this "
+"component for working wireless configuration!"
+msgstr ""
+"<em>libiwinfo</em>-Paket ist nicht installiert. Für eine funktionierende "
+"WLAN-Konfiguration muss du diese Paket installieren!"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:25
+msgid ""
+"The OLSRd service is not configured to capture position data from the "
+"network.<br /> Please make sure that the nameservice plugin is properly "
+"configured and that the <em>latlon_file</em> option is enabled."
+msgstr ""
+"Der OLSRd-Service ist nicht korrekt konfiguriert. Er erfasst keine "
+"Positionsdaten aus dem Netzwerk.<br /> Bitte stelle sicher, dass Nameservice-"
+"Plugin korrekt ist und das die Option <em>latlon_file</em> eingeschaltet ist."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:8
+msgid ""
+"The wireless interfaces which are built into the router can mesh with other "
+"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
+"used.</strong> Some routers (or their drivers) might not support this new "
+"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
+"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
+"to switch to 802.11s collectively. Please select which protocol to use."
+msgstr ""
+"Der Router kann mit anderen Routern entweder über Ad-Hoc oder 802.11s "
+"meshen. <strong>802.11s ist der aktuelle Standard.</strong> Einige Router "
+"(bzw. ihre Treiber) unterstützen diesen neuen Standard möglicherweise nicht. "
+"Wenn dieser Router derzeit über Ad-Hoc mesht, würde die Änderung auf 802.11s "
+"zu Verbindungsverlusten führen. Bitte wende dich an deine Mesh-Nachbarn, um "
+"gemeinsam zu 802.11s zu wechseln. Bitte wähle aus, welches Protokoll "
+"verwendet werden soll."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:11
+msgid ""
+"These are the basic settings for your local wireless community. These "
+"settings define the default values for the wizard and DO NOT affect the "
+"actual configuration of the router."
+msgstr ""
+"Dies sind die Grundeinstellungen für deine lokale Freifunk-Community. Sie "
+"definieren die Standard des Wizards und verändern die aktuellen "
+"Routereinstellungen NICHT."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:13
+msgid "These are the settings of your local community."
+msgstr "Das sind die Einstellungen deiner lokalen Community."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:17
+msgid ""
+"These pages will assist you in setting up your router for Freifunk or "
+"similar wireless community networks."
+msgstr ""
+"Diese Seiten werden dir helfen, deinen Router für Freifunk, oder "
+"vergleichbare WLAN-Community-Netzwerke, einzurichten."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:62
+msgid "This is the access point"
+msgstr "Dies ist der Zugangspunkt"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:8
+msgid ""
+"To enable island nodes of the Berlin Freifunk Network to be able to "
+"virtually mesh with the Berlin Backbone (BBB), BBB-VPN servers have been set "
+"up to allow meshing through a VPN using tunneldigger (bbbdigger). The BBB-"
+"VPN servers run a modified version of OLSRd which blocks any gateway "
+"advertisements and does not allow the VPN clients to see each other as "
+"direct neighbors.<br><br>Using bbbdigger will add a constant amount of "
+"background traffic going over the WAN interface of the router. So it is not "
+"recommended for devices which have metered internet access."
+msgstr ""
+"Um sogenannte Inselknoten des Berliner Freifunk-Netzes mit dem Berlin "
+"Backbone verbinden zu können, gibt es die BBB-VPN-Server. Diese ermöglichen "
+"das Meshen über eine VPN-Verbindung mit tunneldigger (bbbdigger). Die BBB-"
+"VPN-Server benutzen einen modifizierten OLSRd, der alle Gateway-"
+"Advertisments abblockt und die VPN-Clients gegeneinander abschottet."
+"<br><br>Wenn du bbbdigger benutzt, wird der Router dauerhaft etwas Backround-"
+"Traffic auf deinem DSL-Anschluss erzeugen. Du solltest es also nicht "
+"benutzen, falls dein Internetanschluss eine Volumenbegrenzung hat."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:24
+msgid ""
+"Upon submission you will be redirected to the OLSRd Neighbors page. There "
+"you will be able to see the effects of enabling/disabling bbbdigger. It may "
+"take up to 60 seconds after enabling to see any results"
+msgstr ""
+"Nach dem Abschicken wirst du auf die OLSRd-Nachbarn-Seite umgeleitet. Dort "
+"kannst du sehen, was das ein-/ausschalten von bbbdigger bewirkt. Es kann bis "
+"zu 60 Sekunden dauern, um nach den Einschalten irgendetwas zu sehen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:231
+msgid "Uptime"
+msgstr "Laufzeit"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:64
+msgid "VAP"
+msgstr "VAP"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:17
+msgid "Very good (ETX < 2)"
+msgstr "Sehr gut (ETX < 2)"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:60
+msgid ""
+"We are an initiative to establish a free, independent and open wireless mesh "
+"network."
+msgstr ""
+"Wir sind eine Initiative, die ein freies, unabhängiges und offenes "
+"drahtloses Mesh-Netzwerk aufbaut."
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:103
+msgid "Wireless Mesh"
+msgstr "WLAN-Mesh"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:7
+msgid "Wireless Mesh Settings"
+msgstr "WLAN-Mesh-Einstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:238
+msgid "Wireless Overview"
+msgstr "WLAN Übersicht"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:4
+msgid "Wireless-Mesh Settings"
+msgstr "WLAN-Mesh-Einstellungen"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:18
+msgid "Yellow"
+msgstr "Gelb"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:4
+msgid ""
+"You can display additional content on the public index page by inserting "
+"valid XHTML in the form below.<br />Headlines should be enclosed between &lt;"
+"h2&gt; and &lt;/h2&gt;."
+msgstr ""
+"Du kannst zusätzliche Information auf der öffentlichen Hauptseite anzeigen, "
+"indem du gültiges XHTML in das Formular einfügst.<br />Überschriften sollten "
+"von &lt;h2&gt; und &lt;/h2&gt;umschlossen werden."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:72
+msgid ""
+"You can find further information about the global Freifunk initiative at"
+msgstr "Weitere Information zur globalen Freifunk-Initiative findest du auf"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile_expert.lua:13
+msgid "You can manually edit the selected community profile here."
+msgstr "Du kannst das gewählte Community-Profil hier manuell bearbeiten."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/profile_error.htm:8
+msgid ""
+"You need to select a profile before you can edit it. To select a profile go "
+"to"
+msgstr ""
+"Du musst ein Profil auswählen, bevor du es editieren kannst. Um ein Profil "
+"zu wählen, gehe zu"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:22
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:29
+msgid "and fill out all required fields."
+msgstr "und fülle alle benötigten Felder aus."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:32
+msgid "buffered"
+msgstr "gepuffert"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:39
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:43
+msgid "e.g."
+msgstr "z.B."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:30
+msgid "free"
+msgstr "frei"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:40
+msgid "to disable it."
+msgstr "um es zu deaktivieren."
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:28
+msgid "used"
+msgstr "benutzt"
+
+#: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:39
+msgid "wireless settings"
+msgstr "WLAN-Einstellungen"
