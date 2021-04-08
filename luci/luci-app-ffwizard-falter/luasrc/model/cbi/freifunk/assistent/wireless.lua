@@ -205,6 +205,12 @@ function main.write(self, section, value)
         tools.statistics_interface_add("collectd_interface", ifnameMesh)
       end
 
+      --RSSI LED settings
+      local rssiled = uci:get("system", "rssid_"..calcifcfg(device), "dev")
+      if rssiled then
+        uci:set("system", "rssid_"..calcifcfg(device), "dev", ifconfig.ifname)
+      end
+
       --NETWORK CONFIG mesh
       local node_ip = wifi_tbl[device]["meship"]:formvalue(section)
       node_ip = ip.IPv4(node_ip)
@@ -235,6 +241,7 @@ function main.write(self, section, value)
       uci:save("firewall")
       uci:save("olsrd")
       uci:save("olsrd6")
+      uci:save("system")
       uci:save("wireless")
       uci:save("network")
       if statistics_installed then
