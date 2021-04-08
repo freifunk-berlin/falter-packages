@@ -103,10 +103,15 @@ function index()
 	page.title  = _("Wireless Mesh")
 	page.order  = 30
 
+        page        = node("admin", "freifunk", "bandwidth")
+        page.target = cbi("freifunk/bandwidth", {hideapplybtn=true})
+        page.title  = _("Bandwidth")
+        page.order  = 35
+
 	page        = node("admin", "freifunk", "bbbdigger")
 	page.target = cbi("freifunk/bbbdigger", {hideapplybtn=true})
 	page.title  = _("BBB-VPN (bbbdigger)")
-	page.order  = 35
+	page.order  = 40
 
 	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
 	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
