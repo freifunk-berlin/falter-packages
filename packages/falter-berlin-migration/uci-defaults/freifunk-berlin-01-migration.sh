@@ -613,7 +613,7 @@ r1_1_0_ffwizard() {
 
   reset_cb
   config_load wireless
-  config_foreach handle_wifi-iface wifi-iface
+  config_foreach handle_wifi_iface wifi-iface
 }
 
 r1_1_0_statistics() {
@@ -630,6 +630,35 @@ r1_1_0_sharenet_setup() {
     log "enabling ffuplink because sharenet is set to 1"
     uci set network.ffuplink.disabled=0
   fi
+}
+
+r1_1_1_rssiled() {
+  # make sure that the rssileds are set properly to the mesh interface
+  log "setting rssidleds to the wireless mesh interface"
+  handle_wifi_iface_rssiled() {
+    local config=$1
+    local mode=''
+    local ifname=''
+    config_get mode $config mode
+    config_get ifname $config ifname
+    [ $mode != "adhoc" ] && [ $mode != "mesh"] && return
+
+    local rssidev=${ifname%%-*}
+    local result = $(uci -q get system.rssid_${rssidev}.dev)
+    if [ "X${result}X" != "XX" ]; then
+      # we need to stop the rssileds service before making the new setting
+      /etc/init.d/rssileds stop
+      uci set system.rssid_${rssiddev}.dev=${ifname}
+      # we need to commit the system changes early if we want the
+      # rssileds service to start correctly
+      uci commit system
+      /etc/init.d/rssileds start
+    fi
+  }
+
+  reset_cb
+  config_load wireless
+  config_foreach handle_wifi_iface_rssiled wifi-iface
 }
 
 migrate () {
@@ -709,6 +738,10 @@ migrate () {
     r1_1_0_ffwizard
     r1_1_0_statistics
     r1_1_0_nosharenet_setup
+  fi
+
+  if semverLT ${OLD_VERSION} "1.1.1"; then
+    r1_1_1_rssiled
   fi
 
   # overwrite version with the new version
