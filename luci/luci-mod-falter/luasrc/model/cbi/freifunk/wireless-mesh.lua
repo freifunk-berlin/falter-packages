@@ -142,9 +142,19 @@ function write_wireless(section)
       uci:delete("wireless", name)
       uci:section("wireless", "wifi-iface", newSectionName, ifconfig)
 
+      -- RSSI LED setting
+      local rssidev = string.sub(ifconfig.ifname,
+                                 string.find(ifconfig.ifname, "wlan%d"))
+      local rssiled = uci:get("system", "rssid_"..rssidev, "dev")
+      if rssiled then
+        uci:set("system", "rssid_"..rssidev, "dev", ifconfig.ifname)
+      end
+
     end)
 
+    uci:save("system")
     uci:save("wireless")
+    uci:commit("system")
     uci:commit("wireless")
 
 end
