@@ -12,6 +12,18 @@ int2float() {
 	ratio="$((ratio-rest))"
 	printf "%d.%02d" $reell $ratio
 }
+olsr2_links() {
+	json_select $2
+	json_get_var localIP link_bindto
+	json_get_var remoteIP neighbor_originator
+	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' -e 's/\..*//')"".olsr"
+	#TODO
+	json_get_var linkQuality domain_metric_out_raw
+	#json_get_var linkQuality domain_metric_in_raw
+	json_get_var ifName "if"
+	json_select ..
+	olsr2links="$olsr2links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+}
 olsr4_links() {
 	json_select $2
 	json_get_var localIP localIP
@@ -34,7 +46,11 @@ olsr6_links() {
 	json_select ..
 	olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
 }
-#json_load "$(echo '/netjsoninfo filter graph ipv6_0' | nc ::1 2009)"
+json_load "$(echo /nhdpinfo json link | nc ::1 2009 2>/dev/null)" 2>/dev/null
+olsr2links=""
+if json_is_a link array;then
+	json_for_each_item olsr2_links link
+fi
 json_cleanup
 json_load "$( echo /links | nc 127.0.0.1 9090 2>/dev/null)" 2>/dev/null
 #json_get_var timeSinceStartup timeSinceStartup
@@ -105,12 +121,12 @@ json_add_string type "node"
 json_add_string script "owm.sh"
 json_add_string api_rev "1.0"
 json_add_object system
-#FIME
+#FIXME
 json_add_array sysinfo
 json_add_string "" "system is deprecated"
 json_add_string "" "$model"
 json_close_array
-#FIME
+#FIXME
 json_add_array uptime
 json_add_int "" $uptime
 json_close_array
@@ -127,10 +143,21 @@ json_close_object
 #TODO
 json_add_object olsr
 json_close_object
-#TODO
 json_add_array links
 IFSORIG="$IFS"
 IFS=';'
+for i in ${olsr2links} ; do
+	IFS="$IFSORIG"
+	set -- $i
+	json_add_object
+	json_add_string sourceAddr6 "$1"
+	json_add_string destAddr6 "$2"
+	json_add_string id "$3"
+	#json_add_string quality "$4"
+	json_add_double quality "$4"
+	json_close_object
+	IFS=';'
+done
 for i in ${olsr4links} ; do
 	IFS="$IFSORIG"
 	set -- $i
