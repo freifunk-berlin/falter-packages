@@ -12,8 +12,44 @@ int2float() {
 	ratio="$((ratio-rest))"
 	printf "%d.%02d" $reell $ratio
 }
+olsr4_links() {
+	json_select $2
+	json_get_var localIP localIP
+	json_get_var remoteIP remoteIP
+	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/')"
+	json_get_var linkQuality linkQuality
+	json_get_var olsrInterface olsrInterface
+	json_get_var ifName ifName
+	json_select ..
+	olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+}
+olsr6_links() {
+	json_select $2
+	json_get_var localIP localIP
+	json_get_var remoteIP remoteIP
+	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/')"
+	json_get_var linkQuality linkQuality
+	json_get_var olsrInterface olsrInterface
+	json_get_var ifName ifName
+	json_select ..
+	olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+}
 #json_load "$(echo '/netjsoninfo filter graph ipv6_0' | nc ::1 2009)"
-
+json_cleanup
+json_load "$( echo /links | nc 127.0.0.1 9090 2>/dev/null)" 2>/dev/null
+#json_get_var timeSinceStartup timeSinceStartup
+olsr4links=""
+if json_is_a links array;then
+	json_for_each_item olsr4_links links
+fi
+json_cleanup
+json_load "$( echo /links | nc ::1 9090 2>/dev/null)" 2>/dev/null
+#json_get_var timeSinceStartup timeSinceStartup
+olsr6links=""
+if json_is_a links array;then
+	json_for_each_item olsr6_links links
+fi
+json_cleanup
 json_load "$(ubus call system board)"
 json_get_var model model
 json_get_var hostname hostname
@@ -92,8 +128,36 @@ json_close_object
 json_add_object olsr
 json_close_object
 #TODO
-json_add_object links
-json_close_object
+json_add_array links
+IFSORIG="$IFS"
+IFS=';'
+for i in ${olsr4links} ; do
+	IFS="$IFSORIG"
+	set -- $i
+	json_add_object
+	json_add_string sourceAddr4 "$1"
+	json_add_string destAddr4 "$2"
+	json_add_string id "$3"
+	#json_add_string quality "$4"
+	json_add_double quality "$4"
+	json_close_object
+	IFS=';'
+done
+for i in ${olsr6links} ; do
+	IFS="$IFSORIG"
+	set -- $i
+	json_add_object
+	json_add_string sourceAddr6 "$1"
+	json_add_string destAddr6 "$2"
+	json_add_string id "$3"
+	#json_add_string quality "$4"
+	json_add_double quality "$4"
+	json_close_object
+	IFS=';'
+done
+IFS="$IFSORIG"
+
+json_close_array
 json_add_string longitude "$longitude"
 json_add_string hostname "$hostname"
 json_add_string hardware "$system"
