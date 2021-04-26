@@ -1,0 +1,47 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:41
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:41
+msgid "Antennas settings"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:85
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:85
+msgid "Horizontal Beamwidth"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:79
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:79
+msgid "Horizontal Direction"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:49
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:49
+msgid "Manufacturer"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:58
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:58
+msgid "Model"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:62
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:62
+msgid "Polarization"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luci-app-falter-owm/root/usr/share/rpcd/acl.d/luci-app-falter-owm.json:3
+#: luci/luci-app-falter-owm/root/usr/share/rpcd/acl.d/luci-app-falter-owm.json:3
+msgid "Provides access to config files and scripts"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:97
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:97
+msgid "Vertical Beamwidth"
+msgstr ""
+
+#: luci/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:91
+#: luci/luci-app-falter-owm/luci-app-falter-owm/luasrc/model/cbi/antennas.lua:91
+msgid "Vertical Direction"
+msgstr ""
