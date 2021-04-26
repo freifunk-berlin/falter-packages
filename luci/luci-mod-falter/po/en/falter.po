@@ -16,7 +16,7 @@ msgstr ""
 msgid "Ad-Hoc (outdated)"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:108
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:113
 msgid "BBB-VPN (bbbdigger)"
 msgstr ""
 
@@ -31,6 +31,15 @@ msgstr ""
 
 #: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:20
 msgid "Bad (ETX > 10)"
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:108
+msgid "Bandwidth"
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:3
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:6
+msgid "Bandwidth Settings"
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:78
@@ -109,6 +118,10 @@ msgstr ""
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:38
 msgid "Diversity is enabled for device"
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:19
+msgid "Download-Bandwith in Mbit/s"
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:12
@@ -252,7 +265,7 @@ msgstr ""
 msgid "Longitude"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:111
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:116
 msgid "Map"
 msgstr ""
 
@@ -429,6 +442,18 @@ msgid ""
 "configured and that the <em>latlon_file</em> option is enabled."
 msgstr ""
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:7
+msgid ""
+"The nodes of the Freifunk network foward data based on shortest paths and "
+"highest bandwidth. Therefor we need to know, how much bandwidth to the "
+"internet there is and how much do you want to share. Typical values are 6.0 "
+"Mbit/s download and 0.5 Mbit/s upload with <em>DSL 6000</em> or 50.0 Mbit/s "
+"download and 10.0 Mbit/s upload with <em>VDSL 50000</em>. Preferably you "
+"test the actual bandwidth multiple time with a tool like <em>speedof.me</"
+"em>. Then you can fill in how much bandwidth you are willing to share with "
+"your peers. Please be generous, but don't overestimate. :-)"
+msgstr ""
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:8
 msgid ""
 "The wireless interfaces which are built into the router can mesh with other "
@@ -470,6 +495,10 @@ msgid ""
 "direct neighbors.<br><br>Using bbbdigger will add a constant amount of "
 "background traffic going over the WAN interface of the router. So it is not "
 "recommended for devices which have metered internet access."
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:24
+msgid "Upload-Bandwidth in Mbit/s"
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua:24
