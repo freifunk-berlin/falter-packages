@@ -548,8 +548,8 @@ msgid ""
 "take up to 60 seconds after enabling to see any results"
 msgstr ""
 "Nach dem Abschicken wirst du auf die OLSRd-Nachbarn-Seite umgeleitet. Dort "
-"kannst du sehen, was das ein-/ausschalten von bbbdigger bewirkt. Es kann bis "
-"zu 60 Sekunden dauern, um nach den Einschalten irgendetwas zu sehen"
+"kannst du sehen, was das Ein-/Ausschalten von bbbdigger bewirkt. Es kann bis "
+"zu 60 Sekunden dauern, um nach dem Einschalten irgendetwas zu sehen."
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:231
 msgid "Uptime"
@@ -599,7 +599,7 @@ msgid ""
 msgstr ""
 "Du kannst zusätzliche Information auf der öffentlichen Hauptseite anzeigen, "
 "indem du gültiges XHTML in das Formular einfügst.<br />Überschriften sollten "
-"von &lt;h2&gt; und &lt;/h2&gt;umschlossen werden."
+"von &lt;h2&gt; und &lt;/h2&gt; umschlossen werden."
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:72
 msgid ""
