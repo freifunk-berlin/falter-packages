@@ -2,4 +2,4 @@
 test -f /etc/crontabs/root || touch /etc/crontabs/root
 SEED="$( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read line; then echo 0x${line#* }; fi )"
 MIN="$(( $SEED % 59 ))"
-crontab -l | grep -q "owm.lua" || crontab -l | { cat; echo "$MIN * * * *	test -e /usr/sbin/owm.lua && /usr/sbin/owm.lua"; } | crontab -
+crontab -l | grep -q "owm.sh" || crontab -l | { cat; echo "$MIN * * * *	test -e /usr/sbin/owm.sh && /usr/sbin/owm.sh"; } | crontab -
