@@ -72,7 +72,7 @@ endef
 
 define Package/luci-app-falter-owm-cmd/install
 	$(INSTALL_DIR) $(1)/usr/sbin/
-	$(CP) files/owm.lua $(1)/usr/sbin/owm.lua
+	$(CP) files/owm.sh $(1)/usr/sbin/owm.sh
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(CP) files/owm-defaults $(1)/etc/uci-defaults/owm
 endef
