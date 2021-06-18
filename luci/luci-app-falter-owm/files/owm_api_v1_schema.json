@@ -1,0 +1,199 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "owm_data_set",
+    "type": "object",
+    "properties": {
+        "freifunk": {
+            "type": "object",
+            "properties": {
+                "contact": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "mail": {
+                            "type": "string"
+                        },
+                        "nickname": {
+                            "type": "string"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "homepage": {
+                            "type": "string"
+                        },
+                        "note": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "mail"
+                    ]
+                },
+                "community": {
+                    "type": "object",
+                    "properties": {
+                        "ssid": {
+                            "type": "string"
+                        },
+                        "longitude": {
+                            "type": "string"
+                        },
+                        "splash_network": {
+                            "type": "string"
+                        },
+                        "ssid_scheme": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        },
+                        "homepage": {
+                            "type": "string"
+                        },
+                        "mesh_network": {
+                            "type": "string"
+                        },
+                        "latitude": {
+                            "type": "string"
+                        },
+                        "owm_api": {
+                            "type": "string"
+                        },
+                        "splash_prefix": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "ssid",
+                        "name",
+                        "homepage"
+                    ]
+                }
+            },
+            "required": [
+                "contact",
+                "community"
+            ]
+        },
+        "type": {
+            "description": "type of entity that pushes the data. e.g. 'node'",
+            "type": "string"
+        },
+        "script": {
+            "description": "name of the programm that pushes the data",
+            "type": "string"
+        },
+        "api_rev": {
+            "type": "string"
+        },
+        "system": {
+            "description": "general system information",
+            "type": "object",
+            "properties": {
+                "sysinfo": {
+                    "type": "array",
+                    "items": {
+                        "description": "contains an old string and the router model at scond index",
+                        "type":"string"
+                    },
+                    "minItems": 1
+                },
+                "uptime": {
+                    "description": "time since last reboot in seconds.",
+                    "type": "array",
+                    "items": {
+                        "type":"number"
+                    },
+                    "minItems": 1
+                },
+                "loadavg": {
+                    "description": "router load avg on the last 0, 5, and 15 minutes. May also contain only one number",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 1
+                }
+            },
+            "required": [
+                "sysinfo",
+                "uptime"
+            ]
+        },
+        "olsr": {
+            "description": "Information on the routers OLSR-configuration. This section is optional and may contain anything."
+        },
+        "links": {
+            "description": "Data on any mesh links that the node may have.",
+            "type": "array",
+            "items": {
+                "description": "This object contains information on the mesh link. further information on that link should be given in an extra field, which name is the routing protocol.",
+                "type": "object",
+                "properties": {
+                    "sourceAddr4": {
+                        "type": "string"
+                    },
+                    "destAddr4": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "NodeId of peer, with .olsr at the end. i.e: 'a.bbb-vpn.olsr'",
+                        "type": "string"
+                    },
+                    "quality": {
+                        "description": "quality may range from 0.0 to 1",
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "sourceAddr4",
+                    "destAddr4",
+                    "id",
+                    "quality"
+                ]
+            }
+        },
+        "longitude": {
+            "type": "number"
+        },
+        "hostname": {
+            "type": "string"
+        },
+        "latitude": {
+            "type": "number"
+        },
+        "updateInterval": {
+            "description": "in seconds",
+            "type": "number"
+        },
+        "firmware": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "Usally this holds the firmware name and its version, like 'Freifunk Falter 1.1.1'.",
+                    "type": "string"
+                },
+                "revision": {
+                    "description": "git-revision of the firmware build. May also contain a git-tag.",
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "required": [
+        "freifunk",
+        "type",
+        "script",
+        "api_rev",
+        "system",
+        "links",
+        "longitude",
+        "hostname",
+        "latitude",
+        "updateInterval",
+        "firmware"
+    ]
+}
