@@ -86,6 +86,9 @@ function write_ffwizard(section)
   uci:foreach("wireless", "wifi-device",
     function(sec)
       local device = sec[".name"]
+      if wifi_tbl[device]["newmeshmode"] == nil then
+        return
+      end
       uci:set("ffwizard", "settings","meshmode_" .. device,
         wifi_tbl[device]["newmeshmode"]:formvalue(section))
     end)
@@ -103,6 +106,9 @@ function write_wireless(section)
       local mode = sec["mode"]
       local ifname = sec["ifname"]
       local device = sec["device"]
+      if wifi_tbl[device]["newmeshmode"] == nil then
+        return
+      end
       local network = sec["network"]
       local formvalue = wifi_tbl[device]["newmeshmode"]:formvalue(section)
       local newmeshmode = formvalue
