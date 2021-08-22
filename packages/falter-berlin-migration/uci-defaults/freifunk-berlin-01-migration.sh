@@ -66,6 +66,7 @@ fi
 migrate_profiles() {
   # migrate to the latest /etc/config/profile_* and /etc/config/freifunk
   log "Updating Community-Profiles."
+  rm /etc/config/profile_* # remove deprecated profiles
   cp /rom/etc/config/profile_* /etc/config
 
   log "Importing updates to /etc/config/freifunk"
@@ -270,6 +271,13 @@ vpn03_udp4() {
 
 set_ipversion_olsrd6() {
   uci set olsrd6.@olsrd[0].IpVersion=6
+}
+
+bump_repo() {
+  # adjust the opkg packagefeed to point to new version
+  local FEED_LINE=$(grep "openwrt_falter" /rom/etc/opkg/customfeeds.conf)
+  log "adjusting packagefeed to new version feed"
+  sed -ie "s,src\/gz.openwrt_falter.https\?:\/\/firmware\.berlin\.freifunk\.net.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
 }
 
 r1_0_0_vpn03_splitconfig() {
@@ -661,17 +669,33 @@ r1_1_1_rssiled() {
   config_foreach handle_wifi_iface_rssiled wifi-iface
 }
 
-r1_1_2_bump_repo() {
-  # adjust the opkg packagefeed to point to new version
-  log "bumping packagefeed to 1.1.2"
-  sed -ie 's|firmware.berlin.freifunk.net/feed/.*/packages|firmware.berlin.freifunk.net/feed/1.1.2/packages|g' /etc/opkg/customfeeds.conf
+r1_1_2_dnsmasq_ignore_wan() {
+  # introduced at 1157a128140962364b5392c7857c174c1d34409f
+  log "adjust dnsmasq to ignore wan iface in log"
+  uci add_list dhcp.@dnsmasq[0].notinterface='wan'
+  uci commit dhcp
+}
+
+r1_1_2_peerdns_ffuplink() {
+  # migrates for a4a0693cc1ebb536350e9228d54c2291f4df8133
+  log "set peerdns=0 on ffuplink"
+  uci set network.ffuplink.peerdns=0
+  uci commit network
+}
+
+r1_1_2_new_sysctl_conf() {
+  # the sysctl changed considerably since hedy. There's not much inportant to preserve,
+  # just overwrite with new default. Effectively this would clear the file.
+  log "migrating /etc/sysctl.conf"
+  cp -f /rom/etc/sysctl.conf /etc/sysctl.conf
 }
 
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
-  # always use the most recent profiles
+  # always use the most recent profiles and update repo-link
   migrate_profiles
+  bump_repo
 
   if semverLT ${OLD_VERSION} "0.1.0"; then
     update_openvpn_remote_config
@@ -751,8 +775,11 @@ migrate () {
   fi
 
   if semverLT ${OLD_VERSION} "1.1.2"; then
-    r1_1_2_bump_repo
+    r1_1_2_dnsmasq_ignore_wan
+    r1_1_2_peerdns_ffuplink
+    r1_1_2_new_sysctl_conf
   fi
+
 
   # overwrite version with the new version
   log "Setting new system version to ${VERSION}."
