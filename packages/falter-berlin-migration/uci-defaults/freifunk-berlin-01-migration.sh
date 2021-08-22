@@ -661,6 +661,12 @@ r1_1_1_rssiled() {
   config_foreach handle_wifi_iface_rssiled wifi-iface
 }
 
+r1_1_2_bump_repo() {
+  # adjust the opkg packagefeed to point to new version
+  log "bumping packagefeed to 1.1.2"
+  sed -ie 's|firmware.berlin.freifunk.net/feed/.*/packages|firmware.berlin.freifunk.net/feed/1.1.2/packages|g' /etc/opkg/customfeeds.conf
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -742,6 +748,10 @@ migrate () {
 
   if semverLT ${OLD_VERSION} "1.1.1"; then
     r1_1_1_rssiled
+  fi
+
+  if semverLT ${OLD_VERSION} "1.1.2"; then
+    r1_1_2_bump_repo
   fi
 
   # overwrite version with the new version
