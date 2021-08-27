@@ -671,9 +671,19 @@ r1_1_1_rssiled() {
 
 r1_1_2_dnsmasq_ignore_wan() {
   # introduced at 1157a128140962364b5392c7857c174c1d34409f
-  log "adjust dnsmasq to ignore wan iface in log"
-  uci add_list dhcp.@dnsmasq[0].notinterface='wan'
-  uci commit dhcp
+  local notinterfaces=$(uci -q get dhcp.@dnsmasq[0].notinterface)
+  local found=0
+  for interface in ${notinterfaces}; do
+    if [ "X${interface}X" == "XwanX" ]; then
+      found=1
+    fi
+  done
+
+  if [ "X${found}X" == "X0X"]; then
+    log "adjust dnsmasq to ignore wan iface in log"
+    uci add_list dhcp.@dnsmasq[0].notinterface='wan'
+    uci commit dhcp
+  fi
 }
 
 r1_1_2_peerdns_ffuplink() {
