@@ -652,7 +652,7 @@ r1_1_1_rssiled() {
     [ $mode != "adhoc" ] && [ $mode != "mesh"] && return
 
     local rssidev=${ifname%%-*}
-    local result = $(uci -q get system.rssid_${rssidev}.dev)
+    local result=$(uci -q get system.rssid_${rssidev}.dev)
     if [ "X${result}X" != "XX" ]; then
       # we need to stop the rssileds service before making the new setting
       /etc/init.d/rssileds stop
@@ -688,6 +688,11 @@ r1_1_2_new_sysctl_conf() {
   # just overwrite with new default. Effectively this would clear the file.
   log "migrating /etc/sysctl.conf"
   cp -f /rom/etc/sysctl.conf /etc/sysctl.conf
+}
+
+r1_1_2_rssiled() {
+  # rerund the r1_1_1_rssileds function because of a previous code error
+  r1_1_1_rssiled
 }
 
 migrate () {
@@ -778,6 +783,7 @@ migrate () {
     r1_1_2_dnsmasq_ignore_wan
     r1_1_2_peerdns_ffuplink
     r1_1_2_new_sysctl_conf
+    r1_1_2_rssiled
   fi
 
 
