@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-uplink-notunnel
-PKG_VERSION:=1
+PKG_VERSION:=2
 
 include $(INCLUDE_DIR)/package.mk
 
