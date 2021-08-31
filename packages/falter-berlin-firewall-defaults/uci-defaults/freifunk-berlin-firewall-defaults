@@ -17,7 +17,7 @@ uci set firewall.$SECTION.drop_invalid=0
 ZONE="$(uci add firewall zone)"
 uci set firewall.$ZONE.name=wan
 uci set firewall.$ZONE.masq=1
-uci set firewall.$ZONE.network=wan
+uci add_list firewall.$ZONE.network=wan
 uci set firewall.$ZONE.forward=REJECT
 uci set firewall.$ZONE.output=ACCEPT
 uci set firewall.$ZONE.local_restrict=1
@@ -80,7 +80,7 @@ uci set firewall.zone_freifunk.input=ACCEPT
 uci set firewall.zone_freifunk.forward=REJECT
 uci set firewall.zone_freifunk.name=freifunk
 uci set firewall.zone_freifunk.output=ACCEPT
-uci set firewall.zone_freifunk.network=tunl0
+uci add_list firewall.zone_freifunk.network=tunl0
 uci set firewall.zone_freifunk.device=tnl_+
 
 # add named zone section for the uplink of client-traffic
@@ -89,7 +89,7 @@ uci set firewall.zone_ffuplink.name=ffuplink
 uci set firewall.zone_ffuplink.input=REJECT
 uci set firewall.zone_ffuplink.forward=ACCEPT
 uci set firewall.zone_ffuplink.output=ACCEPT
-uci set firewall.zone_ffuplink.network=ffuplink
+uci add_list firewall.zone_ffuplink.network=ffuplink
 uci set firewall.zone_ffuplink.masq=1
 
 FORWARDING="$(uci add firewall forwarding)"
