@@ -72,7 +72,7 @@ function main.write(self, section, value)
       -- create the interface
       uci:set("network", "bbbdigger", "interface")
       uci:set("network", "bbbdigger", "proto", "dhcp")
-      uci:set("network", "bbbdigger", "ifname", "bbbdigger")
+      uci:set("network", "bbbdigger", "device", "bbbdigger")
       uci:set("network", "bbbdigger", "disabled", "0")
 
       -- create the tunneldigger section
@@ -92,7 +92,8 @@ function main.write(self, section, value)
 
       -- add bbbdigger to the freifunk firewall zone
       local fwzone = uci:get("firewall", "zone_freifunk", "network")
-      uci:set("firewall", "zone_freifunk", "network", fwzone .. " bbbdigger")
+      table.insert(fwzone, "bbbdigger")
+      uci:set("firewall", "zone_freifunk", "network", fwzone)
 
       -- add bbbdigger to olsrd
       local olsrif = uci:set("olsrd", "bbbdigger", "Interface")
