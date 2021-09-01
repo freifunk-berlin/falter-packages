@@ -267,10 +267,20 @@ function main.write(self, section, value)
     prenetconfig.ipaddr=dhcpmeshnet:minhost():string()
     prenetconfig.netmask=dhcpmeshnet:mask():string()
     prenetconfig.ip6assign="64"
-    prenetconfig.type="bridge"
+    -- prenetconfig.type="bridge" -- as of 21.02 type=bridge is not used for interface sections
     prenetconfig.proto="static"
-    -- use ifname from dhcp bridge on a consecutive run of assistent
-    prenetconfig.ifname=uci:get("network", "lan", "ifname") or uci:get("network", "dhcp", "ifname")
+    -- use device from dhcp bridge on a consecutive run of assistent
+    prenetconfig.device=uci:get("network", "lan", "device") or uci:get("network", "dhcp", "device")
+
+    -- find the device section and rename it from br-lan to br-dhcp
+    -- if there isn't a bridge set up (no wifi) and only a port is used, this still works
+    uci:foreach("network", "device", function(s)
+      if ( s.name == prenetconfig.device ) then
+        uci:set("network", s['.name'], "name", "br-dhcp")
+        prenetconfig.device="br-dhcp"
+        return false -- early exit from the foreach
+      end
+    end)
 
     -- if macaddr is set for lan interface also set it for dhcp interface (needed for wdr4900)
     local macaddr=uci:get("network", "lan", "macaddr") or uci:get("network", "dhcp", "macaddr")
@@ -282,7 +292,7 @@ function main.write(self, section, value)
 
     -- add to statistics
     if statistics_installed then
-      tools.statistics_interface_add("collectd_interface", "br-dhcp")
+      tools.statistics_interface_add("collectd_interface", prenetconfig.device)
     end
 
     --NETWORK CONFIG remove lan bridge because ports a part of dhcp bridge now

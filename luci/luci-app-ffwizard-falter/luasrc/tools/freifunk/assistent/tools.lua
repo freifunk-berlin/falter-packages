@@ -38,8 +38,7 @@ function firewall_zone_add_interface(name, interface)
 	local cursor = uci.cursor()
 	local zone = firewall_find_zone(name)
 	local net = cursor:get("firewall", zone, "network")
-	local old = net or (cursor:get("network", name) and name)
-	cursor:set("firewall", zone, "network", (old and old .. " " or "") .. interface)
+	cursor:set("firewall", zone, "network", add_list_entry(net, interface))
 	cursor:save("firewall")
 end
 
@@ -100,6 +99,23 @@ end
 
 
 -- Helpers --
+-- Adds an entry to a table, always returns a table
+function add_list_entry(value, entry)
+	local newtable = {}
+	if type(value) == "nil" then
+		-- the table was empty, 
+	elseif type(value) == "table" then
+		-- make sure the value is not already in the table
+		newtable = remove_list_entry(value, entry) or value
+	else
+		-- the "table" seems to be just a string, split it up
+		newtable = util.split(value, " ")
+	end
+
+	table.insert(newtable, entry)
+	return newtable
+end
+
 -- Removes a listentry, handles real and pseduo lists transparently
 function remove_list_entry(value, entry)
 	if type(value) == "nil" then
