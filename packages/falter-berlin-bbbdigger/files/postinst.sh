@@ -52,12 +52,11 @@ uci set network.${IFACE}_dev.name=$IFACE
 
 uci set network.$IFACE=interface
 uci set network.$IFACE.proto=dhcp
-uci set network.$IFACE.ifname=$IFACE
+uci set network.$IFACE.device=$IFACE
 
 # firewall setup (first remove from the zone and add it back)
-ZONE=$(echo $(uci show firewall.zone_freifunk.network | cut -d \' -f 2 | sed "s/${IFACE}//g"))
-ZONE="$ZONE $IFACE"
-uci set firewall.zone_freifunk.network="${ZONE}"
+uci -q del_list firewall.zone_freifunk.network=$IFACE
+uci -q add_list firewall.zone_freifunk.network=$IFACE
 
 # olsr setup (first remove it and add it again)
 SECTION=$(uci show olsrd | grep ${IFACE} | cut -d . -f 1-2)
