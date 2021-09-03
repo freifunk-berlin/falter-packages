@@ -77,7 +77,7 @@ olsr6_links() {
 }
 
 # This section is relevant for hopglass statistics feature (isUplink/isHotspot)
-OLSRCONFIG=$(printf "/config" | nc localhost 9090)
+OLSRCONFIG=$(printf "/config" | nc 127.0.0.1 9090)
 
 # collect nodes location
 uci_load system
