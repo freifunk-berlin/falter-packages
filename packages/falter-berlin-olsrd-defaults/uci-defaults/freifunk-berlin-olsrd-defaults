@@ -74,6 +74,12 @@ uci set olsrd.$INTERFACES.MidInterval=25.0
 uci set olsrd.$INTERFACES.HelloInterval=3.0
 uci set olsrd.$INTERFACES.HnaInterval=10.0
 
+# set procd parameters
+uci set olsrd.procd=procd
+uci set olsrd.procd.respawn_threshold=3600
+uci set olsrd.procd.respawn_timeout=15
+uci set olsrd.procd.respawn_retry=0
+
 uci commit olsrd
 
 
@@ -136,6 +142,12 @@ uci set olsrd6.$INTERFACES.TcValidityTime=500.0
 uci set olsrd6.$INTERFACES.MidInterval=25.0
 uci set olsrd6.$INTERFACES.HelloInterval=3.0
 uci set olsrd6.$INTERFACES.HnaInterval=10.0
+
+# set procd parameters
+uci set olsrd6.procd=procd
+uci set olsrd6.procd.respawn_threshold=3600
+uci set olsrd6.procd.respawn_timeout=15
+uci set olsrd6.procd.respawn_retry=0
 
 uci commit olsrd6
 
