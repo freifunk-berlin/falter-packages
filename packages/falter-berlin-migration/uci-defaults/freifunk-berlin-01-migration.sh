@@ -87,6 +87,13 @@ migrate_profiles() {
   uci commit freifunk
 }
 
+ensure_profiled() {
+  # since the files in /etc/profile.d are carried over though upgrades,
+  # make sure that the ones in /rom are the ones being used
+  log "updating /etc/profile.d"
+  cp /rom/etc/profile.d/* /etc/profile.d
+}
+
 update_openvpn_remote_config() {
   # use dns instead of ips for vpn servers (introduced with 0.1.0)
   log "Setting openvpn.ffvpn.remote to vpn03.berlin.freifunk.net"
@@ -705,12 +712,177 @@ r1_1_2_rssiled() {
   r1_1_1_rssiled
 }
 
+r1_2_0_dhcp() {
+  uci -q get dhcp.@dnsmasq[0].ednspacket_max
+  if [ $? -eq 1 ]; then
+    log "adding ednspacket_max=1232 to dnsmasq config"
+    uci set dhcp.@dnsmasq[0].ednspacket_max=1232
+    uci commit dhcp
+  fi
+}
+
+r1_2_0_fw_zone_freifunk() {
+  log "ensuring that the networks in zone_freifunk are stored as a list"
+  NETS=$(uci -q get firewall.zone_freifunk.network)
+  uci delete firewall.zone_freifunk.network
+  for net in $NETS; do
+    uci add_list firewall.zone_freifunk.network=$net
+  done
+  uci commit firewall
+}
+
+r1_2_0_fw_synflood() {
+  log "changing firewall default from syn_flood to synflood_protect"
+  uci -q delete firewall.@defaults[0].syn_flood
+  uci -q set firewall.@defaults[0].synflood_protect=1
+  uci commit firewall
+}
+
+r1_2_0_statistics() {
+  log "adding (disabled) dhcpleases section to luci_statistics"
+  uci set luci_statistics.collectd_dhcpleases=statistics
+  uci set luci_statistics.collectd_dhcpleases.enable=0
+  uci set luci_statistics.collectd_dhcpleases.Path='/tmp/dhcp.leases'
+  uci commit luci_statistics
+}
+
+r1_2_0_network() {
+  log "adjusting network config to openwrt 21.02 syntax"
+
+  # Make sure wan is a bridge.
+  WANDEV=$(uci -q get network.wan.ifname)
+  echo ${WANDEV} | grep ^br- > /dev/null
+  BRIDGECHECK=$?
+
+  if [ "X${WANDEV}X" = "XX" ]; then
+    # This device does not have a wan port. Create a wan device without
+    # a physical port.  This makes it easier to change a single
+    # port device from the client network to wan. This is also needed
+    # in the case where the user decides to use the "notunnel" variant
+    log "creating a wan bridge device and wan/wan6 interfaces"
+    NEWDEV=$(uci -q add network device)
+    uci -q set network.$NEWDEV.type="bridge"
+    uci -q set network.$NEWDEV.name="br-wan"
+
+    # create a wan interface, even if it can't do anything
+    uci -q set network.wan=interface
+    uci -q set network.wan.device="br-wan"
+    uci -q set network.wan.proto="dhcp"
+
+    # create a wan6 interface, even if it can't do anything
+    uci -q set network.wan6=interface
+    uci -q set network.wan6.device="br-wan"
+    uci -q set network.wan6.proto="dhcp6"
+
+  elif [ $BRIDGECHECK = "0" ]; then
+    # The wan device is a bridge (ex DSA with multiple physical ports)
+    # everything should be set up fine in this case
+    : # do nothing
+  else
+    # The wan device is not a bridge.  Change it to a bridge
+    log "changing wan device to a bridge"
+    NEWDEV=$(uci -q add network device)
+    uci -q set network.$NEWDEV.type="bridge"
+    uci -q set network.$NEWDEV.name="br-wan"
+    for port in $WANDEV; do
+      uci -q add_list network.$NEWDEV.ports=$port
+    done
+
+    uci -q set network.wan.device="br-wan"
+    uci -q delete network.wan.type
+    uci -q delete network.wan.ifname
+
+    uci -q set network.wan6.device="br-wan"
+    uci -q delete network.wan6.type
+    uci -q delete network.wan6.ifname
+  fi
+
+  # change ffuplink from ifname to device (may or may not be a 
+  # tunneldigger interface).
+  dev=$(uci -q get network.ffuplink.ifname)
+  if [ $? -eq 0 ]; then
+    log "changing ffuplink interface from ifname syntax to device"
+    uci -q delete network.ffuplink.ifname
+    uci -q set network.ffuplink.device=$dev
+    uci -q delete network.ffuplink.type
+  fi
+
+  # change dhcp from ifname to device
+  ports=$(uci -q get network.dhcp.ifname)
+  if [ $? -eq 0 ]; then
+    log "changing dhcp interface from ifname syntax to device"
+    NEWDEV=$(uci -q add network device)
+    uci -q set network.$NEWDEV.type="bridge"
+    uci -q set network.$NEWDEV.name="br-dhcp"
+    for port in $ports; do
+      uci -q add_list network.$NEWDEV.ports=$port
+    done
+    uci -q delete network.dhcp.ifname
+    uci -q set network.dhcp.device="br-dhcp"
+    uci -q delete network.dhcp.type
+  fi
+
+  # ensure all interfaces created by tunneldigger are changed from
+  # ifname to device. This should handle bbbdigger, pdmdigger and
+  # any other community mesh tunneldigger interfaces.  In the case
+  # of ffuplink, it will fail through the second if clause as it has
+  # already been taken care of explicitly above (ffuplink can also
+  # be a notunnel interface).
+  handle_tunneldigger_interface() {
+    local config=$1
+    local interface=''
+    config_get interface $config interface "unset"
+    if [ ${interface} != "unset" ]; then
+      local dev=$(uci -q get network.${interface}.ifname)
+      if [ "X${dev}X" != "XX" ]; then
+        log "changing ${interface} interface from ifname syntax to device"
+        uci -q delete network.${interface}.ifname
+        uci -q set network.${interface}.device=$dev
+        uci -q delete network.${interface}.type
+      fi
+    fi
+  }
+  reset_cb
+  config_load tunneldigger
+  config_foreach handle_tunneldigger_interface broker
+
+  uci commit network
+}
+
+r1_2_0_olsrd() {
+  log "adding new procd section to olsrd and olsrd6"
+  uci set olsrd.procd=procd
+  uci set olsrd.procd.respawn_threshold=3600
+  uci set olsrd.procd.respawn_timeout=15
+  uci set olsrd.procd.respawn_retry=0
+
+  uci set olsrd6.procd=procd
+  uci set olsrd6.procd.respawn_threshold=3600
+  uci set olsrd6.procd.respawn_timeout=15
+  uci set olsrd6.procd.respawn_retry=0
+
+  uci commit olsrd
+  uci commit olsrd6
+}
+
+r1_2_0_owm() {
+  log "removing old owm.lua cronjob in exchange with the new owm.sh script"
+  crontab -l | grep -v "owm.lua" | crontab -
+  /etc/init.d/cron restart
+}
+
+r1_2_0_dynbanner() {
+  log "removing old dynbanner.sh as now it is called 10_dynbanner.sh"
+  rm -f /etc/profile.d/dynbanner.sh
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
   # always use the most recent profiles and update repo-link
   migrate_profiles
   bump_repo
+  ensure_profiled
 
   if semverLT ${OLD_VERSION} "0.1.0"; then
     update_openvpn_remote_config
@@ -796,6 +968,16 @@ migrate () {
     r1_1_2_rssiled
   fi
 
+  if semverLT ${OLD_VERSION} "1.2.0"; then
+    r1_2_0_dhcp
+    r1_2_0_fw_zone_freifunk
+    r1_2_0_fw_synflood
+    r1_2_0_statistics
+    r1_2_0_network
+    r1_2_0_olsrd
+    r1_2_0_owm
+    r1_2_0_dynbanner
+  fi
 
   # overwrite version with the new version
   log "Setting new system version to ${VERSION}."
