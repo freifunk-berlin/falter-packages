@@ -13,18 +13,21 @@ As testing every configuration can be quite time-consuming, we usally involve th
 ## Do the actual release
 
 When everything is ready, do the following:
+
 1. Create a commit with the new version number (like in pre-release) and push it to the repo. We use only stable OpenWrt-releases versions as release base.
 2. Then follow the instructions on the [github manual](https://docs.github.com/en/github/administering-a-repository/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release). If everything went right, the release should be based on the commit you've just pushed.
 
 ## After a release
 
-This step is very important: You need to do another commit immediately after the buildbot has start building and before merging other commits. In `freifunk_release` you need to adjust these variables to values matching your situation:
+This step is very important: You need to do another commit **after** the buildbot has start building and before merging other commits. Please wait at least 10 minutes before doing so, as buildbot waits that amount of time for new commits, before starting the build process. If you do it too early, buildbot won't build the release commit but only the commit reverting to snapshots.
+
+For the reversion to snapshot builds you need to adjust these variables in `freifunk_release` to values matching your situation. For example:
 
 ```sh
-FREIFUNK_RELEASE='1.2-snapshot'
-FREIFUNK_OPENWRT_BASE='21.01-SNAPSHOT'
+FREIFUNK_RELEASE='1.2.0-snapshot'
+FREIFUNK_OPENWRT_BASE='21.02-SNAPSHOT'
 ```
 
-If you don't do this, buildbot will just overwrite your precious release images once you've merged the next commit. That's becaus buildbot derived the destination-directory from the version.
+If you don't do this, buildbot will just overwrite your precious release images once you've merged the next commit. That's because buildbot derives the destination-directory from the version.
 
 So please don't miss this step.
