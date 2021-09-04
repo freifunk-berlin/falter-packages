@@ -8,7 +8,7 @@ uci import firewall <<EOF
 EOF
 
 SECTION="$(uci add firewall defaults)"
-uci set firewall.$SECTION.syn_flood=1
+uci set firewall.$SECTION.synflood_protect=1
 uci set firewall.$SECTION.input=ACCEPT
 uci set firewall.$SECTION.output=ACCEPT
 uci set firewall.$SECTION.forward=REJECT
