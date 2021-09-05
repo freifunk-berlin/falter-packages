@@ -728,6 +728,12 @@ r1_2_0_fw_zone_freifunk() {
   for net in $NETS; do
     uci add_list firewall.zone_freifunk.network=$net
   done
+  DEVS=$(uci -q get firewall.zone_freifunk.device)
+  uci delete firewall.zone_freifunk.device
+  for dev in $DEVS; do
+    uci add_list firewall.zone_freifunk.device=$dev
+  done
+
   uci commit firewall
 }
 
