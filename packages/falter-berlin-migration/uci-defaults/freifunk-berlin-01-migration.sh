@@ -1007,6 +1007,13 @@ r1_2_1_olsrd_watchdog_crontab() {
   /etc/init.d/cron restart
 }
 
+r1_2_2_https_interface() {
+  log "enabling redirection to TLS-encrypted LuCI-Interface"
+  uci set uhttpd.main.redirect_https=1
+  uci commit uhttpd
+  service uhttpd reload
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1119,6 +1126,10 @@ migrate () {
     r1_2_1_rpcd
     r1_2_1_ffwizard
     r1_2_1_olsrd_watchdog_crontab
+  fi
+
+  if semverLT ${OLD_VERSION} "1.2.2"; then
+    r1_2_2_https_interface
   fi
 
   # overwrite version with the new version
