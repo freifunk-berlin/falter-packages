@@ -7,6 +7,8 @@ guard "uhttpd"
 # this should help us to avoid different certificates with same
 # commonname/issuer id
 uci set uhttpd.px5g.commonname="Freifunk Berlin - $(dd if=/dev/urandom bs=4 count=1 | hexdump -e '1/1 "%02x"')"
-# do not force redirect to https
-uci set uhttpd.main.redirect_https=0
+# do force redirect to https for encrypted web interface
+uci set uhttpd.main.redirect_https=1
 uci commit
+
+service uhttpd reload
