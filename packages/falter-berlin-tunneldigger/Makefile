@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-tunneldigger
 PKG_SOURCE_DATE:=2020-08-10
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/wlanslovenija/tunneldigger.git
@@ -16,7 +16,7 @@ define Package/falter-berlin-tunneldigger
   SECTION:=net
   CATEGORY:=Network
   DEPENDS:=+libnl-tiny
-  EXTRA_DEPENDS:=kmod-l2tp, kmod-l2tp-ip, kmod-l2tp-eth, librt, libpthread
+  EXTRA_DEPENDS:=kmod-l2tp, kmod-l2tp-eth, librt, libpthread
   TITLE:=L2TPv3 tunnel broker client
   PROVIDES:=tunneldigger
 endef
