@@ -31,12 +31,6 @@ uci set olsrd.$PLUGIN.accept=0.0.0.0
 uci set olsrd.$PLUGIN.library=olsrd_jsoninfo
 uci set olsrd.$PLUGIN.ignore=0
 
-# add watchdog plugin
-PLUGIN="$(uci add olsrd LoadPlugin)"
-uci set olsrd.$PLUGIN.library=olsrd_watchdog
-uci set olsrd.$PLUGIN.file=/var/run/olsrd.watchdog
-uci set olsrd.$PLUGIN.interval=30
-
 # add dyngw plain plugin - it is ipv4 only
 PLUGIN="$(uci add olsrd LoadPlugin)"
 uci set olsrd.$PLUGIN.library=olsrd_dyn_gw
@@ -112,12 +106,6 @@ uci set olsrd6.$PLUGIN.accept=0::
 uci set olsrd6.$PLUGIN.library=olsrd_jsoninfo
 uci set olsrd6.$PLUGIN.ignore=0
 uci set olsrd6.$PLUGIN.ipv6only=true
-
-# add watchdog plugin
-PLUGIN="$(uci add olsrd6 LoadPlugin)"
-uci set olsrd6.$PLUGIN.library=olsrd_watchdog
-uci set olsrd6.$PLUGIN.file=/var/run/olsrd6.watchdog
-uci set olsrd6.$PLUGIN.interval=30
 
 # set olsrd defaults
 OLSRD="$(uci add olsrd6 olsrd)"
