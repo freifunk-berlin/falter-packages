@@ -4,7 +4,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-common
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 
@@ -32,7 +32,7 @@ define Package/falter-common-olsr
   CATEGORY:=LuCI
   SUBMENU:=9. Freifunk
   TITLE:=Falter common files for olsr-v1
-  EXTRA_DEPENDS:=falter-common, olsrd, micrond, libuci-lua, lua
+  EXTRA_DEPENDS:=falter-common, olsrd, libuci-lua, lua
   PKGARCH:=all
 endef
 
