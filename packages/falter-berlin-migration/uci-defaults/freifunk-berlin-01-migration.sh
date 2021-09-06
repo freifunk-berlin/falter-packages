@@ -867,6 +867,25 @@ r1_2_0_olsrd() {
   uci set olsrd6.procd.respawn_timeout=15
   uci set olsrd6.procd.respawn_retry=0
 
+  log "removing olsrd_watchdog settings in olsrd and olsrd6"
+  handle_watchdog_plugin() {
+    local config=$1
+    local confname=$2
+    local library=""
+    config_get library $config library
+    if [ $library = "olsrd_watchdog" ]; then
+      uci -q delete $confname.$config
+    fi
+  }
+
+  reset_cb
+  config_load olsrd
+  config_foreach handle_watchdog_plugin LoadPlugin olsrd
+
+  reset_cb
+  config_load olsrd6
+  config_foreach handle_watchdog_plugin LoadPlugin olsrd6
+
   uci commit olsrd
   uci commit olsrd6
 }
