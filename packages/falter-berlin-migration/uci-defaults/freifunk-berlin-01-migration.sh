@@ -901,6 +901,21 @@ r1_2_0_dynbanner() {
   rm -f /etc/profile.d/dynbanner.sh
 }
 
+r1_2_0_fixbbbdigger() {
+  handle_device() {
+    local config=$1
+    local name=$(uci get network.$config.name)
+    if [ $name = "bbbdiggger" ]; then
+      log "fixing misspelling of bbbdigger device section"
+      uci set network.$config.name=bbbdigger
+      uci commit network
+    fi
+  }
+  reset_cb
+  config_load network
+  config_foreach handle_device device
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1002,6 +1017,7 @@ migrate () {
     r1_2_0_olsrd
     r1_2_0_owm
     r1_2_0_dynbanner
+    r1_2_0_fixbbbdigger
   fi
 
   # overwrite version with the new version
