@@ -67,7 +67,7 @@ function main.write(self, section, value)
       end
       uci:set("network", "bbbdigger_dev", "device")
       uci:set("network", "bbbdigger_dev", "macaddr", mac)
-      uci:set("network", "bbbdigger_dev", "name", "bbbdiggger")
+      uci:set("network", "bbbdigger_dev", "name", "bbbdigger")
 
       -- create the interface
       uci:set("network", "bbbdigger", "interface")
