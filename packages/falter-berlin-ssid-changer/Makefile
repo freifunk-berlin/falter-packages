@@ -29,9 +29,8 @@ define Build/Compile
 endef
 
 define Package/falter-berlin-ssid-changer/install
-	$(INSTALL_DIR) $(1)/etc/pingcheck
-	$(CP) ./files/online.d $(1)/etc/pingcheck/online.d
-	$(CP) ./files/offline.d $(1)/etc/pingcheck/offline.d
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
+	$(CP) ./files/hotplug.d/* $(1)/etc/hotplug.d/net
 	$(CP) ./files/lib $(1)/lib
 endef
 
