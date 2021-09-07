@@ -113,6 +113,11 @@ function index()
 	page.title  = _("BBB-VPN (bbbdigger)")
 	page.order  = 40
 
+	page        = node("admin", "freifunk", "swapports")
+	page.target = cbi("freifunk/swapports", {hideapplybtn=true})
+	page.title  = _("Swap Physical Ports")
+        page.order  = 41
+
 	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
 	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
 	entry({"admin", "freifunk", "profile_error"}, template("freifunk/profile_error"))
