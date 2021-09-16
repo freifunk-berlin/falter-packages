@@ -9,9 +9,21 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Language: de\n"
-"X-Generator: Poedit 2.4.2\n"
+"X-Generator: Poedit 3.0\n"
 
-#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:54
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:46
+msgid ""
+"</strong>. The current default setup is 802.11s. Please select how to use "
+"this device in the future."
+msgstr ""
+"</strong>. Der aktuelle Standard ist 802.11s. Bitte wähle, welchen Funkmodus "
+"du verwenden möchtest."
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:60
+msgid "<br> Current DHCP ports are:"
+msgstr "<br> Derzeit DHCP:"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:55
 msgid "Ad-Hoc (outdated)"
 msgstr "Ad-Hoc (veraltet)"
 
@@ -269,7 +281,7 @@ msgstr "Standort"
 msgid "Longitude"
 msgstr "Längengrad"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:116
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:121
 msgid "Map"
 msgstr "Karte"
 
@@ -406,6 +418,45 @@ msgstr "Auf Karte zeigen"
 msgid "Signal"
 msgstr "Signal"
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:41
+msgid ""
+"Sometimes the physical ports on a router are inconveniently assigned to WAN "
+"and DHCP networks. By selecting to swap the ports, the roles of the ports "
+"will be reversed.<br><ul><li>A router with only two ports will reverse their "
+"roles. An example is the NanoStation M2/M5. The standard setup for the PoE "
+"port is DHCP, while WAN needs to be connected to the secondary port. This is "
+"a quite inconvenient configuration which this tool will change.<li>A router "
+"with only one port will, per default, be assigned to DHCP. This prevents "
+"being able to have any WAN access. This tool will reassign the single "
+"physical port to WAN. An example router is the Unifi-AC-Mesh.<li>A standand "
+"home router, with normally one WAN port and multiple DHCP ports can benefit "
+"from this tool as well. For example, if you want to use those ports for your "
+"private network (the network which has your DSL router) to be able to add "
+"additional devices (printer, game console, NAS storage), this tool will "
+"enable that. In this setup, the single port will be the only access to the "
+"freifunk network, while the remaining ports will be a part of your home "
+"network as well as internet access for freifunk</ul><br><br> Current WAN "
+"ports are:"
+msgstr ""
+"Manchmal möchte man die Zuordnung der Netzwerkbuchsen am Router vertauschen. "
+"Das ist hier möglich. <br><ul><li>\n"
+"Bei einem Router mit nur zwei Ports werden die Rollen vertauscht, zum "
+"Beispiel bei der NanoStation M2/MS5. Die Standardeinstellung für den PoE-"
+"Port ist FF-DHCP und WAN auf dem anderen, zweiten Port. Dies kann man hier "
+"tauschen, sodass per PoE-Port der WAN-Uplink kommen kann (und an dem "
+"sekundären Port FF-DHCP anliegt).<li>Ein Router mit nur einem Port hat an "
+"diesem standardmäßig Freifunk-DHCP. Somit können wir hier normaler Weise "
+"keinen WAN-Uplink anschließen. Mit diesem Tool wird der einzelne Port zum "
+"WAN. Zum Beispiel nützlich beim Unifi-AC-Mesh mit seinem einen Port.<li>Auch "
+"für einen Standard-Router mit einem WAN- und mehreren DHCP-Ports kann dieses "
+"Tool genutzt werden. Zum Beispiel dann, wenn du die DHCP-Ports für den "
+"privates Heim-Netzwerk (das Netzwerk deines DSL-Routers) nutzen möchtest um "
+"zusätzliche Geräte (Drucker, Spielekonsole, NAS) anzuschließen. Dieses Tool "
+"kann das einstellen. In dieser Variante wird der einzelne Port der einzige "
+"Zugang zum Freifunknetz sein, während die anderen Ports Teil deines Heim-"
+"Netzwerks sein werden und Internetzugang für Freifunk bieten.</ul><br><br> "
+"Derzeit WAN:"
+
 #: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
 msgid "Splash"
 msgstr "Splash"
@@ -421,6 +472,22 @@ msgstr "Status"
 #: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:19
 msgid "Still usable (4 < ETX < 10)"
 msgstr "Noch gebrauchbar (4 < ETX < 10)"
+
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:118
+msgid "Swap Physical Ports"
+msgstr "Physische Ports vertauschen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:37
+msgid "Swap WAN and DCHP Physical Ports"
+msgstr "Physische WAN- und DHCP-Ports vertauschen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:63
+msgid "Swap WAN and DCHP ports"
+msgstr "WAN- und DHCP-Ports vertauschen"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:40
+msgid "Swap WAN and DHCP Physical Ports"
+msgstr "Physische WAN- und DHCP-Ports vertauschen"
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:224
 #: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:226
@@ -626,6 +693,10 @@ msgstr "und fülle alle benötigten Felder aus."
 #: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:32
 msgid "buffered"
 msgstr "gepuffert"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:44
+msgid "device is currently set to <strong>"
+msgstr "Das Gerät nutzt derzeit <strong>"
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:39
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:43
