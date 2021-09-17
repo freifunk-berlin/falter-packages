@@ -41,10 +41,10 @@ end)
 m = Map("antennas", translate("Antennas settings"), translate("Antennas settings"))
 uci:foreach("wireless", "wifi-device",
 function(sec)
-	s = m:section(NamedSection, sec[".name"], "wifi-device", "Wifi Device: "..sec[".name"])
+	s = m:section(NamedSection, sec[".name"], "wifi-device", translate("Wifi Device: ")..sec[".name"])
 	s.remove = true
 	
-	svc = s:option(Flag, "builtin", "Built in")
+	svc = s:option(Flag, "builtin", translate("Built in"))
 	
 	svc = s:option(Value, "manufacturer", translate("Manufacturer"))
 	svc:depends("builtin","")
@@ -70,7 +70,7 @@ function(sec)
 	svc.optional = true
 	svc.datatype = "range(0,100)"
 	
-	svc = s:option(ListValue, "type", "Type")
+	svc = s:option(ListValue, "type", translate("Type"))
 	svc.default = "omni"
 	svc:value("omni")
 	svc:value("directed")
