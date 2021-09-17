@@ -13,14 +13,14 @@ css.template = "freifunk/assistent/snippets/css"
 shareBandwidth = f:field(DummyValue, "shareBandwidthfo", "")
 shareBandwidth.template = "freifunk/assistent/snippets/shareBandwidth"
 
-local usersBandwidthDown = f:field(Value, "usersBandwidthDown", "Download-Bandbreite in Mbit/s")
+local usersBandwidthDown = f:field(Value, "usersBandwidthDown", translate("Download-Bandbreite in Mbit/s"))
 usersBandwidthDown.datatype = "float"
 usersBandwidthDown.rmempty = false
 function usersBandwidthDown.cfgvalue(self, section)
   return uci:get("ffwizard", "settings", "usersBandwidthDown")
 end
 
-local usersBandwidthUp = f:field(Value, "usersBandwidthUp", "Upload-Bandbreite in Mbit/s")
+local usersBandwidthUp = f:field(Value, "usersBandwidthUp", translate("Upload-Bandbreite in Mbit/s"))
 usersBandwidthUp.datatype = "float"
 usersBandwidthUp.rmempty = false
 function usersBandwidthUp.cfgvalue(self, section)

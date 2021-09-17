@@ -21,8 +21,8 @@ local community = "profile_"..uci:get("freifunk", "community", "name")
 local sharenet = uci:get("ffwizard", "settings", "sharenet")
 
 f = SimpleForm("ffwizard", "", "")
-f.submit = "Save and reboot"
-f.cancel = "Back"
+f.submit = translate("Save and reboot")
+f.cancel = translate("Back")
 f.reset = false
 
 css = f:field(DummyValue, "css", "")
@@ -39,13 +39,13 @@ uci:foreach("wireless", "wifi-device",
     local channel = tonumber(section["channel"])
     local devicename
     if ( channel <= 14 ) then
-      devicename = "2.4 Ghz Wifi ("..device:upper()..")"
+      devicename = translate("2.4 Ghz Wifi (")..device:upper()..")"
     else
-      devicename = "5 Ghz Wifi ("..device:upper()..")"
+      devicename = translate("5 Ghz Wifi (")..device:upper()..")"
     end
     f:field(DummyValue, device:upper(), devicename)
     wifi_tbl[device] = {}
-    local meship = f:field(Value, "meship_" .. device, "Mesh-IP", "")
+    local meship = f:field(Value, "meship_" .. device, translate("Mesh-IP"), "")
     meship.rmempty = false
     meship.datatype = "ip4addr"
     function meship.cfgvalue(self, section)
@@ -58,14 +58,14 @@ uci:foreach("wireless", "wifi-device",
     wifi_tbl[device]["meship"] = meship
 
     local supportedModes = tools.wifi_get_mesh_modes(device)
-    local meshmode = f:field(ListValue, "mode_" .. device, "Mesh Mode", "")
+    local meshmode = f:field(ListValue, "mode_" .. device, translate("Mesh Mode"), "")
     meshmode.widget = "radio"
     if supportedModes["80211s"] == true then
-      meshmode:value("80211s", "802.11s")
+      meshmode:value("80211s", translate("802.11s"))
       meshmode.default = "80211s"
     end
     if supportedModes["adhoc"] == true then
-      meshmode:value("adhoc", "Ad-Hoc (veraltet)")
+      meshmode:value("adhoc", translate("Ad-Hoc (veraltet)"))
       if supportedModes["80211s"] ~= true then
         meshmode.default = "adhoc"
       end
@@ -83,14 +83,14 @@ if vap == "1" then
   ipinfo = f:field(DummyValue, "ipinfo", "")
   ipinfo.template = "freifunk/assistent/snippets/ipinfo"
 
-  ssid = f:field(Value, "ssid", "Freifunk-SSID", "")
+  ssid = f:field(Value, "ssid", translate("Freifunk-SSID"), "")
   ssid.rmempty = false
   function ssid.cfgvalue(self, section)
     return uci:get("ffwizard", "settings", "ssid")
       or uci:get(community, "profile", "ssid")
   end
 
-  dhcpmesh = f:field(Value, "dhcpmesh", "DHCP-Network", "")
+  dhcpmesh = f:field(Value, "dhcpmesh", translate("DHCP-Network"), "")
   dhcpmesh.rmempty = false
   dhcpmesh.datatype = "ip4addr"
   function dhcpmesh.cfgvalue(self, section)

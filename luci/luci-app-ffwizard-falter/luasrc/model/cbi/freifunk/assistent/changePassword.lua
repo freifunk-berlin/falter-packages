@@ -2,7 +2,7 @@ local uci = require "luci.model.uci".cursor()
 
 f = SimpleForm("ffwizward", "", "")
 --change button texts
-f.submit = "Next"
+f.submit = translate("Next")
 --hide reset button
 f.reset = false
 --enable skip button
