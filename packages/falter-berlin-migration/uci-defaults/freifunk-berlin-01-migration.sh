@@ -705,6 +705,21 @@ r1_1_2_rssiled() {
   r1_1_1_rssiled
 }
 
+r1_1_3_fixbbbdigger() {
+  handle_device() {
+    local config=$1
+    local name=$(uci get network.$config.name)
+    if [ $name = "bbbdiggger" ]; then
+      log "fixing misspelling of bbbdigger device section"
+      uci set network.$config.name=bbbdigger
+      uci commit network
+    fi
+  }
+  reset_cb
+  config_load network
+  config_foreach handle_device device
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -796,6 +811,9 @@ migrate () {
     r1_1_2_rssiled
   fi
 
+  if semverLT ${OLD_VERSION} "1.1.3"; then
+    r1_1_3_fixbbbdigger
+  fi
 
   # overwrite version with the new version
   log "Setting new system version to ${VERSION}."
