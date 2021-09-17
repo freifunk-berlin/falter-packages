@@ -23,9 +23,9 @@ uci:foreach("wireless", "wifi-device",
     local channel = tonumber(section["channel"])
     local devicename
     if ( channel <= 14 ) then
-      devicename = "2.4 Ghz Wifi ("..device:upper()..")"
+      devicename = translate("2.4 Ghz Wifi (")..device:upper()..")"
     else
-      devicename = "5 Ghz Wifi ("..device:upper()..")"
+      devicename = translate("5 Ghz Wifi (")..device:upper()..")"
     end
 
     -- determine which mesh modes are support by this radio
@@ -42,13 +42,13 @@ uci:foreach("wireless", "wifi-device",
         local meshmode = f:option(ListValue, "mode_" .. device, devicename, 
             translate("The ") .. devicename .. 
             translate(" device is currently set to <strong>") .. 
-            ((ifaceSection["mode"] == "adhoc") and "Ad-Hoc" or "802.11s") ..
+            ((ifaceSection["mode"] == "adhoc") and translate("Ad-Hoc") or translate("802.11s")) ..
             translate("</strong>. The current default setup is 802.11s.  " ..
             "Please select how to use this device in the future. "))
         meshmode.widget = "radio"
         local supportedModes = fftools.wifi_get_mesh_modes(device)
         if supportedModes["80211s"] == true then
-          meshmode:value("80211s", "802.11s")
+          meshmode:value("80211s", translate("802.11s"))
           meshmode.default = "80211s"
         end
         if supportedModes["adhoc"] == true then
