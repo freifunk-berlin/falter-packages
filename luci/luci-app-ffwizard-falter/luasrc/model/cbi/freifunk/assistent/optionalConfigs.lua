@@ -13,8 +13,8 @@ if html.formvalue("sharenet", true) == "0" then
 end
 
 f = SimpleForm("ffwizard", "", "")
-f.submit = "Next"
-f.cancel = "Back"
+f.submit = translate("Next")
+f.cancel = translate("Back")
 f.reset = false
 
 css = f:field(DummyValue, "css", "")
@@ -23,7 +23,7 @@ css.template = "freifunk/assistent/snippets/css"
 enableStatsInfo = f:field(DummyValue, "statsInfo", "")
 enableStatsInfo.template = "freifunk/assistent/snippets/enableStats"
 
-enableStats = f:field(Flag, "stats", "Monitoring anschalten")
+enableStats = f:field(Flag, "stats", translate("Monitoring anschalten"))
 enableStats.default = 0 -- this does not work
 function enableStats.cfgvalue(self, section)
   return tostring(uci:get("ffwizard", "settings" , "enableStats")) or "0"
