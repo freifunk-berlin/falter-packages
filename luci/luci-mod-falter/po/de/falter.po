@@ -453,6 +453,19 @@ msgstr ""
 "Positionsdaten aus dem Netzwerk.<br /> Bitte stelle sicher, dass Nameservice-"
 "Plugin korrekt ist und das die Option <em>latlon_file</em> eingeschaltet ist."
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:11
+msgid ""
+"The community profile holds the basic settings for your local wireless "
+"community. These settings define the default values for the wizard. Changing "
+"the community profile DOES NOT affect the actual configuration of the "
+"router. Please do another wizard run or adjust the values by hand."
+msgstr ""
+"Das Community-Profil beinhaltet die Grundeinstellungen für deine lokale "
+"Community. Diese Einstellungen beeinflussen die Standard-Werte im Wizard. "
+"Das Community-Profil zu wechseln, ändert NICHT die aktuellen Einstellungen "
+"an deinem Router. Bitte führe dafür den Wizard nochmals aus oder passe die "
+"Einstellungen von Hand an."
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:7
 msgid ""
 "The nodes of the Freifunk network foward data based on shortest paths and "
@@ -490,16 +503,6 @@ msgstr ""
 "zu Verbindungsverlusten führen. Bitte wende dich an deine Mesh-Nachbarn, um "
 "gemeinsam zu 802.11s zu wechseln. Bitte wähle aus, welches Protokoll "
 "verwendet werden soll."
-
-#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:11
-msgid ""
-"These are the basic settings for your local wireless community. These "
-"settings define the default values for the wizard and DO NOT affect the "
-"actual configuration of the router."
-msgstr ""
-"Dies sind die Grundeinstellungen für deine lokale Freifunk-Community. Sie "
-"definieren die Standard des Wizards und verändern die aktuellen "
-"Routereinstellungen NICHT."
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:13
 msgid "These are the settings of your local community."
@@ -647,3 +650,12 @@ msgstr "benutzt"
 #: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:39
 msgid "wireless settings"
 msgstr "WLAN-Einstellungen"
+
+#~ msgid ""
+#~ "These are the basic settings for your local wireless community. These "
+#~ "settings define the default values for the wizard and DO NOT affect the "
+#~ "actual configuration of the router."
+#~ msgstr ""
+#~ "Dies sind die Grundeinstellungen für deine lokale Freifunk-Community. Sie "
+#~ "definieren die Standard des Wizards und verändern die aktuellen "
+#~ "Routereinstellungen NICHT."
