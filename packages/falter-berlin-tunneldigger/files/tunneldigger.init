@@ -53,7 +53,24 @@ missing() {
 }
 
 handle_td() {
-        local cfg=$1
+        local cfg=$1; shift
+        # determine if we should start only this instance
+        local sections=$@
+        local argn=$#
+        local skip=0
+        if [ $argn -ne 0 ]; then
+                skip=1
+                for section in $sections; do
+                        if [ "$cfg" == "$section" ]; then
+                                skip=0
+                                break
+                        fi
+                done
+                if [ $skip -ne 0 ]; then
+                        return
+                fi
+        fi
+
         local enabled
         local srv
         local addresses
@@ -127,15 +144,38 @@ handle_td() {
         /sbin/start-stop-daemon -S -q -b -m -c root:${group} -p ${PIDPATH}/tunneldigger.${interface}.pid -x /usr/bin/tunneldigger -- -u ${uuid} -i ${interface} -t ${tunnel_id} ${broker_opts}
 }
 
+# the start function can take arguements.  Without any arguements, the default behavior is
+# to start all tunneldigger sections.  With arguements, only the listed tunneldigger
+# sections are started
 start() {
         config_load tunneldigger
-        config_foreach handle_td broker
+        config_foreach handle_td broker $@
 }
 
+# the stop function can take arguements.  Without any arguements, the default behavior is
+# to stop all tunneldigger sections.  With arguements, only the listed tunneldigger
+# sections are stopped
 stop() {
+        local sections=$@
+        local argn=$#
         for PIDFILE in `find ${PIDPATH}/ -name "tunneldigger\.*\.pid"`; do
                 PID="$(cat ${PIDFILE})"
                 IFACE="$(echo ${PIDFILE} | awk -F\/tunneldigger '{print $2}' | cut -d'.' -f2)"
+                # determine if we should stop only this instance
+                local skip=0
+                if [ $argn -ne 0 ]; then
+                        skip=1
+                        for section in $sections; do
+                                local section_iface=$(uci get tunneldigger.${section}.interface)
+                                if [ $IFACE = $section_iface ]; then
+                                        skip=0
+                                        break
+                                fi
+                         done
+                         if [ $skip -ne 0 ]; then
+                                continue
+                         fi
+                fi
                 echo "Stopping tunneldigger for interface ${IFACE}"
                 start-stop-daemon -K -q -p $PIDFILE 
                 while test -d "/proc/${PID}"; do
@@ -147,8 +187,11 @@ stop() {
         done
 }
 
+# the restart function can take arguements.  Without any arguements, the default behavior is
+# to restart all tunneldigger sections.  With arguements, only the listed tunneldigger
+# sections are restarted
 restart() {
-        stop
-        start
+        stop $@
+        start $@
 }
 
