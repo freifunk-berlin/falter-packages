@@ -12,6 +12,7 @@ msgstr ""
 "X-Generator: Poedit 2.4.2\n"
 "Language-Team: \n"
 
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:46
 msgid ""
 "</strong>. The current default setup is 802.11s. Please select how to use "
@@ -489,6 +490,14 @@ msgid ""
 "configured and that the <em>latlon_file</em> option is enabled."
 msgstr ""
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:11
+msgid ""
+"The community profile holds the basic settings for your local wireless "
+"community. These settings define the default values for the wizard. Changing "
+"the community profile DOES NOT affect the actual configuration of the "
+"router. Please do another wizard run or adjust the values by hand."
+msgstr ""
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua:7
 msgid ""
 "The nodes of the Freifunk network foward data based on shortest paths and "
@@ -509,13 +518,6 @@ msgid ""
 "standard. Also, if this router currently meshes with Ad-Hoc then changing it "
 "to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
 "to switch to 802.11s collectively. Please select which protocol to use."
-msgstr ""
-
-#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:11
-msgid ""
-"These are the basic settings for your local wireless community. These "
-"settings define the default values for the wizard and DO NOT affect the "
-"actual configuration of the router."
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:13
