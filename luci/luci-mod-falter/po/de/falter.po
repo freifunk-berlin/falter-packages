@@ -11,6 +11,19 @@ msgstr ""
 "Language: de\n"
 "X-Generator: Poedit 3.0\n"
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:26
+msgid "2.4 Ghz Wifi ("
+msgstr "2.4 GHz WLAN ("
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:28
+msgid "5 Ghz Wifi ("
+msgstr "5 GHz WLAN ("
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:45
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:51
+msgid "802.11s"
+msgstr "802.11s"
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:46
 msgid ""
 "</strong>. The current default setup is 802.11s. Please select how to use "
@@ -22,6 +35,10 @@ msgstr ""
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:60
 msgid "<br> Current DHCP ports are:"
 msgstr "<br> Derzeit DHCP:"
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:45
+msgid "Ad-Hoc"
+msgstr "Ad-Hoc"
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:55
 msgid "Ad-Hoc (outdated)"
