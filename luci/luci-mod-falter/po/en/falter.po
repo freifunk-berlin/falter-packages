@@ -12,6 +12,18 @@ msgstr ""
 "X-Generator: Poedit 2.4.2\n"
 "Language-Team: \n"
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:26
+msgid "2.4 Ghz Wifi ("
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:28
+msgid "5 Ghz Wifi ("
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:45
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:51
+msgid "802.11s"
+msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:46
 msgid ""
@@ -21,6 +33,10 @@ msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/swapports.lua:60
 msgid "<br> Current DHCP ports are:"
+msgstr ""
+
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:45
+msgid "Ad-Hoc"
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:55
