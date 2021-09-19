@@ -12,27 +12,22 @@ msgstr ""
 "X-Generator: Poedit 2.4.2\n"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:17
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:17
 msgid "Bad (SNR < 5)"
 msgstr "Schlecht (SNR < 5)"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:7
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:7
 msgid "Both link ends can hear each other"
 msgstr "Beide Endstellen des Link können sich gegenseitig hören"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:30
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:30
 msgid "Broadcast address"
 msgstr "Broadcast-Adresse"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:157
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:157
 msgid "Configuration"
 msgstr "Einstellungen"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:36
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:36
 msgid ""
 "Could not get any data. Make sure the telnet interface is activated and "
 "allows connections from localhost."
@@ -41,109 +36,84 @@ msgstr ""
 "aktiviert ist und einkommen Verbindungen von localhost erlaubt."
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:24
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:24
 msgid "Device"
 msgstr "Gerät"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:162
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:162
 msgid "Download Config"
 msgstr "Einstellungen herunterladen"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:15
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:15
 msgid "Good (30 > SNR > 20)"
 msgstr "Gut (30 > SNR > 20)"
 
-#: luci/luci-app-olsr2/luci-app-olsr2/root/usr/share/rpcd/acl.d/luci-app-olsr2.json:3
 #: luci/luci-app-olsr2/root/usr/share/rpcd/acl.d/luci-app-olsr2.json:3
 msgid "Grant UCI access for luci-app-olsr2"
 msgstr "UCI-Zugriff für luci-app-olsr2 erlauben"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:14
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:14
 msgid "Green"
 msgstr "Grün"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:137
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:137
 msgid "HNA"
 msgstr "HNA"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:8
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:8
 msgid "Heard"
 msgstr "Gehört"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:55
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:121
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:55
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:121
 msgid "Hostname"
 msgstr "Hostname"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:23
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:56
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:122
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:23
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:56
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:122
 msgid "Interface"
 msgstr "Schnittstelle"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:14
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:122
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:14
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:122
 msgid "Interfaces"
 msgstr "Schnittstellen"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:1
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:1
 msgid "Legend"
 msgstr "Legende"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:58
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:124
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:58
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:124
 msgid "Link Status"
 msgstr "Link Status"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:3
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:3
 msgid "Link metric as reported by OLSRD2"
 msgstr "Link-Metrik nach Bericht von OLSRd2"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:4
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:4
 msgid "Link status as reported by OLSRD2"
 msgstr "Link-Status nach Bericht von OLSRd2"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:147
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:147
 msgid "Links per node (average)"
 msgstr "Links pro Knoten (Durchschnitt)"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:142
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:142
 msgid "Links total"
 msgstr "Links insgesamt"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:57
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:123
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:57
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:123
 msgid "Local bind IP"
 msgstr "Lokale Bind-Adresse"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:26
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:26
 msgid "MTU"
 msgstr "MTU"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:10
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:10
 msgid ""
 "Make sure that OLSRd2 is running, has telnet configured on port 2009 and "
 "accepts connections from \"127.0.0.1\"."
@@ -153,146 +123,116 @@ msgstr ""
 
 #: luci/luci-app-olsr2/luasrc/controller/olsr2.lua:27
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:127
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/controller/olsr2.lua:27
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:127
 msgid "Neighbors"
 msgstr "Nachbarn"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:54
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:120
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:54
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:120
 msgid "Neighbour IP"
 msgstr "Nachbar-IP"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:29
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:29
 msgid "Netmask"
 msgstr "Netzmaske"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:119
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:119
 msgid "Network"
 msgstr "Netzwerk"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:132
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:132
 msgid "Nodes"
 msgstr "Knoten"
 
 #: luci/luci-app-olsr2/luasrc/controller/olsr2.lua:16
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/controller/olsr2.lua:16
 msgid "OLSRv2"
 msgstr "OLSRv2"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:8
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:8
 msgid "OLSRv2 Daemon"
 msgstr "OLSRv2 Daemon"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:111
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:111
 msgid "OLSRv2 connections"
 msgstr "OLSRv2-Verbindungen"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:16
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:16
 msgid "Orange"
 msgstr "Orange"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:116
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:116
 msgid "Overview"
 msgstr "Übersicht"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:116
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/neighbors.htm:116
 msgid "Overview of currently established OLSRv2 connections"
 msgstr "Übersicht der aufgebauten OLSR-Verbindungen"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:19
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:19
 msgid "Overview of interfaces where OLSR is running"
 msgstr "Übersicht der Schnittstellen, auf denen OLSR läuft"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:17
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:17
 msgid "Red"
 msgstr "Rot"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:11
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:11
 msgid "Signal Noise Ratio in dB"
 msgstr "Signal-Rausch-Abstand in dB"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:28
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:28
 msgid "Source address"
 msgstr "Quelladresse"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:25
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:25
 msgid "State"
 msgstr "Status"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:16
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:16
 msgid "Still usable (20 > SNR > 5)"
 msgstr "Noch zu gebrauchen (20 > SNR > 5)"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:7
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:7
 msgid "Symmetric"
 msgstr "Symmetrisch"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:9
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/error_olsr.htm:9
 msgid "Unable to connect to the OLSRv2 daemon!"
 msgstr "Verbinden zum OLSRv2 Daemon nicht möglich!"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:159
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/overview.htm:159
 msgid "Version"
 msgstr "Version"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:14
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:14
 msgid "Very good (SNR > 30)"
 msgstr "Sehr gut (SNR > 30)"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:27
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:27
 msgid "WLAN"
 msgstr "WLAN"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:8
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:8
 msgid ""
 "We only heard the other link end but they don&#39;t seem to be able to hear "
 "us"
 msgstr "Wir haben die Gegenstelle gehört, aber sie scheint uns nicht zu hören"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:15
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/legend.htm:15
 msgid "Yellow"
 msgstr "Gelb"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:38
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:38
 msgid "down"
 msgstr "herunter"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:40
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:40
 msgid "no"
 msgstr "nein"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:38
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:38
 msgid "up"
 msgstr "herauf"
 
 #: luci/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:40
-#: luci/luci-app-olsr2/luci-app-olsr2/luasrc/view/status-olsr2/interfaces.htm:40
 msgid "yes"
 msgstr "ja"
