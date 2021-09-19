@@ -1,42 +1,93 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/ffwizard-berlin.json:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:42
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:25
+msgid "2.4 Ghz Wifi ("
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:44
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:27
+msgid "5 Ghz Wifi ("
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:64
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:44
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:50
+msgid "802.11s"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:45
+msgid ""
+"</strong>. The current default setup is 802.11s. Please select how to use "
+"this device in the future."
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/ffwizard-berlin.json:3
 msgid "Access some status information without login"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:53
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:54
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:44
+msgid "Ad-Hoc"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:54
 msgid "Ad-Hoc (outdated)"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:10
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:68
+msgid "Ad-Hoc (veraltet)"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:10
 msgid ""
 "Als naechstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte die "
 "IPs bereit, die du ueber den Wizard von config.berlin.freifunk.net bekommen "
 "hast."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:19
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:19
 msgid "Am Freifunk-Netz teilnehmen"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:36
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:36
 msgid "Am Freifunk-Netz teilnehmen und Internet teilen"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:16
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:17
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:25
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:50
+msgid "Back"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:16
 msgid ""
 "Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
 "erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist er "
 "auch unter dem Namen <em>frei.funk</em> zu erreichen."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:24
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:51
+msgid "Cancel"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:24
 msgid "Confirmation"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:13
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:93
+msgid "DHCP-Network"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:33
+msgid "Dein Nickname"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:39
+msgid "Dein Realname"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:13
 msgid ""
 "Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
 "Freifunk-Netzwerkes. Die noetige Angabe solltest du von config.berlin."
@@ -44,7 +95,7 @@ msgid ""
 "(Beispiel: 10.42.42.42/28)."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/shareBandwidth.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/shareBandwidth.htm:3
 msgid ""
 "Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des kuerzesten "
 "Wegs und der hoechsten Bandbreite weiter. Dazu muss bekannt sein, wieviel "
@@ -57,7 +108,7 @@ msgid ""
 "grosszuegig, aber nicht ueberbieten. :-)"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:3
 msgid ""
 "Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> "
 "lassen, sofern sich nicht in unmittelbarer Naehe ein weiterer Access Point "
@@ -68,14 +119,22 @@ msgid ""
 "das Adhoc-Netzwerk, das fuer das Freifunk-Meshing benutzt wird."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:11
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:16
+msgid "Download-Bandbreite in Mbit/s"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:11
 msgid ""
 "Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu gestartet. "
 "Am besten, du machst dir kurz einen Kaffee oder einen Tee :D und sobald alle "
 "Lichter wieder blinken, bist du Freifunkerin!"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:24
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:45
+msgid "E-Mail"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:24
 msgid ""
 "Erweitere das Freifunk-Netz. Du benoetigst dazu eine WLAN-Verbindung zu "
 "einem anderen Freifunk-Router. Du kannst auf der Freifunk-Karte nachschauen, "
@@ -83,14 +142,30 @@ msgid ""
 "optimal ausrichten koennt."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:22
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:22
 msgid ""
 "Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im Freifunk-"
 "Hauptmenu unter <em>Services</em> ansehen, sobald dein Router neugestartet "
 "hat."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/welcome.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:16
+msgid "Freifunk-Community"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:86
+msgid "Freifunk-SSID"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:57
+msgid "Geographischer Breitengrad"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:63
+msgid "Geographischer Längengrad"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/welcome.htm:3
 msgid ""
 "Herzlichen Glueckwunsch! <br/>Du hast deinen Router erfolgreich mit der "
 "Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim Einrichten "
@@ -101,7 +176,11 @@ msgid ""
 "Bereich <em>System &gt; Administration.</em>"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/meshipinfo.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:69
+msgid "Höhe über Grund"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/meshipinfo.htm:3
 msgid ""
 "Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
 "berlin.freifunk.net bekommen hast. Ueber diese Adresse(n) verbindet sich "
@@ -110,49 +189,68 @@ msgid ""
 "Wireless</em> anschauen."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpninfo.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpninfo.htm:3
 msgid ""
 "Im Folgenden wird dein Schluessel zum Tunnel/VPN gebraucht. Du entpackst die "
 "Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und deinen "
 "Schlüssel hoch."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
 msgid "Local Certificate"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
 msgid "Local Key"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:61
+msgid "Mesh Mode"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:48
+msgid "Mesh-IP"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:26
+msgid "Monitoring anschalten"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:27
+msgid "Name dieses Freifunk-Knotens"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:5
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:7
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:16
+msgid "Next"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
 msgid "Password"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpncertreupload.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:24
+msgid "Save and reboot"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpncertreupload.htm:3
 msgid "Schluessel loeschen und erneut hochladen"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:51
+msgid "Standort"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
 msgid "Super user access role"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:43
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
 msgid "The"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:8
-msgid ""
-"The wireless interfaces which are built into the router can mesh with other "
-"routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
-"used.</strong> Some routers (or their drivers) might not support this new "
-"standard. Also, if this router currently meshes with Ad-Hoc then changing it "
-"to 802.11s would cause connectivity loss. Please contact your mesh neighbors "
-"to switch to 802.11s collectively. Please select which protocol to use."
-msgstr ""
-
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:5
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:5
 msgid ""
 "The wireless interfaces which are built into the router can mesh with other "
 "routers using either Ad-Hoc or 802.11s. <strong>802.11s is now the standard "
@@ -164,18 +262,22 @@ msgid ""
 "at a later time to change these settings.</em>"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:41
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:41
 msgid ""
 "Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
 "freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu anderen "
 "Freifunk-Routern sinnvoll."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
 msgid "Update Wireless-Mesh Settings"
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/enableStats.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:23
+msgid "Upload-Bandbreite in Mbit/s"
+msgstr ""
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/enableStats.htm:3
 msgid ""
 "Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-"
 "Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der "
@@ -188,7 +290,7 @@ msgid ""
 "Router-Oberflaeche."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/generalInfo.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/generalInfo.htm:3
 msgid ""
 "Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
 "Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
@@ -201,10 +303,6 @@ msgid ""
 "benutzt."
 msgstr ""
 
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:7
-msgid "Wireless Mesh Settings"
-msgstr ""
-
-#: applications/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua:4
-msgid "Wireless-Mesh Settings"
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:43
+msgid "device is currently set to <strong>"
 msgstr ""
