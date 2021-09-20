@@ -10,7 +10,7 @@
 
 . /lib/functions.sh
 
-TUNNEL_SERV='a.bbb-vpn.berlin.freifunk.net:8942 b.bbb-vpn.berlin.freifunk.net:8942'
+TUNNEL_SRV='_bbb-vpn._udp.berlin.freifunk.net'
 IFACE=bbbdigger
 BIND=wan
 
@@ -35,10 +35,9 @@ fi
 
 # tunneldigger setup
 uci set tunneldigger.$IFACE=broker
+# remove old address list in favor of srv
 uci -q delete tunneldigger.$IFACE.address
-for srv in $TUNNEL_SERV; do
-  uci add_list tunneldigger.$IFACE.address=$srv
-done
+uci set tunneldigger.$IFACE.srv=$TUNNEL_SRV
 uci set tunneldigger.$IFACE.uuid=$UUID
 uci set tunneldigger.$IFACE.interface=$IFACE
 uci set tunneldigger.$IFACE.broker_selection=usage
