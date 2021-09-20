@@ -916,6 +916,20 @@ r1_2_0_fixbbbdigger() {
   config_foreach handle_device device
 }
 
+r1_2_0_tunneldigger_srv() {
+  local section=$1
+  local srv=$2
+  # check to make sure such a section is defined
+  uci -q get tunneldigger.${section}
+  if [ $? -ne 0 ]; then
+    log "updating server list for $section"
+    uci -q delete tunneldigger.${section}.address
+    uci -q set tunneldigger.${section}.srv="$srv"
+    uci commit tunneldigger
+    /etc/init.d/tunneldigger restart $section
+  fi
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1018,6 +1032,8 @@ migrate () {
     r1_2_0_owm
     r1_2_0_dynbanner
     r1_2_0_fixbbbdigger
+    r1_2_0_tunneldigger_srv "ffuplink" "_tunnel._udp.berlin.freifunk.net"
+    r1_2_0_tunneldigger_srv "bbbdigger" "_bbb-vpn._udp.berlin.freifunk.net"
   fi
 
   # overwrite version with the new version
