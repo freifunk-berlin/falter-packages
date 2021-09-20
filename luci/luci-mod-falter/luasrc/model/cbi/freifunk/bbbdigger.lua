@@ -81,9 +81,7 @@ function main.write(self, section, value)
         uuid = uuid .. sys.exec("dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 \":%02x\"'")
       end
       uci:set("tunneldigger", "bbbdigger", "broker")
-      uci:set("tunneldigger", "bbbdigger", "address", { 
-        "a.bbb-vpn.berlin.freifunk.net:8942", 
-        "b.bbb-vpn.berlin.freifunk.net:8942" } )
+      uci:set("tunneldigger", "bbbdigger", "srv", "_bbb-vpn._udp.berlin.freifunk.net")
       uci:set("tunneldigger", "bbbdigger", "uuid", uuid)
       uci:set("tunneldigger", "bbbdigger", "interface", "bbbdigger")
       uci:set("tunneldigger", "bbbdigger", "broker_selection", "usage")
@@ -111,7 +109,7 @@ function main.write(self, section, value)
     uci:commit("tunneldigger")
     uci:commit("firewall")
     uci:commit("olsrd")
-    sys.exec("/etc/init.d/tunneldigger restart")
+    sys.exec("/etc/init.d/tunneldigger restart bbbdigger")
 
   end
 
