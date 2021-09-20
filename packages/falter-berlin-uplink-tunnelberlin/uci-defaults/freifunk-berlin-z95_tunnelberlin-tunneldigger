@@ -55,10 +55,9 @@ fi
 
 uci delete tunneldigger.ffuplink
 uci set tunneldigger.ffuplink=broker
+# Remove old address list in excahange with srv
 uci -q delete tunneldigger.ffuplink.address
-for srv in a b c d e f; do
-  uci add_list tunneldigger.ffuplink.address=$srv.tunnel.berlin.freifunk.net:8942
-done
+uci set tunneldigger.ffuplink.srv='_tunnel._udp.berlin.freifunk.net'
 uci set tunneldigger.ffuplink.uuid=$UUID
 uci set tunneldigger.ffuplink.interface=ffuplink
 uci set tunneldigger.ffuplink.broker_selection=usage
