@@ -721,18 +721,31 @@ r1_2_0_dhcp() {
   fi
 }
 
-r1_2_0_fw_zone_freifunk() {
-  log "ensuring that the networks in zone_freifunk are stored as a list"
-  NETS=$(uci -q get firewall.zone_freifunk.network)
-  uci delete firewall.zone_freifunk.network
-  for net in $NETS; do
-    uci add_list firewall.zone_freifunk.network=$net
-  done
-  DEVS=$(uci -q get firewall.zone_freifunk.device)
-  uci delete firewall.zone_freifunk.device
-  for dev in $DEVS; do
-    uci add_list firewall.zone_freifunk.device=$dev
-  done
+r1_2_0_fw_zones() {
+  handle_zone() {
+    local cfg=$1
+    local name=''
+    local nets=''
+    local devs=''
+
+    config_get name $cfg name
+    config_get nets $cfg network
+    config_get devs $cfg device
+
+    log "ensuring that the networks and devices in zone ${name} are stored as a list"
+    uci -q delete firewall.$cfg.network
+    for net in $nets; do
+      uci add_list firewall.$cfg.network=$net
+    done
+    uci -q delete firewall.$cfg.device
+    for dev in $devs; do
+      uci add_list firewall.$cfg.device=$dev
+    done
+  }
+
+  reset_cb
+  config_load firewall 
+  config_foreach handle_zone zone
 
   uci commit firewall
 }
@@ -745,9 +758,10 @@ r1_2_0_fw_synflood() {
 }
 
 r1_2_0_statistics() {
-  log "adding (disabled) dhcpleases section to luci_statistics"
+  local enabled=$(uci -q get luci_statistics.collectd_interface.enable)
+  log "adding dhcpleases section to luci_statistics"
   uci set luci_statistics.collectd_dhcpleases=statistics
-  uci set luci_statistics.collectd_dhcpleases.enable=0
+  uci set luci_statistics.collectd_dhcpleases.enable=$enabled
   uci set luci_statistics.collectd_dhcpleases.Path='/tmp/dhcp.leases'
   uci commit luci_statistics
 }
@@ -1024,7 +1038,7 @@ migrate () {
 
   if semverLT ${OLD_VERSION} "1.2.0"; then
     r1_2_0_dhcp
-    r1_2_0_fw_zone_freifunk
+    r1_2_0_fw_zones
     r1_2_0_fw_synflood
     r1_2_0_statistics
     r1_2_0_network
