@@ -337,7 +337,7 @@ msgstr "Netzwerk für Client-DHCP Adressen"
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:9
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:28
 msgid "Nickname"
-msgstr "Sptzname"
+msgstr "Spitzname"
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/public_status.htm:329
 msgid "No default routes known."
