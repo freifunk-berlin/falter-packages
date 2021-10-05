@@ -842,6 +842,23 @@ r1_2_0_network() {
     uci -q delete network.dhcp.type
   fi
 
+  # change lo from ifname to device
+  dev=$(uci -q get network.lo.ifname)
+  if [ $? -eq 0 ]; then
+    log "changing lo interface from ifname sytax to device"
+    uci -q delete network.lo.ifname
+    uci -q set network.lo.device=$dev
+  fi
+
+  # change tunl0 from ifname to device
+  dev=$(uci -q get network.tunl0.ifname)
+  if [ $? -eq 0 ]; then
+    log "changing tunl0 interface from ifname sytax to device"
+    uci -q delete network.tunl0.ifname
+    uci -q set network.tunl0.device=$dev
+  fi
+
+
   # ensure all interfaces created by tunneldigger are changed from
   # ifname to device. This should handle bbbdigger, pdmdigger and
   # any other community mesh tunneldigger interfaces.  In the case
@@ -933,15 +950,29 @@ r1_2_0_fixbbbdigger() {
 r1_2_0_tunneldigger_srv() {
   local section=$1
   local srv=$2
-  # check to make sure such a section is defined
-  uci -q get tunneldigger.${section}
-  if [ $? -ne 0 ]; then
+  local reslut=$(uci -q get tunneldigger.${section})
+  # check to make sure such a section is defined}
+  if [ "$result" == "broker" ]; then
     log "updating server list for $section"
     uci -q delete tunneldigger.${section}.address
     uci -q set tunneldigger.${section}.srv="$srv"
     uci commit tunneldigger
     /etc/init.d/tunneldigger restart $section
   fi
+}
+
+r1_2_0_ucitrack() {
+  # in case there are multiple freifunk-policytrouing sections, remove extras
+  log "removing extra freifunk-policyrouting sections from ucitrack"
+  while [ "$(uci -q get ucitrack.@freifunk-policyrouting[1])" == "freifunk-policyrouting" ]; do
+    uci -q delete ucitrack.@freifunk-policyrouting[1]
+  done
+
+  # remove radvd from the list of network affects
+  log "removing radvd from ucitrack network settings"
+  uci -q del_list ucitrack.@network[0].affects=radvd
+
+  uci commit ucitrack
 }
 
 migrate () {
@@ -1048,6 +1079,7 @@ migrate () {
     r1_2_0_fixbbbdigger
     r1_2_0_tunneldigger_srv "ffuplink" "_tunnel._udp.berlin.freifunk.net"
     r1_2_0_tunneldigger_srv "bbbdigger" "_bbb-vpn._udp.berlin.freifunk.net"
+    r1_2_0_ucitrack
   fi
 
   # overwrite version with the new version
