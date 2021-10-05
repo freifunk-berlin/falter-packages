@@ -1,4 +1,8 @@
 #!/bin/sh
+
+. /lib/functions/guard.sh
+guard "freifunk-policyrouting"
+
 uci batch <<-EOF
         add ucitrack freifunk-policyrouting
         add_list ucitrack.@freifunk-policyrouting[-1].exec="/etc/init.d/freifunk-policyrouting restart"
