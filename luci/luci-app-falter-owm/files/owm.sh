@@ -56,7 +56,7 @@ olsr4_links() {
 	json_select $2
 	json_get_var localIP localIP
 	json_get_var remoteIP remoteIP
-	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/')"
+	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
 	json_get_var linkQuality linkQuality
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
@@ -68,7 +68,7 @@ olsr6_links() {
 	json_select $2
 	json_get_var localIP localIP
 	json_get_var remoteIP remoteIP
-	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/')"
+	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
 	json_get_var linkQuality linkQuality
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
