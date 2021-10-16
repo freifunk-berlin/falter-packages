@@ -950,7 +950,7 @@ r1_2_0_fixbbbdigger() {
 r1_2_0_tunneldigger_srv() {
   local section=$1
   local srv=$2
-  local reslut=$(uci -q get tunneldigger.${section})
+  local result=$(uci -q get tunneldigger.${section})
   # check to make sure such a section is defined}
   if [ "$result" == "broker" ]; then
     log "updating server list for $section"
