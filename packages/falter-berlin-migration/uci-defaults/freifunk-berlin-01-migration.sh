@@ -842,12 +842,12 @@ r1_2_0_network() {
     uci -q delete network.dhcp.type
   fi
 
-  # change lo from ifname to device
-  dev=$(uci -q get network.lo.ifname)
+  # change loopback from ifname to device
+  dev=$(uci -q get network.loopback.ifname)
   if [ $? -eq 0 ]; then
-    log "changing lo interface from ifname sytax to device"
-    uci -q delete network.lo.ifname
-    uci -q set network.lo.device=$dev
+    log "changing loopback interface from ifname sytax to device"
+    uci -q delete network.loopback.ifname
+    uci -q set network.loopback.device=$dev
   fi
 
   # change tunl0 from ifname to device
