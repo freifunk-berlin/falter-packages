@@ -214,7 +214,7 @@ json_add_object system
 		json_add_string "" "system is deprecated"
 		json_add_string "" "$model"
 	json_close_array
-	json_add_array
+	json_add_array uptime
 		json_add_int "" $uptime
 	json_close_array
 	json_add_array loadavg
