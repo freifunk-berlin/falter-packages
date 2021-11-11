@@ -975,6 +975,38 @@ r1_2_0_ucitrack() {
   uci commit ucitrack
 }
 
+r1_2_1_dynbanner() {
+  log "removing old dynbanner.sh as now it is called 10_dynbanner.sh"
+  rm -f /etc/profile.d/dynbanner.sh
+}
+
+r1_2_1_rpcd() {
+  if [ "$(uci get rpcd.@rpcd[0].socket)" != "/var/run/ubus/ubus.sock" ]; then
+    log "ensuring that the ubus sock is set correctly"
+    uci set rpcd.@rpcd[0].socket='/var/run/ubus/ubus.sock'
+    uci commit rpcd
+  fi
+}
+
+r1_2_1_ffwizard() {
+  log "removing unneeded mode_radioX options from ffwizard"
+  handle_wifi_device() {
+    local section=$1
+    uci -q del ffwizard.settings.mode_${section}
+  }
+  reset_cb
+  config_load wireless
+  config_foreach handle_wifi_device wifi-device
+
+  uci commit ffwizard
+}
+
+r1_2_1_olsrd_watchdog_crontab() {
+  log "removing the olsrds watchdog script from crontab"
+  crontab -l | grep -v "ff_olsr_watchdog" | crontab -
+  /etc/init.d/cron restart
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1080,6 +1112,13 @@ migrate () {
     r1_2_0_tunneldigger_srv "ffuplink" "_tunnel._udp.berlin.freifunk.net"
     r1_2_0_tunneldigger_srv "bbbdigger" "_bbb-vpn._udp.berlin.freifunk.net"
     r1_2_0_ucitrack
+  fi
+
+  if semverLT ${OLD_VERSION} "1.2.1"; then
+    r1_2_1_dynbanner
+    r1_2_1_rpcd
+    r1_2_1_ffwizard
+    r1_2_1_olsrd_watchdog_crontab
   fi
 
   # overwrite version with the new version
