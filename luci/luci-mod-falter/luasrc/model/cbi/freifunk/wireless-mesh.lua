@@ -39,7 +39,7 @@ uci:foreach("wireless", "wifi-device",
         if ( "mesh" ~= ifaceSection["mode"] and "adhoc" ~= ifaceSection["mode"] ) then
           return
         end
-        local meshmode = f:option(ListValue, "mode_" .. device, devicename, 
+        local meshmode = f:option(ListValue, "meshmode_" .. device, devicename, 
             translate("The ") .. devicename .. 
             translate(" device is currently set to <strong>") .. 
             ((ifaceSection["mode"] == "adhoc") and translate("Ad-Hoc") or translate("802.11s")) ..
