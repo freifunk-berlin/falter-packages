@@ -31,6 +31,8 @@ if [ -n "$CMD_1" ] && [ "$CMD_1" != "--dry-run" ]; then
 	exit 1
 fi
 
+# ToDo: Make this nice
+owm_api_host="api.openwifimap.net"
 
 ######################
 #                    #
@@ -58,10 +60,11 @@ olsr4_links() {
 	json_get_var remoteIP remoteIP
 	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
 	json_get_var linkQuality linkQuality
+	json_get_var linkCost linkCost
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $linkCost $ifName;"
 }
 
 olsr6_links() {
@@ -70,10 +73,11 @@ olsr6_links() {
 	json_get_var remoteIP remoteIP
 	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
 	json_get_var linkQuality linkQuality
+	json_get_var linkCost linkCost
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $linkCost $ifName;"
 }
 
 # This section is relevant for hopglass statistics feature (isUplink/isHotspot)
@@ -125,6 +129,7 @@ json_select release
 json_get_var revision revision
 json_get_var distribution distribution
 json_get_var version version
+json_get_var description description
 json_select ..
 json_load "$(ubus call system info)"
 json_get_var uptime uptime
@@ -138,11 +143,23 @@ if [ -f /etc/freifunk_release ]; then
 	revision="$FREIFUNK_REVISION"
 fi
 
-# Get Sysload
+# Get System Data
 sysload=$(cat /proc/loadavg)
-load1=$(echo "$sysload" | cut -d' ' -f1)
-load5=$(echo "$sysload" | cut -d' ' -f2)
-load15=$(echo "$sysload" | cut -d' ' -f3)
+load_one=$(echo "$sysload" | cut -d' ' -f1)
+load_five=$(echo "$sysload" | cut -d' ' -f2)
+load_fifteen=$(echo "$sysload" | cut -d' ' -f3)
+json_load "$(ubus call system info)"
+json_select memory
+json_get_var freeram free
+json_get_var sharedram shared
+json_get_var bufferedram buffered
+json_get_var totalram total
+json_select ..
+json_select swap
+json_get_var totalswap total
+json_get_var freeswap free
+json_select ..
+procs=$(ps|wc -l)
 
 # Date when the firmware was build.
 kernelString=$(cat /proc/version)
@@ -161,7 +178,8 @@ note="$(uci_get freifunk contact note)"
 # community info
 ssid="$(uci_get freifunk community ssid)"
 mesh_network="$(uci_get freifunk community mesh_network)"
-uci_owm_apis="$(uci_get freifunk community owm_api)"
+uci_owm_api="$(uci_get freifunk community owm_api)"
+owm_api_host=$(echo $uci_owm_api | sed -e 's/http\(s\)\{0,1\}:\/\///g')
 com_name="$(uci_get freifunk community name)"
 com_homepage="$(uci_get freifunk community homepage)"
 com_longitude="$(uci_get freifunk community longitude)"
@@ -169,7 +187,6 @@ com_latitude="$(uci_get freifunk community latitude)"
 com_ssid_scheme=$(uci_get freifunk community ssid_scheme)
 com_splash_network=$(uci_get freifunk community splash_network)
 com_splash_prefix=$(uci_get freifunk community splash_prefix)
-
 
 
 ###########################
@@ -211,14 +228,31 @@ json_add_double api_rev $OWM_API_VER
 
 json_add_object system
 	json_add_array sysinfo
-		json_add_string "" "system is deprecated"
+		json_add_string "" "$system"
 		json_add_string "" "$model"
+		json_add_object ""
+		        json_add_int freeram "$freeram"
+		        json_add_int sharedram "$sharedram"
+		        json_add_int bufferram "$bufferedram"
+		        json_add_int uptime "$uptime" 
+		        json_add_int totalswap "$totalswap" 
+		        json_add_int procs "$procs"
+		        json_add_int totalram "$totalram"
+		        json_add_array loads
+		        	json_add_double $load_one
+		        	json_add_double $load_five
+		        	json_add_double $load_fifteen
+		        json_close_array
+		        json_add_int freeswap "$freeswap"
+		json_close_object
 	json_close_array
 	json_add_array uptime
 		json_add_int "" $uptime
 	json_close_array
 	json_add_array loadavg
-		json_add_double "" $load5
+		#json_add_double $load_one
+		json_add_double $load_five
+		#json_add_double $load_fifteen
 	json_close_array
 json_close_object
 
@@ -239,17 +273,21 @@ json_add_array links
 		json_add_string destAddr6 "$2"
 		json_add_string id "$3"
 		json_add_double quality "$4"
+		json_add_double linkCost "$5"
 		json_close_object
 		IFS=';'
 	done
 	for i in ${olsr4links} ; do
 		IFS="$IFSORIG"
+		IFS=" "
 		set -- $i
 		json_add_object
 		json_add_string sourceAddr4 "$1"
 		json_add_string destAddr4 "$2"
 		json_add_string id "$3"
 		json_add_double quality "$4"
+		json_add_double linkCost "$5"
+		json_add_string interface "$6"
 		json_close_object
 		IFS=';'
 	done
@@ -261,10 +299,15 @@ json_add_array links
 		json_add_string destAddr6 "$2"
 		json_add_string id "$3"
 		json_add_double quality "$4"
+		json_add_double linkCost "$5"
+		json_add_string interface "$6"
 		json_close_object
 		IFS=';'
 	done
 	IFS="$IFSORIG"
+json_close_array
+
+json_add_array interfaces
 json_close_array
 
 # General node info
@@ -277,11 +320,12 @@ json_add_int updateInterval 3600
 json_add_string hardware "$system"
 json_add_object firmware
 	json_add_string name "$distribution $version"
+	json_add_string distname "$distribution"
+	json_add_string distversion "$version"
 	json_add_string revision "$revision"
+	json_add_string description "$description"
 	json_add_string kernelVersion "$kernelVersion"
 	json_add_string kernelBuildDate "$buildDate"
-json_close_object
-
 json_close_object
 
 JSON_STRING=$(json_dump)
@@ -308,11 +352,11 @@ LEN=$(echo $JSON_STRING | wc -m)
 MSG="\
 PUT /update_node/$hostname.olsr HTTP/1.1\r
 User-Agent: nc/0.0.1\r
-Host: api.openwifimap.net\r
+Host: $owm_api_host\r
 Content-type: application/json\r
 Content-length: $LEN\r
 \r
 $JSON_STRING\r\n"
 
-printf "$MSG" | nc api.openwifimap.net 80
+printf "$MSG" | nc $owm_api_host 80
 printf "\n\n"
