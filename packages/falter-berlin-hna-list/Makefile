@@ -1,10 +1,9 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-hna-list
-PKG_RELEASE:=3
+PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/cmake.mk
 
 define Package/falter-berlin-hna-list
   SECTION:=falter-berlin
@@ -13,14 +12,16 @@ define Package/falter-berlin-hna-list
   PROVIDES:=hna-list
 endef
 
-TARGET_CFLAGS += \
-	-I$(STAGING_DIR)/usr/include/libnl-tiny \
-	-I$(STAGING_DIR)/usr/include \
-	-DLIBNL_TINY
-
 define Build/Prepare
-	$(call Build/Prepare/Default)
-	$(CP) $(PKG_BUILD_DIR)/src/* $(PKG_BUILD_DIR)
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) $(SOURCE_DIR)/* $(PKG_BUILD_DIR)
+	$(Build/Patch)
+endef
+
+# Package build instructions; invoke the target-specific compiler to first compile the source file, and then to link the file into the final executable
+define Build/Compile
+	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/hna-list.o -c $(PKG_BUILD_DIR)/main.c $(PKG_BUILD_DIR)/src/avl.c
+	$(TARGET_CC) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/$1 $(PKG_BUILD_DIR)/hna-list.o
 endef
 
 define Package/falter-berlin-hna-list/install
