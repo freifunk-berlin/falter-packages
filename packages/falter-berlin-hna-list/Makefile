@@ -24,7 +24,9 @@ endef
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/main.o -c $(PKG_BUILD_DIR)/src/main.c 
 	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/avl.o -c $(PKG_BUILD_DIR)/src/libavl/avl.c
-	$(TARGET_CC) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/hna-list $(PKG_BUILD_DIR)/main.o $(PKG_BUILD_DIR)/avl.o
+	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/avl_helper.o -c $(PKG_BUILD_DIR)/src/libhna/avl_helper.c
+	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/hna.o -c $(PKG_BUILD_DIR)/src/libhna/hna.c
+	$(TARGET_CC) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/hna-list $(PKG_BUILD_DIR)/main.o $(PKG_BUILD_DIR)/avl.o $(PKG_BUILD_DIR)/hna.o $(PKG_BUILD_DIR)/avl_helper.o
 endef
 
 define Package/falter-berlin-hna-list/install
