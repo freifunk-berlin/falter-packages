@@ -61,7 +61,9 @@ olsr4_links() {
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	if [[ "$olsrInterface" != *"wg_"* ]]; then
+		olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	fi
 }
 
 olsr6_links() {
