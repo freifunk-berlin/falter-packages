@@ -146,8 +146,8 @@ load15=$(echo "$sysload" | cut -d' ' -f3)
 
 # Date when the firmware was build.
 kernelString=$(cat /proc/version)
-buildDate=$(echo $kernelString | cut -d'#' -f2 | cut -c 3-)
-kernelVersion=$(echo $kernelString | cut -d' ' -f3)
+buildDate=$(echo "$kernelString" | cut -d'#' -f2 | cut -c 3-)
+kernelVersion=$(echo "$kernelString" | cut -d' ' -f3)
 
 # contact information
 uci_load freifunk
@@ -161,7 +161,7 @@ note="$(uci_get freifunk contact note)"
 # community info
 ssid="$(uci_get freifunk community ssid)"
 mesh_network="$(uci_get freifunk community mesh_network)"
-uci_owm_apis="$(uci_get freifunk community owm_api)"
+uci_owm_api="$(uci_get freifunk community owm_api)"
 com_name="$(uci_get freifunk community name)"
 com_homepage="$(uci_get freifunk community homepage)"
 com_longitude="$(uci_get freifunk community longitude)"
@@ -285,7 +285,7 @@ json_close_object
 json_close_object
 
 JSON_STRING=$(json_dump)
-#insert json-string from OLSR and repair wrong syntax at string-borders (shell-quotes...)
+# insert json-string from OLSR and repair wrong syntax at string-borders (shell-quotes...)
 JSON_STRING=$(echo "$JSON_STRING" | sed -e 's|$OLSRCONFIG|'"$OLSRCONFIG"'|; s|"{|{|; s|}"|}|' )
 
 # just print data to stdout, if we have test-run.
@@ -303,7 +303,7 @@ fi
 
 #echo $JSON_STRING
 # get message lenght for request
-LEN=$(echo $JSON_STRING | wc -m) 
+LEN=${#JSON_STRING}
 
 MSG="\
 PUT /update_node/$hostname.olsr HTTP/1.1\r

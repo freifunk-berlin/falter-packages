@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-falter-owm
-PKG_VERSION:=2021.09.03
+PKG_VERSION:=2022.01.09
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 PKG_BUILD_DEPENDS += lua/host luci-base/host LUCI_CSSTIDY:csstidy/host LUCI_SRCDIET:luasrcdiet/host $(LUCI_BUILD_DEPENDS)
@@ -100,4 +100,3 @@ $(eval $(call BuildPackage,luci-app-falter-owm))
 $(eval $(call BuildPackage,luci-app-falter-owm-cmd))
 $(eval $(call BuildPackage,luci-app-falter-owm-gui))
 $(eval $(call BuildPackage,luci-app-falter-owm-ant))
-
