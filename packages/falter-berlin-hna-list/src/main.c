@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+
 int main(int argc, char *argv[]) {
         /*const char *hna4 = tcp_read("127.0.0.1", 2006, "/hna");
         const char *hna6 = tcp_read("::1", 2006, "/hna");
@@ -62,12 +63,15 @@ int main(int argc, char *argv[]) {
                 curr = (hna_data *) avl_t_next(&traverser);
         } while (curr != NULL);
 
-        // free avl-tree
-        avl_destroy(tree, &free_hna_data);
-
         free(hna4);
         free(hosts);
         free(hna6);
+        
+        // free avl-tree
+        avl_destroy(tree, &free_hna_data);
+
+
+        //getchar();
 
         return EXIT_SUCCESS;
 }

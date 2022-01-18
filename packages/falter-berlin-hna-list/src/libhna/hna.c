@@ -1,4 +1,5 @@
 #include "hna.h"
+#include <stdlib.h>
 
 char *read_file(const char *filename) {
         char *buffer;
@@ -91,7 +92,7 @@ char *tcp_read(const char *addr_str, int port, const char *request) {
 
 hna_data *serialize_hna_string(char *hna, char *gateway) {
         // input-data: "10.230.198.192/28", "10.31.43.188"
-        hna_data* dataset = calloc(1,sizeof(hna_data));
+        hna_data* dataset = calloc(1, sizeof(hna_data));
 
         char* ipaddr = strtok(hna, "/");
         char* netmask = strtok(NULL, "/");
@@ -113,10 +114,12 @@ void read_hna_into_tree(struct avl_table *tree, char *raw_data) {
         int j;
         for (str1 = raw_data;;str1 = NULL) {
                 token = strtok_r(str1, line_delim, &saveptr1);
-                if (token == NULL)
+                if (token == NULL) {
                         break;
-                if (token[0] == 'T' || token[0] == 'D')
+                }
+                if (token[0] == 'T' || token[0] == 'D') {
                         continue;
+                }
 
                 char* args[2];
                 for (j=0,str2 = token;;str2 = NULL, j++) {
