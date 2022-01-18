@@ -1,0 +1,35 @@
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=falter-berlin-tunnelmanager
+PKG_VERSION:=0.1
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/falter-berlin-tunnelmanager
+  SECTION:=falter-berlin
+  CATEGORY:=falter-berlin
+  TITLE:=Freifunk Berlin tunnelmanager
+  URL:=http://github.com/Freifunk-Spalter/packages
+  PKGARCH:=all
+endef
+
+define Package/falter-berlin-tunnelmanager/description
+  Scripts for managing wireguard-tunnels on Freifunk Berlin routers.
+endef
+
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+endef
+
+define Build/Configure
+endef
+
+define Build/Compile
+endef
+
+define Package/falter-berlin-tunnelmanager/install
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(CP) ./files/tunnelman.sh $(1)/usr/bin/tunnelman
+endef
+
+$(eval $(call BuildPackage,falter-berlin-tunnelmanager))
