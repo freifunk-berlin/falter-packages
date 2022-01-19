@@ -52,58 +52,6 @@ Example call:
 \n"
 }
 
-##################
-#   CMD-PARSER   #
-##################
-
-ENDPOINT_COUNT=0
-
-while getopts a:c:g:i:n:t:T:D:U: option; do
-    case $option in
-    a) OPT_UPLINK_IP=$OPTARG ;;
-    c) OPT_TUNNEL_COUNT=$OPTARG ;;
-    g) OPT_UPLINK_GW=$OPTARG ;;
-    i) OPT_UPLINK_INTERFACE=$OPTARG ;;
-    n) OPT_NAMESPACE_NAME=$OPTARG ;;
-    t) OPT_INTERVAL=$OPTARG ;;
-    D) OPT_UP_SCRIPT=$OPTARG ;;
-    T)
-        if [ $ENDPOINT_COUNT = 0 ]; then
-            OPT_TUNNEL_ENDPOINTS=$OPTARG
-            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
-        else
-            OPT_TUNNEL_ENDPOINTS="$OPT_TUNNEL_ENDPOINTS $OPTARG"
-            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
-        fi
-        ;;
-    U) OPT_DOWN_SCRIPT=$OPTARG ;;
-    *)
-        print_help
-        exit 2
-        ;;
-    esac
-done
-
-# check roughly, if we could have enogh information for execution (primitive)
-if [ $# -le 18 ]; then
-    printf "Not enough options. Please give all necessary options!\n\n"
-    print_help
-    exit 2
-fi
-
-log "starting tunnelmanager with
-    Uplink-Interface.....: $OPT_UPLINK_INTERFACE
-    Uplink-IP............: $OPT_UPLINK_IP
-    Uplink-GW............: $OPT_UPLINK_GW
-    Namespace............: $OPT_NAMESPACE_NAME 
-    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
-    Tunnel-Count.........: $OPT_TUNNEL_COUNT 
-    Intervall............: $OPT_INTERVAL 
-    Up_Script............: $OPT_DOWN_SCRIPT 
-    Down_Script..........: $OPT_UP_SCRIPT"
-
-# TODO: Check arguments for plausability, so that they can't crash the script
-
 init() {
     local uplink_interface="$1"
     local uplink_ip="$2"
@@ -210,14 +158,71 @@ init() {
 # #  usercount=$current
 # #	return best
 # #}
-#
-# newtunnel(){
-#   local ip="$1"
-#   local nsname="$1"
-#   $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
-#
-#   # move WG interface to default namespace to allow meshing on it
-# 	ip link set dev $interface netns 1
-#   post_setup.sh $interface
-# }
-#
+
+newtunnel() {
+    local ip="$1"
+    local nsname="$1"
+    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
+    
+    # move WG interface to default namespace to allow meshing on it
+    ip link set dev $interface netns 1
+    post_setup.sh $interface
+}
+
+#####################
+#   Main Programm   #
+#####################
+
+########################
+#  Commandline parsing
+
+ENDPOINT_COUNT=0
+
+while getopts a:c:g:i:n:t:T:D:U: option; do
+    case $option in
+    a) OPT_UPLINK_IP=$OPTARG ;;
+    c) OPT_TUNNEL_COUNT=$OPTARG ;;
+    g) OPT_UPLINK_GW=$OPTARG ;;
+    i) OPT_UPLINK_INTERFACE=$OPTARG ;;
+    n) OPT_NAMESPACE_NAME=$OPTARG ;;
+    t) OPT_INTERVAL=$OPTARG ;;
+    D) OPT_UP_SCRIPT=$OPTARG ;;
+    T)
+        if [ $ENDPOINT_COUNT = 0 ]; then
+            OPT_TUNNEL_ENDPOINTS=$OPTARG
+            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
+        else
+            OPT_TUNNEL_ENDPOINTS="$OPT_TUNNEL_ENDPOINTS $OPTARG"
+            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
+        fi
+        ;;
+    U) OPT_DOWN_SCRIPT=$OPTARG ;;
+    *)
+        print_help
+        exit 2
+        ;;
+    esac
+done
+
+# check roughly, if we could have enogh information for execution (primitive)
+if [ $# -le 18 ]; then
+    printf "Not enough options. Please give all necessary options!\n\n"
+    print_help
+    exit 2
+fi
+
+# TODO: Check arguments for plausability, so that they can't crash the script
+
+log "starting tunnelmanager with
+    Uplink-Interface.....: $OPT_UPLINK_INTERFACE
+    Uplink-IP............: $OPT_UPLINK_IP
+    Uplink-GW............: $OPT_UPLINK_GW
+    Namespace............: $OPT_NAMESPACE_NAME 
+    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
+    Tunnel-Count.........: $OPT_TUNNEL_COUNT 
+    Intervall............: $OPT_INTERVAL 
+    Up_Script............: $OPT_DOWN_SCRIPT 
+    Down_Script..........: $OPT_UP_SCRIPT"
+
+###############################
+#   configure wireguard-stuff
