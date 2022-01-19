@@ -69,16 +69,11 @@ while getopts a:c:g:i:n:t:T:D:U: option; do
     D) OPT_UP_SCRIPT=$OPTARG ;;
     T)
         if [ $ENDPOINT_COUNT = 0 ]; then
-            OPT_TUNNEL_ENDPOINT_0=$OPTARG
+            OPT_TUNNEL_ENDPOINTS=$OPTARG
             ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
         else
-            if [ $ENDPOINT_COUNT = 1 ]; then
-                OPT_TUNNEL_ENDPOINT_1=$OPTARG
-                ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
-            else
-                echo "Too many tunnel-endpoints given. Only Two allowed!"
-                exit 42
-            fi
+            OPT_TUNNEL_ENDPOINTS="$OPT_TUNNEL_ENDPOINTS $OPTARG"
+            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
         fi
         ;;
     U) OPT_DOWN_SCRIPT=$OPTARG ;;
@@ -89,52 +84,63 @@ while getopts a:c:g:i:n:t:T:D:U: option; do
     esac
 done
 
-if [ $# != 20 ]; then
+# check roughly, if we could have enogh information for execution (primitive)
+if [ $# -le 18 ]; then
     printf "Not enough options. Please give all necessary options!\n\n"
     print_help
     exit 2
 fi
 
-log "starting with -i $OPT_UPLINK_INTERFACE -a $OPT_UPLINK_IP -g $OPT_UPLINK_GW -n $OPT_NAMESPACE_NAME -T $OPT_TUNNEL_ENDPOINT_0 -T $OPT_TUNNEL_ENDPOINT_1 -c $OPT_TUNNEL_COUNT -t $OPT_INTERVAL -D $OPT_DOWN_SCRIPT -U $OPT_UP_SCRIPT"
+log "starting tunnelmanager with
+    Uplink-Interface.....: $OPT_UPLINK_INTERFACE
+    Uplink-IP............: $OPT_UPLINK_IP
+    Uplink-GW............: $OPT_UPLINK_GW
+    Namespace............: $OPT_NAMESPACE_NAME 
+    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
+    Tunnel-Count.........: $OPT_TUNNEL_COUNT 
+    Intervall............: $OPT_INTERVAL 
+    Up_Script............: $OPT_DOWN_SCRIPT 
+    Down_Script..........: $OPT_UP_SCRIPT"
 
 # TODO: Check arguments for plausability, so that they can't crash the script
 
-# init(){
-#   local uplink_interface="$1"
-#   local uplink_ip="$2"
-#   local uplink_gw="$3"
-#   local nsname="$4"
-#   local tunnelendpoints="$5"
-#
-#   # Prepare Interface. If we have a bridge, which therefore is somehow used in default NS (e.g. for Wifi), then we need to connect a second interface to the main interface
-#   # * check if $uplink_interface is bridge
-#   # -> ip link add mv-$nsname link $uplink_interface type macvlan mode bridge
-#   # -> $uplink_interface = mv-$nsname ne b
-#   # Prepare Interface. If we have a . in the interface name, we most likely have a vlan interface. We need to take care of creating that interface, since we cant rely on openwrt for that, since we move it into a namespace later
-#   # * or if $uplink_interface contains "."
-#   # -> $baseif = $uplink_interface.split('.')[0]
-#   # -> $vid = $uplink_interface.split('.')[1]
-#   # -> ip link add link $baseif name $uplink_interface type vlan id $vid
-#
-#   #  Do nothing if we already get a plain interface, which we cann pass over to the namespace
-#   # * or if $uplink_interface is plain interface then NOOP
-#
-#   # Create Namespace
-#   ip netns add $nsname
-#
-#   # Move that Uplink Interface to namespace
-#   ip link set dev $uplink_interface netns $nsname
-#
-# #	# Configure Uplink Interface in Namespace. In case of DHCP, launch UDHCP in namespace. We leave it running in  foreground and sending it to background to make it terminate when we close the manager script
-#   #if $uplink_ip == dhcp
-#   #        ip netns exec $nsname udhcp -i $uplink_interface -f -R &
-#   #else
-#   #        ip -n $nsname address add $uplink_ip dev $uplink_interface
-#   #        ip -n uplink route add default via $uplink_gw
-#   #fi
-# #	manage(nsname,connection_count, tunnelendpoints)
-# }
-#
+init() {
+    local uplink_interface="$1"
+    local uplink_ip="$2"
+    local uplink_gw="$3"
+    local nsname="$4"
+    local tunnelendpoints="$5"
+
+    # Prepare Interface. If we have a bridge, which therefore is somehow used in default NS (e.g. for Wifi), then we need to connect a second interface to the main interface
+    # * check if $uplink_interface is bridge
+    # -> ip link add mv-$nsname link $uplink_interface type macvlan mode bridge
+    # -> $uplink_interface = mv-$nsname ne b
+
+    # Prepare Interface. If we have a . in the interface name, we most likely have a vlan interface. We need to take care of creating that interface, since we cant rely on openwrt for that, since we move it into a namespace later
+    # * or if $uplink_interface contains "."
+    # -> $baseif = $uplink_interface.split('.')[0]
+    # -> $vid = $uplink_interface.split('.')[1]
+    # -> ip link add link $baseif name $uplink_interface type vlan id $vid
+
+    #  Do nothing if we already get a plain interface, which we cann pass over to the namespace
+    # * or if $uplink_interface is plain interface then NOOP
+
+    # Create Namespace
+    ip netns add "$nsname"
+
+    # Move that Uplink Interface to namespace
+    ip link set dev "$uplink_interface" netns "$nsname"
+
+    #	# Configure Uplink Interface in Namespace. In case of DHCP, launch UDHCP in namespace. We leave it running in  foreground and sending it to background to make it terminate when we close the manager script
+    #if $uplink_ip == dhcp
+    #        ip netns exec $nsname udhcp -i $uplink_interface -f -R &
+    #else
+    #        ip -n $nsname address add $uplink_ip dev $uplink_interface
+    #        ip -n uplink route add default via $uplink_gw
+    #fi
+    #	manage(nsname,connection_count, tunnelendpoints)
+}
+
 #
 # # This method sets up the Tunnels and ensures everything is up and running
 # #manage() {
