@@ -27,8 +27,8 @@ int compare_node_structs(const void *avl_a, const void *avl_b, void *avl_param) 
 
 //avl_item_func (void *avl_item, void *avl_param);
 void free_hna_data(void *avl_item, void *avl_param) {
-        //hna_data *item = (hna_data*)avl_item;
+        hna_data *item = (hna_data*)avl_item;
         //free(item->host_name);
         //free(item->hna.netmask);
-        free(avl_item);
+        free(item);
 }
