@@ -170,18 +170,24 @@ manage() {
 
     # Check for stale tunnels and tear em down
     for conn in $connections; do
-        if get_age "$conn" >$tunneltimeout; then
+        get_age "$conn"
+        age=$?
+        if [ $age -ge $tunneltimeout ]; then
             teardown "$conn"
 
+            #ToDo: currently only one tunnel.
+            ep=$(get_least_used_tunnelserver "$tunnel_endpoints" "$connections")
+            new_tunnel "$ep" "$nsname"
+            connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
             # Setup new Tunnels until we have enough
-            while connections | wc -w <$connection_count; do
-                ep=get_least_used_tunnelserver $tunnel_endpoints $connections
-                new_tunnel $ep $nsname
-                connections=$connections+$tunnel
-
-                # Sleep to not overwhelm the cpu :)
-                sleep $intervall
-            done
+            #while connections | wc -w <$connection_count; do
+            #    ep=get_least_used_tunnelserver $tunnel_endpoints $connections
+            #    new_tunnel $ep $nsname
+            #    connections=$connections+$tunnel
+            #
+            #    # Sleep to not overwhelm the cpu :)
+            #    sleep $intervall
+            #done
         fi
     done
 }
