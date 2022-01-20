@@ -33,6 +33,12 @@ log() {
     echo "$msg"
 }
 
+cleanup() {
+    log "Closing"
+    exit
+}
+trap cleanup EXIT
+
 print_help() {
     printf "\
 
@@ -94,91 +100,82 @@ setup_namespace() {
     return 0
 }
 
-cleanup() {
-    log "Closing"
-    exit
+get_age() {
+    local interface="$1"
+    # Check latest handshake, returns value in seconds ago
+    return $(($(date +%s) - $(wg show "$interface" latest-handshakes | awk '{print $2}')))
 }
-trap cleanup EXIT
 
-#
-# # This method sets up the Tunnels and ensures everything is up and running
-# #manage() {
-# #  local nsname="$1"
-# #  local connection_count="$2"
-# #  local tunnel_endpoints="$3"
-# #  local interval=60
-# #  local tunneltimeout=600
-# #
-# #  # Connections holds a list of current WG interfaces (e.g wg_51312 )
-# #  connections = ""
-# #  while true;
-# #
-# #  # Check for stale tunnels and tear em down
-# #  for conn in connections:
-# #  	if get_age $conn > $tunneltimeout:
-# #    	teardown $conn
-# #
-# #      # Setup new Tunnels until we have enough
-# #			while true connections | wc -w < connection_count:
-# #        $ep= get_least_used_tunnelserver $tunnel_endpoints $connections
-# #        new_tunnel $ep $nsname
-# #        $connections += $tunnel
-# #
-# #    		# Sleep to not overwhelm the cpu :)
-# #    		sleep $intervall
-# #      done
-# #    fi
-# #	done
-# #}
-#
-#
-# get_age(){
-# 	local interface="$1"
-#   # Check latest handshake, returns value in seconds ago
-#   return $(($(date +%s)-$(wg show $interface latest-handshakes | awk '{print $2}')))
-# }
-#
-#
-# teardown(){
-#   local interface="$1"
-#   down.sh $interface
-#   ip link delete dev "$interface"
-# }
-#
-#
-# #get_least_used_tunnelserver() {
-# #  local tunnel_endpoints="$1"
-# #  local connections="$2"
-# #
-# #  # Dont check tunnelserver we already have a connection with
-# #
-# #  for i in $connections
-# #  ip=$(wg show $i endpoints | awk -F'[\t:]' '{print $2}')
-# #  # remove ip from connections:
-# #  tunnel_endpoints=$(echo \$tunnel_endpoints | sed 's/$ip//')
-# #
-# #  # Select next best tunnelserver
-# #
-# #  best = ""
-# #  usercount = 99999
-# #
-# #  for i in $tunnel_endpoints
-# #  current = wg_get_usage
-# #  if $current < $usercount
-# #  best=$i
-# #  usercount=$current
-# #	return best
-# #}
+teardown() {
+    local interface="$1"
+    down.sh "$interface"
+    ip link delete dev "$interface"
+}
 
-#newtunnel() {
-#    local ip="$1"
-#    local nsname="$1"
-#    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
-#
-#    # move WG interface to default namespace to allow meshing on it
-#    ip link set dev $interface netns 1
-#    post_setup.sh $interface
-#}
+get_least_used_tunnelserver() {
+    local tunnel_endpoints="$1"
+    local connections="$2"
+
+    # Dont check tunnelserver we already have a connection with
+
+    for i in $connections; do
+        ip=$(wg show "$i" endpoints | awk -F'[\t:]' '{print $2}')
+        # remove ip from connections:
+        tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$ip//")
+    done
+
+    # Select next best tunnelserver
+    best=""
+    usercount=99999
+
+    for i in $tunnel_endpoints; do
+        current=wg_get_usage
+        if $current <$usercount; then
+            best=$i
+            usercount=$current
+        fi
+    done
+    echo "$best"
+}
+
+newtunnel() {
+    local ip="$1"
+    local nsname="$1"
+    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
+
+    # move WG interface to default namespace to allow meshing on it
+    ip link set dev $interface netns 1
+    post_setup.sh $interface
+}
+
+# This method sets up the Tunnels and ensures everything is up and running
+manage() {
+    local nsname="$1"
+    local connection_count="$2"
+    local tunnel_endpoints="$3"
+    local intervall=60
+    local tunneltimeout=600
+
+    # Connections holds a list of current WG interfaces (e.g wg_51312 )
+    connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
+
+    # Check for stale tunnels and tear em down
+    for conn in $connections; do
+        if get_age "$conn" >$tunneltimeout; then
+            teardown "$conn"
+
+            # Setup new Tunnels until we have enough
+            while connections | wc -w <$connection_count; do
+                ep=get_least_used_tunnelserver $tunnel_endpoints $connections
+                new_tunnel $ep $nsname
+                connections=$connections+$tunnel
+
+                # Sleep to not overwhelm the cpu :)
+                sleep $intervall
+            done
+        fi
+    done
+}
 
 #####################
 #   Main Programm   #
