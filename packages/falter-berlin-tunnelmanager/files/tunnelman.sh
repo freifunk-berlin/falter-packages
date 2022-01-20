@@ -26,8 +26,6 @@
 # -c: tunnel_count
 # -t: interval
 
-
-
 log() {
     local msg="$1"
     #logger -t vpnmanager -s "$msg"
@@ -54,13 +52,11 @@ Example call:
 \n"
 }
 
-
 setup_namespace() {
     local namespace_name="$1"
     local uplink_interface="$2"
     local uplink_ip="$3"
     local uplink_gw="$4"
-
 
     local final_uplink_interface="ul-$namespace_name"
 
@@ -71,7 +67,7 @@ setup_namespace() {
 
     if ! ip netns add "$namespace_name"; then
         log "Error while setting up namespace $namespace_name"
-	exit 1
+        exit 1
     fi
 
     # for now we unconditionally attach a subinterface to the given uplink_interface
@@ -80,12 +76,12 @@ setup_namespace() {
 
     if ! ip link add "$final_uplink_interface" link "$uplink_interface" type macvlan mode bridge; then
         log "Error while setting up macvlan-based uplink interface $final_uplink_interface attached to $uplink_interface"
-	exit 1
+        exit 1
     fi
 
     if ! ip link set dev "$final_uplink_interface" netns "$namespace_name"; then
         log "Error while moving uplink interface $final_uplink_interface attached to $uplink_interface"
-	exit 1
+        exit 1
     fi
 
     # Bringup interface
@@ -98,13 +94,11 @@ setup_namespace() {
     return 0
 }
 
-
 cleanup() {
     log "Closing"
     exit
 }
 trap cleanup EXIT
-
 
 #
 # # This method sets up the Tunnels and ensures everything is up and running
@@ -176,15 +170,15 @@ trap cleanup EXIT
 # #	return best
 # #}
 
-newtunnel() {
-    local ip="$1"
-    local nsname="$1"
-    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
-    
-    # move WG interface to default namespace to allow meshing on it
-    ip link set dev $interface netns 1
-    post_setup.sh $interface
-}
+#newtunnel() {
+#    local ip="$1"
+#    local nsname="$1"
+#    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
+#
+#    # move WG interface to default namespace to allow meshing on it
+#    ip link set dev $interface netns 1
+#    post_setup.sh $interface
+#}
 
 #####################
 #   Main Programm   #
@@ -221,8 +215,12 @@ while getopts a:c:g:i:n:t:T:D:U: option; do
     esac
 done
 
-# check roughly, if we could have enogh information for execution (primitive)
-if [ $# -le 18 ]; then
+# check if we got all information necessary
+if [ -z "$OPT_UPLINK_IP" ] || [ -z "$OPT_TUNNEL_COUNT" ] ||
+    [ -z "$OPT_UPLINK_GW" ] || [ -z "$OPT_UPLINK_INTERFACE" ] ||
+    [ -z "$OPT_NAMESPACE_NAME" ] || [ -z "$OPT_INTERVAL" ] ||
+    [ -z "$OPT_UP_SCRIPT" ] || [ -z "$OPT_TUNNEL_ENDPOINTS" ] ||
+    [ -z "$OPT_DOWN_SCRIPT" ]; then
     printf "Not enough options. Please give all necessary options!\n\n"
     print_help
     exit 2
