@@ -264,3 +264,5 @@ log "starting tunnelmanager with
 #   configure wireguard-stuff
 
 setup_namespace "$OPT_NAMESPACE_NAME" "$OPT_UPLINK_INTERFACE" "$OPT_UPLINK_IP" "$OPT_UPLINK_GW"
+
+manage "$OPT_NAMESPACE_NAME" "$OPT_TUNNEL_COUNT" "$OPT_TUNNEL_ENDPOINTS"
