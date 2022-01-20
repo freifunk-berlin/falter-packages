@@ -5,6 +5,8 @@ PKG_VERSION:=0.1
 
 include $(INCLUDE_DIR)/package.mk
 
+# todo: add dependency on jshn
+
 define Package/falter-berlin-tunnelmanager
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin

@@ -108,8 +108,16 @@ get_age() {
 
 teardown() {
     local interface="$1"
+    # ToDo: down.sh should be dynamic...
     down.sh "$interface"
     ip link delete dev "$interface"
+}
+
+wg_get_usage() {
+    local server="$1"
+    # ToDo: PASSWORDS!!!!11!!111!!
+    clients=$(wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    return "$(echo "$clients" | cut -d' ' -f2)"
 }
 
 get_least_used_tunnelserver() {
@@ -129,8 +137,9 @@ get_least_used_tunnelserver() {
     usercount=99999
 
     for i in $tunnel_endpoints; do
-        current=wg_get_usage
-        if $current <$usercount; then
+        wg_get_usage "$i"
+        current=$?
+        if [ $current -le $usercount ]; then
             best=$i
             usercount=$current
         fi
