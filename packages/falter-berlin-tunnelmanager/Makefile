@@ -10,6 +10,7 @@ define Package/falter-berlin-tunnelmanager
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin tunnelmanager
   URL:=http://github.com/Freifunk-Spalter/packages
+  EXTRA_DEPENDS:=ip-full, kmod-macvlan, wg-installer-client
   PKGARCH:=all
 endef
 
