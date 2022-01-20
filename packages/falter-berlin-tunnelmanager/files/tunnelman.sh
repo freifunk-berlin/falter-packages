@@ -157,7 +157,7 @@ newtunnel() {
     if [ ! -f $gw_key ] || [ ! -f $gw_pub ]; then
         rm -f $gw_key $gw_pub
         wg genkey | tee $gw_key | wg pubkey >$gw_pub
-        fi
+    fi
 
     interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
 
