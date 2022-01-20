@@ -150,11 +150,20 @@ get_least_used_tunnelserver() {
 newtunnel() {
     local ip="$1"
     local nsname="$1"
-    $interface = timeout 5 ip netns $nsname exec wg-client-installer $ip
+
+    [ -d "/tmp/run/wgclient" ] || mkdir -p /tmp/run/wgclient
+    gw_key="/tmp/run/wgclient/wg.key"
+    gw_pub="/tmp/run/wgclient/wg.pub"
+    if [ ! -f $gw_key ] || [ ! -f $gw_pub ]; then
+        rm -f $gw_key $gw_pub
+        wg genkey | tee $gw_key | wg pubkey >$gw_pub
+        fi
+
+    interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
 
     # move WG interface to default namespace to allow meshing on it
-    ip link set dev $interface netns 1
-    post_setup.sh $interface
+    ip link set dev "$interface" netns 1
+    post_setup.sh "$interface"
 }
 
 # This method sets up the Tunnels and ensures everything is up and running
