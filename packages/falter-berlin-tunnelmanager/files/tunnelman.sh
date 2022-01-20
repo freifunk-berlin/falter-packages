@@ -26,6 +26,8 @@
 # -c: tunnel_count
 # -t: interval
 
+
+
 log() {
     local msg="$1"
     #logger -t vpnmanager -s "$msg"
@@ -52,42 +54,57 @@ Example call:
 \n"
 }
 
-init() {
-    local uplink_interface="$1"
-    local uplink_ip="$2"
-    local uplink_gw="$3"
-    local nsname="$4"
-    local tunnelendpoints="$5"
 
-    # Prepare Interface. If we have a bridge, which therefore is somehow used in default NS (e.g. for Wifi), then we need to connect a second interface to the main interface
-    # * check if $uplink_interface is bridge
-    # -> ip link add mv-$nsname link $uplink_interface type macvlan mode bridge
-    # -> $uplink_interface = mv-$nsname ne b
+setup_namespace() {
+    local namespace_name="$1"
+    local uplink_interface="$2"
+    local uplink_ip="$3"
+    local uplink_gw="$4"
 
-    # Prepare Interface. If we have a . in the interface name, we most likely have a vlan interface. We need to take care of creating that interface, since we cant rely on openwrt for that, since we move it into a namespace later
-    # * or if $uplink_interface contains "."
-    # -> $baseif = $uplink_interface.split('.')[0]
-    # -> $vid = $uplink_interface.split('.')[1]
-    # -> ip link add link $baseif name $uplink_interface type vlan id $vid
 
-    #  Do nothing if we already get a plain interface, which we cann pass over to the namespace
-    # * or if $uplink_interface is plain interface then NOOP
+    local final_uplink_interface="ul-$namespace_name"
 
-    # Create Namespace
-    ip netns add "$nsname"
+    if ip netns list | grep -q "$namespace_name"; then
+        log "Namespace $namespace_name already exists."
+        exit 1
+    fi
 
-    # Move that Uplink Interface to namespace
-    ip link set dev "$uplink_interface" netns "$nsname"
+    if ! ip netns add "$namespace_name"; then
+        log "Error while setting up namespace $namespace_name"
+	exit 1
+    fi
 
-    #	# Configure Uplink Interface in Namespace. In case of DHCP, launch UDHCP in namespace. We leave it running in  foreground and sending it to background to make it terminate when we close the manager script
-    #if $uplink_ip == dhcp
-    #        ip netns exec $nsname udhcp -i $uplink_interface -f -R &
-    #else
-    #        ip -n $nsname address add $uplink_ip dev $uplink_interface
-    #        ip -n uplink route add default via $uplink_gw
-    #fi
-    #	manage(nsname,connection_count, tunnelendpoints)
+    # for now we unconditionally attach a subinterface to the given uplink_interface
+    # which is then moved to the namespace. If performance suffers we can implement
+    # later a method to directly pass over the physicall interface
+
+    if ! ip link add "$final_uplink_interface" link "$uplink_interface" type macvlan mode bridge; then
+        log "Error while setting up macvlan-based uplink interface $final_uplink_interface attached to $uplink_interface"
+	exit 1
+    fi
+
+    if ! ip link set dev "$final_uplink_interface" netns "$namespace_name"; then
+        log "Error while moving uplink interface $final_uplink_interface attached to $uplink_interface"
+	exit 1
+    fi
+
+    # Bringup interface
+    ip -n "$namespace_name" link set up dev "$final_uplink_interface"
+
+    # Configure IP addressing
+    ip -n "$namespace_name" address add "$uplink_ip" dev "$final_uplink_interface"
+    ip -n "$namespace_name" route add default via "$uplink_gw"
+
+    return 0
 }
+
+
+cleanup() {
+    log "Closing"
+    exit
+}
+trap cleanup EXIT
+
 
 #
 # # This method sets up the Tunnels and ensures everything is up and running
@@ -220,9 +237,11 @@ log "starting tunnelmanager with
     Namespace............: $OPT_NAMESPACE_NAME 
     Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
     Tunnel-Count.........: $OPT_TUNNEL_COUNT 
-    Intervall............: $OPT_INTERVAL 
+    Interval.............: $OPT_INTERVAL
     Up_Script............: $OPT_DOWN_SCRIPT 
     Down_Script..........: $OPT_UP_SCRIPT"
 
 ###############################
 #   configure wireguard-stuff
+
+setup_namespace "$OPT_NAMESPACE_NAME" "$OPT_UPLINK_INTERFACE" "$OPT_UPLINK_IP" "$OPT_UPLINK_GW"
