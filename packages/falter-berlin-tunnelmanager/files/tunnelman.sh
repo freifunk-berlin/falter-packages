@@ -109,7 +109,7 @@ get_age() {
 teardown() {
     local interface="$1"
     # ToDo: down.sh should be dynamic...
-    down.sh "$interface"
+    $OPT_DOWN_SCRIPT "$interface"
     ip link delete dev "$interface"
 }
 
@@ -166,7 +166,7 @@ newtunnel() {
 
     # move WG interface to default namespace to allow meshing on it
     ip link set dev "$interface" netns 1
-    post_setup.sh "$interface"
+    $OPT_UP_SCRIPT "$interface"
 }
 
 # This method sets up the Tunnels and ensures everything is up and running
