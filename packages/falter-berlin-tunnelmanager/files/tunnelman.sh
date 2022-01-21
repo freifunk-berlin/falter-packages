@@ -33,15 +33,6 @@ log() {
     #echo "$msg"
 }
 
-cleanup() {
-    for i in $connections; do
-        teardown $connection
-    done
-    ip netns delete "$OPT_NAMESPACE_NAME"
-    log "Closing"
-    exit
-}
-trap cleanup EXIT
 
 print_help() {
     printf "\
@@ -62,6 +53,14 @@ Example call:
 \n"
 }
 
+cleanup() {
+    for i in $connections; do
+        teardown $connection
+    done
+    ip netns delete "$OPT_NAMESPACE_NAME"
+    log "Closing"
+    exit
+}
 setup_namespace() {
     local namespace_name="$1"
     local uplink_interface="$2"
@@ -269,6 +268,7 @@ log "starting tunnelmanager with
 
 generate_keys
 
+trap cleanup EXIT
 setup_namespace "$OPT_NAMESPACE_NAME" "$OPT_UPLINK_INTERFACE" "$OPT_UPLINK_IP" "$OPT_UPLINK_GW"
 
 # contains list of connected endpoint
