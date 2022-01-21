@@ -28,9 +28,9 @@
 
 log() {
     local msg="$1"
-    #logger -t vpnmanager -s "$msg"
+    logger -t vpnmanager -s "$msg"
     # for debugging on local machine
-    echo "$msg"
+    #echo "$msg"
 }
 
 cleanup() {
@@ -125,7 +125,6 @@ get_least_used_tunnelserver() {
     local connections="$2"
 
     # Dont check tunnelserver we already have a connection with
-
     for i in $connections; do
         ip=$(wg show "$i" endpoints | awk -F'[\t:]' '{print $2}')
         # remove ip from connections:
@@ -151,15 +150,19 @@ newtunnel() {
     local ip="$1"
     local nsname="$1"
 
+    # If there isn't a proper key-pair, generate it
     [ -d "/tmp/run/wgclient" ] || mkdir -p /tmp/run/wgclient
     gw_key="/tmp/run/wgclient/wg.key"
     gw_pub="/tmp/run/wgclient/wg.pub"
     if [ ! -f $gw_key ] || [ ! -f $gw_pub ]; then
+        log "No proper keys found. Generating a new pair of keys..."
         rm -f $gw_key $gw_pub
         wg genkey | tee $gw_key | wg pubkey >$gw_pub
+        log "generation done."
     fi
 
     interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
+    log "New tunnel interface is $interface"
 
     # move WG interface to default namespace to allow meshing on it
     ip link set dev "$interface" netns 1
@@ -176,16 +179,19 @@ manage() {
 
     # Connections holds a list of current WG interfaces (e.g wg_51312 )
     connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
+    log "current connections: $connections"
 
     # Check for stale tunnels and tear em down
     for conn in $connections; do
         get_age "$conn"
         age=$?
         if [ $age -ge $tunneltimeout ]; then
+            log "Tunnel to $conn timed out. Try to recreate it."
             teardown "$conn"
 
             #ToDo: currently only one tunnel.
             ep=$(get_least_used_tunnelserver "$tunnel_endpoints" "$connections")
+            log "Server handling least clients is: $ep. Trying to create tunnel..."
             new_tunnel "$ep" "$nsname"
             connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
             # Setup new Tunnels until we have enough
