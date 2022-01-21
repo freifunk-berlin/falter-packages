@@ -111,15 +111,23 @@ get_age() {
 
 teardown() {
     local interface="$1"
-    # ToDo: down.sh should be dynamic...
+
     $OPT_DOWN_SCRIPT "$interface"
     ip link delete dev "$interface"
+
+    local endpoint="$(wg show $interface endpoints | awk -F '\t|:' '{print $2}')"
+
+    interfaces=$(echo "$interfaces" | sed "s/$interface //")
+    connections=$(echo "$connections" | sed "s/$endpoint //")
 }
 
 wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
     clients=$(wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
     echo "$(echo "$clients" | cut -d' ' -f2)"
 }
 
@@ -137,9 +145,11 @@ get_least_used_tunnelserver() {
     usercount=99999
 
     for i in $tunnel_endpoints; do
-        wg_get_usage "$i"
-        current=$?
-        if [ $current -le $usercount ]; then
+        current=$(wg_get_usage "$i")
+        if [ $? -ne 0 ]; then
+            log "Error while querying tunnelserver $i for utilization"
+
+        elif [ $current -le $usercount ]; then
             best=$i
             usercount=$current
         fi
@@ -152,7 +162,7 @@ generate_keys() {
     # If there isn't a proper key-pair, generate it
     [ -d "/etc/wireguard" ] || mkdir -p /etc/wireguard
     gw_key="/etc/wireguard/wg.key"
-    gw_pub="/etc/wireguard wg.pub"
+    gw_pub="/etc/wireguard/wg.pub"
     if [ ! -f $gw_key ] || [ ! -f $gw_pub ]; then
         log "No proper keys found. Generating a new pair of keys..."
         rm -f $gw_key $gw_pub
@@ -162,18 +172,24 @@ generate_keys() {
 }
 
 
-newtunnel() {
+new_tunnel() {
     local ip="$1"
     local nsname="$2"
 
 
-    interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
-    log "New tunnel interface is $interface"
+    local interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
 
-    # move WG interface to default namespace to allow meshing on it
-    ip link set dev "$interface" netns 1
-    $OPT_UP_SCRIPT "$interface"
-    echo $interface
+    if [ $? -eq 0 ]; then
+        log "New tunnel interface is $interface"
+
+        # move WG interface to default namespace to allow meshing on it
+        ip link set dev "$interface" netns 1
+
+	interfaces+="$interface "
+	connections+="$ip "
+
+        $OPT_UP_SCRIPT "$interface"
+    fi
 }
 
 # This method sets up the Tunnels and ensures everything is up and running
@@ -195,9 +211,13 @@ manage() {
 
 	if [ $(echo \$connections | wc -w) -lt $connection_count ]; then
             ep=$(get_least_used_tunnelserver "$tunnel_endpoints" "$connections")
-	    # todo: error handling if no endpoints available
-            log "Server handling least clients is: $ep. Trying to create tunnel..."
-	    interface=$(new_tunnel "$ep" "$nsname")
+	    if [ ! -z "$ep" ]; then
+                log "Server handling least clients is: $ep. Trying to create tunnel..."
+		new_tunnel "$ep" "$nsname"
+	    else
+                log "No servers available..."
+	    fi
+
 	fi
         sleep $interval
     done
