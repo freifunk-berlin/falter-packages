@@ -34,6 +34,10 @@ log() {
 }
 
 cleanup() {
+    for i in $connections; do
+        teardown $connection
+    done
+    ip netns delete "$OPT_NAMESPACE_NAME"
     log "Closing"
     exit
 }
@@ -103,7 +107,7 @@ setup_namespace() {
 get_age() {
     local interface="$1"
     # Check latest handshake, returns value in seconds ago
-    return $(($(date +%s) - $(wg show "$interface" latest-handshakes | awk '{print $2}')))
+    echo $(($(date +%s) - $(wg show "$interface" latest-handshakes | awk '{print $2}')))
 }
 
 teardown() {
@@ -117,16 +121,14 @@ wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
     clients=$(wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
-    return "$(echo "$clients" | cut -d' ' -f2)"
+    echo "$(echo "$clients" | cut -d' ' -f2)"
 }
 
 get_least_used_tunnelserver() {
     local tunnel_endpoints="$1"
-    local connections="$2"
 
     # Dont check tunnelserver we already have a connection with
-    for i in $connections; do
-        ip=$(wg show "$i" endpoints | awk -F'[\t:]' '{print $2}')
+    for i in $(wg show all endpoints); do
         # remove ip from connections:
         tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$ip//")
     done
@@ -146,20 +148,25 @@ get_least_used_tunnelserver() {
     echo "$best"
 }
 
-newtunnel() {
-    local ip="$1"
-    local nsname="$1"
 
+generate_keys() {
     # If there isn't a proper key-pair, generate it
-    [ -d "/tmp/run/wgclient" ] || mkdir -p /tmp/run/wgclient
-    gw_key="/tmp/run/wgclient/wg.key"
-    gw_pub="/tmp/run/wgclient/wg.pub"
+    [ -d "/etc/wireguard" ] || mkdir -p /etc/wireguard
+    gw_key="/etc/wireguard/wg.key"
+    gw_pub="/etc/wireguard wg.pub"
     if [ ! -f $gw_key ] || [ ! -f $gw_pub ]; then
         log "No proper keys found. Generating a new pair of keys..."
         rm -f $gw_key $gw_pub
         wg genkey | tee $gw_key | wg pubkey >$gw_pub
         log "generation done."
     fi
+}
+
+
+newtunnel() {
+    local ip="$1"
+    local nsname="$2"
+
 
     interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
     log "New tunnel interface is $interface"
@@ -167,6 +174,7 @@ newtunnel() {
     # move WG interface to default namespace to allow meshing on it
     ip link set dev "$interface" netns 1
     $OPT_UP_SCRIPT "$interface"
+    echo $interface
 }
 
 # This method sets up the Tunnels and ensures everything is up and running
@@ -174,36 +182,25 @@ manage() {
     local nsname="$1"
     local connection_count="$2"
     local tunnel_endpoints="$3"
-    local intervall=60
+    local interval=60
     local tunneltimeout=600
 
-    # Connections holds a list of current WG interfaces (e.g wg_51312 )
-    connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
-    log "current connections: $connections"
-
     # Check for stale tunnels and tear em down
-    for conn in $connections; do
-        get_age "$conn"
-        age=$?
-        if [ $age -ge $tunneltimeout ]; then
-            log "Tunnel to $conn timed out. Try to recreate it."
-            teardown "$conn"
+    while true; do
+        for connection in $connections; do
+            if [ get_age "$conn" -ge $tunneltimeout ]; then
+                log "Tunnel to $connection timed out."
+                teardown "$conn"
+	    fi
+	done
 
-            #ToDo: currently only one tunnel.
+	if [ $(echo \$connections | wc -w) -lt $connection_count ]; then
             ep=$(get_least_used_tunnelserver "$tunnel_endpoints" "$connections")
+	    # todo: error handling if no endpoints available
             log "Server handling least clients is: $ep. Trying to create tunnel..."
-            new_tunnel "$ep" "$nsname"
-            connections=$(ip link | grep ' wg_[0-9]*:' | awk '{print $2}' | sed 's|:||')
-            # Setup new Tunnels until we have enough
-            #while connections | wc -w <$connection_count; do
-            #    ep=get_least_used_tunnelserver $tunnel_endpoints $connections
-            #    new_tunnel $ep $nsname
-            #    connections=$connections+$tunnel
-            #
-            #    # Sleep to not overwhelm the cpu :)
-            #    sleep $intervall
-            #done
-        fi
+	    interface=$(new_tunnel "$ep" "$nsname")
+	fi
+        sleep $interval
     done
 }
 
@@ -269,6 +266,14 @@ log "starting tunnelmanager with
 ###############################
 #   configure wireguard-stuff
 
+
+generate_keys
+
 setup_namespace "$OPT_NAMESPACE_NAME" "$OPT_UPLINK_INTERFACE" "$OPT_UPLINK_IP" "$OPT_UPLINK_GW"
 
+# contains list of connected endpoint
+connections=""
+
+# contains list of managed wg interfaces
+interfaces=""
 manage "$OPT_NAMESPACE_NAME" "$OPT_TUNNEL_COUNT" "$OPT_TUNNEL_ENDPOINTS"
