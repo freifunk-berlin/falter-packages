@@ -54,8 +54,10 @@ Example call:
 }
 
 cleanup() {
-    for i in $connections; do
-        teardown $connection
+    echo "connections \"$connections\""
+    echo "cons \"$interfaces\""
+    for i in $interfaces; do
+        teardown "$i"
     done
     ip netns delete "$OPT_NAMESPACE_NAME"
     log "Closing"
@@ -111,14 +113,14 @@ get_age() {
 
 teardown() {
     local interface="$1"
-
-    $OPT_DOWN_SCRIPT "$interface"
-    ip link delete dev "$interface"
-
     local endpoint="$(wg show $interface endpoints | awk -F '\t|:' '{print $2}')"
 
-    interfaces=$(echo "$interfaces" | sed "s/$interface //")
-    connections=$(echo "$connections" | sed "s/$endpoint //")
+    sh "$OPT_DOWN_SCRIPT" "$interface"
+    ip link delete "$interface"
+
+
+    interfaces=$(echo "$interfaces" | sed "s/ $interface//")
+    connections=$(echo "$connections" | sed "s/ $endpoint//")
 }
 
 wg_get_usage() {
@@ -135,9 +137,9 @@ get_least_used_tunnelserver() {
     local tunnel_endpoints="$1"
 
     # Dont check tunnelserver we already have a connection with
-    for i in $(wg show all endpoints); do
+    for i in $(wg show all endpoints | awk -F '\t|:' '{print $3}'); do
         # remove ip from connections:
-        tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$ip//")
+        tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$i//")
     done
 
     # Select next best tunnelserver
@@ -183,12 +185,12 @@ new_tunnel() {
         log "New tunnel interface is $interface"
 
         # move WG interface to default namespace to allow meshing on it
-        ip link set dev "$interface" netns 1
+        ip -n "$nsname" link set dev "$interface" netns 1
 
-	interfaces+="$interface "
-	connections+="$ip "
+	interfaces="$interfaces $interface"
+	connections="$connections $ip"
 
-        $OPT_UP_SCRIPT "$interface"
+        sh "$OPT_UP_SCRIPT" "$interface"
     fi
 }
 
@@ -240,7 +242,8 @@ while getopts a:c:g:i:n:t:T:D:U: option; do
     i) OPT_UPLINK_INTERFACE=$OPTARG ;;
     n) OPT_NAMESPACE_NAME=$OPTARG ;;
     t) OPT_INTERVAL=$OPTARG ;;
-    D) OPT_UP_SCRIPT=$OPTARG ;;
+    U) OPT_UP_SCRIPT=$OPTARG ;;
+    D) OPT_DOWN_SCRIPT=$OPTARG ;;
     T)
         if [ $ENDPOINT_COUNT = 0 ]; then
             OPT_TUNNEL_ENDPOINTS=$OPTARG
@@ -250,7 +253,6 @@ while getopts a:c:g:i:n:t:T:D:U: option; do
             ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
         fi
         ;;
-    U) OPT_DOWN_SCRIPT=$OPTARG ;;
     *)
         print_help
         exit 2
@@ -288,7 +290,7 @@ log "starting tunnelmanager with
 
 generate_keys
 
-trap cleanup EXIT
+trap cleanup INT TERM
 setup_namespace "$OPT_NAMESPACE_NAME" "$OPT_UPLINK_INTERFACE" "$OPT_UPLINK_IP" "$OPT_UPLINK_GW"
 
 # contains list of connected endpoint
