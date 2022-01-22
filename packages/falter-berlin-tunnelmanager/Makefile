@@ -32,7 +32,7 @@ endef
 
 define Package/falter-berlin-tunnelmanager/install
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(CP) ./files/tunnelman.init $(1)/etc/init.d/tunnelmanager
+	$(CP) ./files/tunnelmanager.init $(1)/etc/init.d/tunnelmanager
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(CP) ./files/tunnelman.sh $(1)/usr/bin/tunnelman
 	$(INSTALL_DIR) $(1)/usr/share/tunnelman
