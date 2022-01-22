@@ -18,8 +18,8 @@ tm_start() {
 	config_get _value "$instance" interface
 	local interface="$_value"
 
-	config_get _value "$instance" uplink_prefix
-	local uplink_prefix="$_value"
+	config_get _value "$instance" uplink_ip
+	local uplink_ip="$_value"
 
 	config_get _value "$instance" uplink_gateway
 	local uplink_gateway="$_value"
@@ -46,7 +46,7 @@ tm_start() {
 	procd_set_param respawn 3600 5 0
 	procd_set_param stdout 1
 	procd_set_param stderr 1
-	procd_set_param command /bin/sh "/usr/bin/tunnelman" "-T 176.74.57.43" "-T" "176.74.57.19" "-T" "77.87.51.11" "-T" "77.87.49.8" "-n" "$namespace" "-i" "$interface" "-a" "$uplink_prefix" "-g" "$uplink_gateway" "-c" "$tunnel_count" "-t" "$tunnel_timeout" "-o" "$check_interval" "-U" "$up_script" "-A" "$up_script_args" "-D" "$down_script"
+	procd_set_param command /bin/sh "/usr/bin/tunnelman" "-T 176.74.57.43" "-T" "176.74.57.19" "-T" "77.87.51.11" "-T" "77.87.49.8" "-n" "$namespace" "-i" "$interface" "-a" "$uplink_ip" "-g" "$uplink_gateway" "-c" "$tunnel_count" "-t" "$tunnel_timeout" "-o" "$check_interval" "-U" "$up_script" "-A" "$up_script_args" "-D" "$down_script"
 	procd_set_param netdev "$interface"
 	procd_close_instance
 }
