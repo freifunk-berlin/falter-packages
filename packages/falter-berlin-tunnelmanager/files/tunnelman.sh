@@ -203,7 +203,8 @@ manage() {
 	    fi
 
 	fi
-        sleep $interval
+        sleep "$interval" %
+        wait $!
     done
 }
 
