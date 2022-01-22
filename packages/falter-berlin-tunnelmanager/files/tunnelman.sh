@@ -5,26 +5,6 @@
 # work anyway. This is a little reminder to you, if you use some rare shell without
 # a builtin "local" statement.
 
-# Tunnelman:
-# * erstellt Namespace,
-# * richtet WAN interface ein und schiebt es in Namespace
-# * Stellt sicher das stets $tunnel_count Tunnel aktiv sind (redundanz)
-# * Connected neue Tunnelverbindungen und called script nach erfolgreichen Verbindungsaufbau
-# * Löscht stale Tunnelverbindungen und called script bei abgeräumten Verbindungsaufbau
-#
-# * Was fehlt: Logik zum abräumen des Namespaces bei on exit
-#
-#
-# tunnelman (-i eth0.50 -a 192.168.1.2/24 -g 192.168.1.1 -n uplink -T TunnelIP1 -T tunnelip2 -c 2 -t 300 -D down.sh -U up.sh )
-#
-# Arguments:
-# -i : uplink_interface
-# -a: uplink_ip
-# -g: uplink_gw
-# -n:  namespace name
-# -T: tunnel endpoint
-# -c: tunnel_count
-# -t: interval
 
 log() {
     local msg="$1"
@@ -43,19 +23,22 @@ Arguments:
     -i: uplink_interface
     -a: uplink_ip
     -g: uplink_gw
-    -n: namespace name
-    -T: tunnel endpoint
-    -c: tunnel_count
-    -t: interval
+    -n: namespace name where uplink shall reside in
+    -T: tunnel endpoint (can be used multiple times)
+    -c: tunnel_count (how many redundant tunnells)
+    -t: tunnel_timeout (seconds, after what time consider tunnels to be down - last handshake)
+    -o: interval (how often does the loop run, clean up and establish new connection if needed)
+    -D: Pre-Down Script (use too hook after connection is down. - Interface name is passed as \$1)
+    -U: Post-Up Script (use too hook after connection is established - Interface name is passed as \$1)
+    -E: Post-Up Script Arguments (use to pass parameters to post-up script \$2)
 
 Example call:
-    tunnelman -i eth0.50 -a 192.168.1.2/24 -g 192.168.1.1 -n uplink -T TunnelIP1 -T tunnelip2 -c 2 -t 300 -D down.sh -U up.sh 
+    tunnelman.sh -i br-vpn_lte -a 192.168.178.100/24 -g 192.168.178.1 -n vpn_lte -T 176.74.57.43 -T 176.74.57.19 -T 77.87.51.11 -T 77.87.49.8 -c
+ 1 -t 180 -o 60 -D down.sh -U up.sh -A 10.31.147.224/29
 \n"
 }
 
 cleanup() {
-    echo "connections \"$connections\""
-    echo "cons \"$interfaces\""
     for i in $interfaces; do
         teardown "$i"
     done
@@ -126,7 +109,7 @@ teardown() {
 wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
-    clients=$(wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    clients=$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
     if [ $? -ne 0 ]; then
         return 1
     fi
@@ -179,7 +162,7 @@ new_tunnel() {
     local nsname="$2"
 
 
-    local interface=$(timeout 5 ip netns exec uplink wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
+    local interface=$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
 
     if [ $? -eq 0 ]; then
         log "New tunnel interface is $interface"
@@ -190,7 +173,7 @@ new_tunnel() {
 	interfaces="$interfaces $interface"
 	connections="$connections $ip"
 
-        sh "$OPT_UP_SCRIPT" "$interface"
+        sh "$OPT_UP_SCRIPT" "$interface" "$OPT_UP_SCRIPT_ARGS"
     fi
 }
 
@@ -200,19 +183,18 @@ manage() {
     local connection_count="$2"
     local tunnel_endpoints="$3"
     local interval=60
-    local tunneltimeout=600
 
     # Check for stale tunnels and tear em down
     while true; do
-        for connection in $connections; do
-            if [ get_age "$conn" -ge $tunneltimeout ]; then
-                log "Tunnel to $connection timed out."
-                teardown "$conn"
+        for interface in $interfaces; do
+	    if [ $(get_age "$interface") -ge $OPT_TUNNEL_TIMEOUT ]; then
+                log "Tunnel to $interface timed out."
+                teardown "$interface"
 	    fi
 	done
 
-	if [ $(echo \$connections | wc -w) -lt $connection_count ]; then
-            ep=$(get_least_used_tunnelserver "$tunnel_endpoints" "$connections")
+	if [ $(echo $connections | wc -w) -lt $connection_count ]; then
+            ep=$(get_least_used_tunnelserver "$tunnel_endpoints")
 	    if [ ! -z "$ep" ]; then
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
 		new_tunnel "$ep" "$nsname"
@@ -234,16 +216,18 @@ manage() {
 
 ENDPOINT_COUNT=0
 
-while getopts a:c:g:i:n:t:T:D:U: option; do
+while getopts a:c:g:i:n:o:t:T:D:U:A: option; do
     case $option in
     a) OPT_UPLINK_IP=$OPTARG ;;
     c) OPT_TUNNEL_COUNT=$OPTARG ;;
     g) OPT_UPLINK_GW=$OPTARG ;;
     i) OPT_UPLINK_INTERFACE=$OPTARG ;;
     n) OPT_NAMESPACE_NAME=$OPTARG ;;
-    t) OPT_INTERVAL=$OPTARG ;;
-    U) OPT_UP_SCRIPT=$OPTARG ;;
+    o) OPT_INTERVAL=$OPTARG ;;
+    t) OPT_TUNNEL_TIMEOUT=$OPTARG ;;
     D) OPT_DOWN_SCRIPT=$OPTARG ;;
+    U) OPT_UP_SCRIPT=$OPTARG ;;
+    A) OPT_UP_SCRIPT_ARGS=$OPTARG ;;
     T)
         if [ $ENDPOINT_COUNT = 0 ]; then
             OPT_TUNNEL_ENDPOINTS=$OPTARG
@@ -265,7 +249,7 @@ if [ -z "$OPT_UPLINK_IP" ] || [ -z "$OPT_TUNNEL_COUNT" ] ||
     [ -z "$OPT_UPLINK_GW" ] || [ -z "$OPT_UPLINK_INTERFACE" ] ||
     [ -z "$OPT_NAMESPACE_NAME" ] || [ -z "$OPT_INTERVAL" ] ||
     [ -z "$OPT_UP_SCRIPT" ] || [ -z "$OPT_TUNNEL_ENDPOINTS" ] ||
-    [ -z "$OPT_DOWN_SCRIPT" ]; then
+    [ -z "$OPT_DOWN_SCRIPT" ] || [ -z "$OPT_TUNNEL_TIMEOUT" ]; then
     printf "Not enough options. Please give all necessary options!\n\n"
     print_help
     exit 2
@@ -280,9 +264,11 @@ log "starting tunnelmanager with
     Namespace............: $OPT_NAMESPACE_NAME 
     Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
     Tunnel-Count.........: $OPT_TUNNEL_COUNT 
-    Interval.............: $OPT_INTERVAL
-    Up_Script............: $OPT_DOWN_SCRIPT 
-    Down_Script..........: $OPT_UP_SCRIPT"
+    Tunnel-Timeout.......: $OPT_TUNNEL_TIMEOUT
+    Work-Interval........: $OPT_INTERVAL
+    Up_Script............: $OPT_UP_SCRIPT
+    Up_Script-Args.......: $OPT_UP_SCRIPT_ARGS
+    Down_Script..........: $OPT_DOWN_SCRIPT"
 
 ###############################
 #   configure wireguard-stuff
