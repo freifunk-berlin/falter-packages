@@ -32,7 +32,7 @@ next_ip="$(echo $available_ips | awk '{print $1}')"
 
 # Configure IPs
 ip address add "$next_ip/32" dev "$interface"
-ip address add "fe80::2/128" dev "$interface"
+ip address add "fe80::2/64" dev "$interface"
 
 # bringup interface
 
