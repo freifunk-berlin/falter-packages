@@ -162,7 +162,7 @@ new_tunnel() {
     local nsname="$2"
 
 
-    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)"
+    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)"
 
     if [ -z "$interface" ]; then
         log "Failed to register a new tunnel."
