@@ -162,19 +162,24 @@ new_tunnel() {
     local nsname="$2"
 
 
-    local interface=$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)
+    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)"
 
-    if [ $? -eq 0 ]; then
-        log "New tunnel interface is $interface"
-
-        # move WG interface to default namespace to allow meshing on it
-        ip -n "$nsname" link set dev "$interface" netns 1
-
-	interfaces="$interfaces $interface"
-	connections="$connections $ip"
-
-        sh "$OPT_UP_SCRIPT" "$interface" "$OPT_UP_SCRIPT_ARGS"
+    if [ -z "$interface" ]; then
+        log "Failed to register a new tunnel."
+	return 1
     fi
+
+    log "New tunnel interface is $interface"
+
+    # move WG interface to default namespace to allow meshing on it
+    ip -n "$nsname" link set dev "$interface" netns 1
+
+    interfaces="$interfaces $interface"
+    connections="$connections $ip"
+
+    sh "$OPT_UP_SCRIPT" "$interface" "$OPT_UP_SCRIPT_ARGS"
+
+    return 0
 }
 
 # This method sets up the Tunnels and ensures everything is up and running
@@ -203,7 +208,7 @@ manage() {
 	    fi
 
 	fi
-        sleep "$interval" %
+        sleep "$interval" &
         wait $!
     done
 }
