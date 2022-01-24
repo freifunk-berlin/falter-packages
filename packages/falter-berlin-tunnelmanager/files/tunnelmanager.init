@@ -1,0 +1,60 @@
+#!/bin/sh /etc/rc.common
+ 
+USE_PROCD=1
+ 
+START=95
+STOP=01
+ 
+
+
+
+tm_start() {
+	local instance="$1"
+	local parameters="-T 176.74.57.43 -T 176.74.57.19 -T 77.87.51.11 -T 77.87.49.8"
+	
+	config_get _value "$instance" namespace
+	local namespace="$_value"
+
+	config_get _value "$instance" interface
+	local interface="$_value"
+
+	config_get _value "$instance" uplink_ip
+	local uplink_ip="$_value"
+
+	config_get _value "$instance" uplink_gateway
+	local uplink_gateway="$_value"
+
+	config_get _value "$instance" tunnel_count
+	local tunnel_count="$_value"
+
+	config_get _value "$instance" tunnel_timeout
+	local tunnel_timeout="$_value"
+
+	config_get _value "$instance" check_interval
+	local check_interval="$_value"
+
+	config_get _value "$instance" up_script
+	local up_script="$_value"
+
+	config_get _value "$instance" up_script_args
+	local up_script_args="$_value"
+
+	config_get _value "$instance" down_script
+	local down_script="$_value"
+	
+	procd_open_instance
+	procd_set_param respawn 3600 5 0
+	procd_set_param command /bin/sh "/usr/bin/tunnelman" "-T 176.74.57.43" "-T" "176.74.57.19" "-T" "77.87.51.11" "-T" "77.87.49.8" "-n" "$namespace" "-i" "$interface" "-a" "$uplink_ip" "-g" "$uplink_gateway" "-c" "$tunnel_count" "-t" "$tunnel_timeout" "-o" "$check_interval" "-U" "$up_script" "-A" "$up_script_args" "-D" "$down_script"
+	procd_set_param netdev "$interface"
+	procd_close_instance
+}
+
+start_service() {
+	config_load tunnelmanager
+	config_foreach tm_start tunnelmanager
+}
+
+#stop_service() {
+#	config_load tunnelmanager
+#	config_foreach tm_stop tunnelmanager
+#}
