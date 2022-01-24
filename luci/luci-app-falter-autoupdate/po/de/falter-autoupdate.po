@@ -1,0 +1,91 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: Martin Hübner <martin.hubner@web.de>\n"
+"Language-Team: \n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.0.1\n"
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/luci/menu.d/luci-app-falter-autoupdate.json:14
+msgid "Autoupdate"
+msgstr "Autoupdate"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:10
+msgid ""
+"Autoupdate will update your router automatically, once there is a new "
+"firmware version available. <br><br>Hence we do our best in testing upgrades "
+"extensively, there might be a small chance of failing upgrades. For example "
+"this could happen if you costumized your settings a lot. We always recommend "
+"you to keep a backup of your latest working router configuration. <br><br> "
+"To obtain a backup of your current settings, go to <i> System -&gt Backup</"
+"i> and download the backup-archive."
+msgstr ""
+"Autoupdate wird deinen Router automatisch updaten, sobald einen neue "
+"Firmwareversion verfügbar ist. <br><br>Gleichwohl wir unser bestes tun und "
+"Updates ausgiebig testen, kann ein Update auch eventuell fehlschlagen. Das "
+"kann z.B. passieren, wenn du die Konfiguration deines Routers stark "
+"angepasst hast. Wir empfehlen dir, immer ein Backup der aktuellen "
+"(funktionierenden) Einstellungen aufzuheben. <br><br> Um ein Backup deiner "
+"Einstellungen zu erhalten, gehe auf <i> System -&gt Backup</i> und lade das "
+"Archiv herunter."
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:30
+msgid "Deactivates the Autoupdater. We do not recommend this!"
+msgstr "Deaktiviert Autoupdate. Nicht empfohlen!"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:29
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/luci/menu.d/luci-app-falter-autoupdate.json:3
+msgid "Freifunk"
+msgstr "Freifunk"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:9
+msgid "Freifunk Berlin Autoupdate"
+msgstr "Freifunk Berlin Autoupdate"
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/rpcd/acl.d/luci-app-falter-autoupdate.json:3
+msgid "Grant UCI access to LuCI app falter-autoupdate"
+msgstr "UCI-Zugriff für LuCI app falter-autoupdate gewähren"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:26
+msgid "Minimum Certs"
+msgstr "Minimum Zertifikate"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:27
+msgid ""
+"Minimum amount of certificates that must be valid. Otherwise autoupdate will "
+"not perform an upgrade."
+msgstr ""
+"Minimal nötige Anzahl an gültigen Zertifikaten. Bei Unterschreitung wird "
+"autoupdate kein Update durchführen."
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:23
+msgid "Selector-FQDN"
+msgstr "Selector-FQDN"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:24
+msgid "Selector-URL witout protocol, i.e.: selector.berlin.freifunk.net"
+msgstr ""
+"URL des Firmware-Selectors (ohne Protokoll, z.B. selector.berlin.freifunk."
+"net)"
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:20
+msgid "Settings"
+msgstr "Einstellungen"
+
+#~ msgid ""
+#~ "If checked, Auoupdate will (re-)install bbbdigger after an update. Check "
+#~ "this, if you have installed bbbdigger."
+#~ msgstr ""
+#~ "Wenn ausgewäht, wird autoupdate nach einem Update bbbdigger (wieder) "
+#~ "installieren. Aktiviere das, wenn du bbbdigger installiert hast."
+
+#~ msgid "Reinstall bbbdigger"
+#~ msgstr "bbbdigger nachinstallieren"
