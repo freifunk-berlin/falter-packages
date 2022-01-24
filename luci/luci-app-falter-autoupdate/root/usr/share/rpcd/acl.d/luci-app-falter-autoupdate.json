@@ -1,0 +1,26 @@
+{
+	"luci-app-falter-autoupdate": {
+	  "description": "Grant UCI access to LuCI app falter-autoupdate",
+	  "read": {
+		"ubus": {
+		  "uci": [
+			"get"
+		  ]
+		},
+		"uci": [
+		  "autoupdate"
+		]
+	  },
+	  "write": {
+		"ubus": {
+		  "uci": [
+			"set", "commit"
+		  ]
+		},
+		"uci": [
+		  "autoupdate"
+		]
+	  }
+	}
+  }
+  
