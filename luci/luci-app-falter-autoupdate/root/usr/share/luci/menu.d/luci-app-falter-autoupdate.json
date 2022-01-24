@@ -1,0 +1,21 @@
+{
+	"admin/freifunk/": {
+	  "title": "Freifunk",
+	  "order": 1,
+	  "action": {
+		"type": "firstchild"
+	  },
+	  "depends": {
+		"acl": [ "luci-app-falter-autoupdate" ]
+	  }
+	},
+  
+	"admin/freifunk/autoupdate": {
+	  "title": "Autoupdate",
+	  "order": 25,
+	  "action": {
+		"type": "view",
+		"path": "falter-autoupdate/form"
+	  }
+	}
+  }

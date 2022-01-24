@@ -1,0 +1,59 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/luci/menu.d/luci-app-falter-autoupdate.json:14
+msgid "Autoupdate"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:10
+msgid ""
+"Autoupdate will update your router automatically, once there is a new "
+"firmware version available. <br><br>Hence we do our best in testing upgrades "
+"extensively, there might be a small chance of failing upgrades. For example "
+"this could happen if you costumized your settings a lot. We always recommend "
+"you to keep a backup of your latest working router configuration. <br><br> "
+"To obtain a backup of your current settings, go to <i> System -&gt Backup</"
+"i> and download the backup-archive."
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:30
+msgid "Deactivates the Autoupdater. We do not recommend this!"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:29
+msgid "Disabled"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/luci/menu.d/luci-app-falter-autoupdate.json:3
+msgid "Freifunk"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:9
+msgid "Freifunk Berlin Autoupdate"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/root/usr/share/rpcd/acl.d/luci-app-falter-autoupdate.json:3
+msgid "Grant UCI access to LuCI app falter-autoupdate"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:26
+msgid "Minimum Certs"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:27
+msgid ""
+"Minimum amount of certificates that must be valid. Otherwise autoupdate will "
+"not perform an upgrade."
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:23
+msgid "Selector-FQDN"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:24
+msgid "Selector-URL witout protocol, i.e.: selector.berlin.freifunk.net"
+msgstr ""
+
+#: luci/luci-app-falter-autoupdate/htdocs/luci-static/resources/view/falter-autoupdate/form.js:20
+msgid "Settings"
+msgstr ""
