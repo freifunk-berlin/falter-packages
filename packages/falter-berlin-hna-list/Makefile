@@ -5,8 +5,6 @@ PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-SOURCE_DIR:=/home/martin/Freifunk/dev/falter-packages/packages/falter-berlin-hna-list/src/
-
 define Package/falter-berlin-hna-list
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
@@ -16,7 +14,7 @@ endef
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) -r $(SOURCE_DIR) $(PKG_BUILD_DIR)
+	$(CP) -r ./src/* $(PKG_BUILD_DIR)/
 	$(Build/Patch)
 endef
 
