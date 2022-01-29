@@ -13,8 +13,8 @@ define Package/falter-berlin-hna-list
 endef
 
 define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) -r ./src/* $(PKG_BUILD_DIR)/
+	mkdir -p $(PKG_BUILD_DIR)/src
+	$(CP) -r ./src/* $(PKG_BUILD_DIR)/src
 	$(Build/Patch)
 endef
 
