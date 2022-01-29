@@ -13,7 +13,7 @@ char *read_file(const char *filename) {
         fseek(f, 0, SEEK_END);
         long length = ftell(f);
         fseek(f, 0, SEEK_SET);
-        buffer = malloc(length);
+        buffer = calloc(1, length + 1);
         if (buffer) {
                 fread(buffer, 1, length, f);
         }
@@ -121,7 +121,7 @@ void read_hna_into_tree(struct avl_table *tree, char *raw_data) {
                         continue;
                 }
 
-                char* args[2];
+                char* args[2] = {NULL, NULL};
                 for (j=0,str2 = token;;str2 = NULL, j++) {
                         subtoken = strtok_r(str2, field_delim, &saveptr2);
                         if (subtoken == NULL)
@@ -156,7 +156,7 @@ void read_hosts_into_tree(struct avl_table *tree, char *raw_data) {
                 }
 
                 // search-item needs to hold GW-ip-address in binary-form only
-                hna_data search;
+                hna_data search = {0};
                 inet_pton(AF_INET, args[0], &search.via_gateway.sin_addr);
                 hna_data *item = avl_find(tree, &search);
 
