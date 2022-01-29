@@ -12,7 +12,7 @@
 
 
 int main(int argc, char *argv[]) {
-        /*const char *hna4 = tcp_read("127.0.0.1", 2006, "/hna");
+        const char *hna4 = tcp_read("127.0.0.1", 2006, "/hna");
         const char *hna6 = tcp_read("::1", 2006, "/hna");
 
         if (hna4 == NULL) {
@@ -23,11 +23,11 @@ int main(int argc, char *argv[]) {
         //if (hna6 == NULL) {
         //  fprintf(stderr, "failed to read ipv6 HNAs\n");
         //  return EXIT_FAILURE;
-        //}*/
+        //}
 
-        char *hna4 = read_file("raw/hna4_2006.txt");
-        char *hna6 = read_file("raw/hna6_2006.txt");
-        char *hosts = read_file("raw/olsr");
+        //char *hna4 = read_file("raw/hna4_2006.txt");
+        //char *hna6 = read_file("raw/hna6_2006.txt");
+        //char *hosts = read_file("raw/olsr");
         // const char *hosts = read_file("/tmp/hosts/olsr");
 
         // read data into AVL-Treee
