@@ -61,7 +61,7 @@ olsr4_links() {
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	if [[ "$olsrInterface" != *"wg_"* ]]; then
+	if ! echo "$olsrInterface" | grep -q '.*wg_.*'; then
 		olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
 	fi
 }
@@ -75,7 +75,9 @@ olsr6_links() {
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	if ! echo "$olsrInterface" | grep -q '.*wg_.*'; then
+		olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+	fi
 }
 
 # This section is relevant for hopglass statistics feature (isUplink/isHotspot)
