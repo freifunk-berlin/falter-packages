@@ -35,8 +35,17 @@ ip address add "$next_ip/32" dev "$interface"
 ip address add "fe80::2/64" dev "$interface"
 
 # bringup interface
-
 ip link set up dev "$interface"
+
+# wait some time before bringing up olsrd and babeld
+sleep 2
+
+# check if olsrd is started and ubus is available
+ubus list | grep -qF olsrd
+if [ $? -eq 1 ]; then
+    /etc/init.d/olsrd start
+    sleep 1
+fi
 
 # Configure OLSRD
 uci revert olsrd
@@ -47,8 +56,15 @@ uci set "olsrd.$UCIREF.interface=$interface"
 uci set "olsrd.$UCIREF.Mode=ether"
 uci commit olsrd
 
-/etc/init.d/olsrd reload
+# instead of reloading add interface via ipc to make it seamless
+ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
 
+# check if babeld is started and ubus is available
+ubus list | grep -qF babeld
+if [ $? -eq 1 ]; then
+    /etc/init.d/babeld start
+    sleep 1
+fi
 
 # Configure babeld
 uci revert babeld
@@ -57,4 +73,5 @@ uci set "babeld.$UCIREF.ifname=$interface"
 uci set "babeld.$UCIREF.split_horizon=true"
 uci commit babeld
 
-/etc/init.d/babeld reload
+# instead of reloading add interface via ipc to make it seamless
+ubus call babeld add_interface '{"ifname":'\""$interface"\"'}'
