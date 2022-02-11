@@ -5,14 +5,12 @@
 # work anyway. This is a little reminder to you, if you use some rare shell without
 # a builtin "local" statement.
 
-
 log() {
     local msg="$1"
     logger -t vpnmanager -s "$msg"
     # for debugging on local machine
     #echo "$msg"
 }
-
 
 print_help() {
     printf "\
@@ -101,7 +99,6 @@ teardown() {
     sh "$OPT_DOWN_SCRIPT" "$interface"
     ip link delete "$interface"
 
-
     interfaces=$(echo "$interfaces" | sed "s/ $interface//")
     connections=$(echo "$connections" | sed "s/ $endpoint//")
 }
@@ -142,7 +139,6 @@ get_least_used_tunnelserver() {
     echo "$best"
 }
 
-
 generate_keys() {
     # If there isn't a proper key-pair, generate it
     [ -d "/etc/wireguard" ] || mkdir -p /etc/wireguard
@@ -156,17 +152,15 @@ generate_keys() {
     fi
 }
 
-
 new_tunnel() {
     local ip="$1"
     local nsname="$2"
-
 
     local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)"
 
     if [ -z "$interface" ]; then
         log "Failed to register a new tunnel."
-	return 1
+        return 1
     fi
 
     log "New tunnel interface is $interface"
@@ -192,22 +186,28 @@ manage() {
     # Check for stale tunnels and tear em down
     while true; do
         for interface in $interfaces; do
-	    if [ $(get_age "$interface") -ge $OPT_TUNNEL_TIMEOUT ]; then
+            if [ $(get_age "$interface") -ge $OPT_TUNNEL_TIMEOUT ]; then
                 log "Tunnel to $interface timed out."
                 teardown "$interface"
-	    fi
-	done
+            fi
+        done
 
-	if [ $(echo $connections | wc -w) -lt $connection_count ]; then
-            ep=$(get_least_used_tunnelserver "$tunnel_endpoints")
-	    if [ ! -z "$ep" ]; then
+        tmp_tunnel_endpoints="$tunnel_endpoints"
+
+        while [ $(echo $connections | wc -w) -lt $connection_count ]; do
+            ep=$(get_least_used_tunnelserver "$tmp_tunnel_endpoints")
+            if [ ! -z "$ep" ]; then
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
-		new_tunnel "$ep" "$nsname"
-	    else
+                if ! new_tunnel "$ep" "$nsname"; then
+                    # remove ep from tunnel
+                    tmp_tunnel_endpoints=$(echo "$tmp_tunnel_endpoints" | sed "s/$ep//")
+                fi
+            else
                 log "No servers available..."
-	    fi
+                break
+            fi
+        done
 
-	fi
         sleep "$interval" &
         wait $!
     done
@@ -278,7 +278,6 @@ log "starting tunnelmanager with
 
 ###############################
 #   configure wireguard-stuff
-
 
 generate_keys
 
