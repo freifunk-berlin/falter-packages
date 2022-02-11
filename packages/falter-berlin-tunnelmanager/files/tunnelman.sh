@@ -7,7 +7,7 @@
 
 log() {
     local msg="$1"
-    logger -t vpnmanager -s "$msg"
+    logger -t tunnelman -s "$msg"
     # for debugging on local machine
     #echo "$msg"
 }
