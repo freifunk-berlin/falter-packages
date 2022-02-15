@@ -41,7 +41,7 @@ cleanup_olsr_wg_config() {
         # shell ...
         do_delete=1
         for olsr_int in $olsr_wg_interfaces; do
-            if [ "$int_name" == "$olsr_int" ]; then
+            if [ "$int_name" = "$olsr_int" ]; then
                 do_delete=0
             fi
         done
@@ -77,7 +77,7 @@ cleanup_babel_wg_config() {
         # shell ...
         do_delete=1
         for babel_int in $babel_wg_interfaces; do
-            if [ "$int_name" == "$babel_int" ]; then
+            if [ "$int_name" = "$babel_int" ]; then
                 do_delete=0
             fi
         done
