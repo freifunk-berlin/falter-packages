@@ -35,13 +35,13 @@ cleanup_olsr_wg_config() {
         slicedint=$(echo $int_name | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
-	        continue
+            continue
         fi
 
         # shell ...
         do_delete=1
         for olsr_int in $olsr_wg_interfaces; do
-            if [ "$int_name" == "$olsr_int"  ]; then
+            if [ "$int_name" == "$olsr_int" ]; then
                 do_delete=0
             fi
         done
@@ -60,7 +60,7 @@ cleanup_babel_wg_config() {
     babel_wg_interfaces=$(echo "dump" | nc ::1 33123 | grep interface | grep wg_ | awk '{print $3}')
 
     i=0
-    while uci get babeld.@interface[$i] &> /dev/null ; do
+    while uci get babeld.@interface[$i] &>/dev/null; do
         int_name=$(uci get babeld.@interface[$i].ifname)
         if [ $? -ne 0 ]; then # check if interface config is wrong
             uci delete babeld.@interface[$i]
@@ -71,13 +71,13 @@ cleanup_babel_wg_config() {
         slicedint=$(echo $int_name | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
-	        continue
+            continue
         fi
 
         # shell ...
         do_delete=1
         for babel_int in $babel_wg_interfaces; do
-            if [ "$int_name" == "$babel_int"  ]; then
+            if [ "$int_name" == "$babel_int" ]; then
                 do_delete=0
             fi
         done
@@ -90,7 +90,6 @@ cleanup_babel_wg_config() {
     done
     uci commit
 }
-
 
 get_ips_from_prefix "$prefix"
 
