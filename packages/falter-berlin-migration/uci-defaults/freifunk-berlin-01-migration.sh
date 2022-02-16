@@ -1,12 +1,31 @@
-#!/usr/bin/env sh
+#!/usr/bin/env ash
+# shellcheck shell=dash
 
-source /lib/functions.sh
-source /lib/functions/semver.sh
-source /etc/openwrt_release
-source /lib/functions/guard.sh
+# shellcheck disable=SC1091
+# shellcheck disable=SC3043
+# shellcheck disable=SC2155
+
+# allow checks with $?, as cmds output are needed in variable
+# shellcheck disable=SC2181
+# ignore three times unused variables
+# shellcheck disable=SC2034
+# the echo is used for some crazy variable
+# shellcheck disable=SC2116
+# x-prefix is used x times in very old code. It looks like being used for checking for emptyness
+# shellcheck disable=SC2268
+# string-replacement is supported by busybox-ash
+# shellcheck disable=SC3060
+# exponential-calculations are supported by busybox-ash
+# shellcheck disable=SC3019
+
+
+. /lib/functions.sh
+. /lib/functions/semver.sh
+. /etc/openwrt_release
+. /lib/functions/guard.sh
 
 if [ -f /etc/freifunk_release ]; then
-    source /etc/freifunk_release
+    . /etc/freifunk_release
     DISTRIB_ID="Freifunk Berlin"
     DISTRIB_RELEASE=$FREIFUNK_RELEASE
 fi
@@ -58,7 +77,7 @@ else
     log "fresh install - no migration"
     # add system.version with the new version
     log "Setting new system version to ${VERSION}; no migration needed."
-    uci set system.@system[0].version=${VERSION}
+    uci set system.@system[0].version="${VERSION}"
     uci commit
     exit 0
 fi
@@ -74,13 +93,13 @@ migrate_profiles() {
     COMMUNITY=$(uci show freifunk.community)
     cp /rom/etc/config/freifunk /etc/config
     OLDIFS=$IFS
-    IFS=$'\n'
+    IFS=$(printf '\n')
     for i in $CONTACT $COMMUNITY; do
-        key=$(echo $i | cut -d = -f 1)
-        val=$(echo $i | cut -d = -f 2)
-        val=$(echo $val | sed s/\'//g)
-        if [ $val != "defaults" ]; then
-            uci set $key=${val}
+        key=$(echo "$i" | cut -d = -f 1)
+        val=$(echo "$i" | cut -d = -f 2)
+        val=$(echo "$val" | sed s/\'//g)
+        if [ "$val" != "defaults" ]; then
+            uci set "$key=${val}"
         fi
     done
     IFS=$OLDIFS
@@ -104,7 +123,7 @@ update_openvpn_remote_config() {
 
 update_dhcp_lease_config() {
     # set lease time to 5 minutes (introduced with 0.1.0)
-    local current_leasetime=$(uci get dhcp.dhcp.leasetime)
+    local current_leasetime="$(uci get dhcp.dhcp.leasetime)"
     if [ "x${current_leasetime}" = "x" ]; then
         log "Setting dhcp lease time to 5m"
         uci set dhcp.dhcp.leasetime='5m'
@@ -115,7 +134,7 @@ update_wireless_ht20_config() {
     # set htmode to ht20 (introduced with 0.1.0)
     log "Setting htmode to HT20 for radio0"
     uci set wireless.radio0.htmode='HT20'
-    local radio1_present=$(uci get wireless.radio1.htmode)
+    local radio1_present="$(uci get wireless.radio1.htmode)"
     # set htmode if radio1 is present
     if [ "x${radio1_present}" != x ]; then
         log "Setting htmode to HT20 for radio1."
@@ -145,7 +164,7 @@ update_collectd_memory_leak_hotfix() {
     sed -i '/luci_statistics restart$/d' $CRONTAB
     /etc/init.d/cron restart
 
-    if [ "$(cat /proc/meminfo | grep MemTotal: | awk {'print $2'})" -lt "65536" ]; then
+    if [ "$(grep MemTotal: < /proc/meminfo | awk \{'print $2'\})" -lt "65536" ]; then
         uci set luci_statistics.collectd_ping.enable=0
         uci set luci_statistics.collectd_rrdtool.enable=0
     fi
@@ -153,7 +172,7 @@ update_collectd_memory_leak_hotfix() {
 
 update_olsr_smart_gateway_threshold() {
     # set SmartGatewayThreshold if not set
-    local threshold=$(uci get olsrd.@olsrd[0].SmartGatewayThreshold)
+    local threshold="$(uci get olsrd.@olsrd[0].SmartGatewayThreshold)"
     if [ "x${threshold}" = x ]; then
         log "Setting SmartGatewayThreshold to 50."
         uci set olsrd.@olsrd[0].SmartGatewayThreshold='50'
@@ -161,8 +180,8 @@ update_olsr_smart_gateway_threshold() {
 }
 
 fix_olsrd_txtinfo_port() {
-    uci set $(uci show olsrd | grep olsrd_txtinfo | cut -d '=' -f 1 | sed 's/library/port/')=2006
-    uci set $(uci show olsrd6 | grep olsrd_txtinfo | cut -d '=' -f 1 | sed 's/library/port/')=2006
+    uci set "$(uci show olsrd | grep olsrd_txtinfo | cut -d '=' -f 1 | sed 's/library/port/')"=2006
+    uci set "$(uci show olsrd6 | grep olsrd_txtinfo | cut -d '=' -f 1 | sed 's/library/port/')"=2006
 }
 
 add_openvpn_mssfix() {
@@ -174,7 +193,7 @@ openvpn_ffvpn_hotplug() {
     uci set openvpn.ffvpn.nobind=0
     /etc/init.d/openvpn disable
     for entry in $(uci show firewall | grep Reject-VPN-over-ff | cut -d '=' -f 1); do
-        uci delete ${entry%.name}
+        uci delete "${entry%.name}"
     done
     uci delete freifunk-watchdog
     crontab -l | grep -v "/usr/sbin/ffwatchd" | crontab -
@@ -187,7 +206,7 @@ update_collectd_ping() {
 
 fix_qos_interface() {
     for rule in $(uci show qos | grep qos.wan); do
-        uci set ${rule/wan/ffvpn}
+        uci set "${rule/wan/ffvpn}"
     done
     uci delete qos.wan
 }
@@ -205,12 +224,12 @@ change_olsrd_dygw_ping() {
     change_olsrd_dygw_ping_handle_config() {
         local config=$1
         local library=''
-        config_get library $config library
-        if [ $library == 'olsrd_dyn_gw.so.0.5' ]; then
-            uci delete olsrd.$config.Ping
-            uci add_list olsrd.$config.Ping=85.214.20.141   # dns.digitalcourage.de
-            uci add_list olsrd.$config.Ping=213.73.91.35    # dnscache.ccc.berlin.de
-            uci add_list olsrd.$config.Ping=194.150.168.168 # dns.as250.net
+        config_get library "$config" library
+        if [ "$library" = 'olsrd_dyn_gw.so.0.5' ]; then
+            uci delete "olsrd.$config.Ping"
+            uci add_list "olsrd.$config.Ping='85.214.20.141'"   # dns.digitalcourage.de
+            uci add_list "olsrd.$config.Ping='213.73.91.35'"    # dnscache.ccc.berlin.de
+            uci add_list "olsrd.$config.Ping='194.150.168.168'" # dns.as250.net
             return 1
         fi
     }
@@ -229,9 +248,9 @@ fix_dhcp_start_limit() {
             # get network-length
             if netmask="$(uci -q get network.dhcp.netmask)"; then
                 # use ipcalc.sh to and get prefix-length only
-                prefix="$(ipcalc.sh 0.0.0.0 ${netmask} | grep PREFIX | awk -F "=" '{print $2}')"
+                prefix="$(ipcalc.sh 0.0.0.0 "${netmask}" | grep PREFIX | awk -F "=" '{print $2}')"
                 # compute limit (2^(32-prefix)-3) with arithmetic evaluation
-                limit=$((2 ** (32 - ${prefix}) - 3))
+                limit=$((2 ** (32 - prefix) - 3))
                 uci set dhcp.dhcp.start=2
                 uci set dhcp.dhcp.limit=${limit}
                 log "set new dhcp.limit and dhcp.start on interface dhcp"
@@ -260,7 +279,7 @@ update_berlin_owm_api() {
 
 fix_olsrd6_watchdog_file() {
     log "fix olsrd6 watchdog file"
-    uci set $(uci show olsrd6 | grep "/var/run/olsrd.watchdog" | cut -d '=' -f 1)=/var/run/olsrd6.watchdog
+    uci set "$(uci show olsrd6 | grep "/var/run/olsrd.watchdog" | cut -d '=' -f 1)"=/var/run/olsrd6.watchdog
 }
 
 quieten_dnsmasq() {
@@ -318,9 +337,9 @@ r1_0_0_change_to_ffuplink() {
     change_olsrd_dygw_ping_iface() {
         local config=$1
         local lib=''
-        config_get lib $config library
+        config_get lib "$config" library
         if [ -z "${lib##olsrd_dyn_gw.so*}" ]; then
-            uci set olsrd.$config.PingCmd='ping -c 1 -q -I ffuplink %s'
+            uci set "olsrd.$config.PingCmd"='ping -c 1 -q -I ffuplink %s'
             return 1
         fi
     }
@@ -329,7 +348,7 @@ r1_0_0_change_to_ffuplink() {
         case "$config" in
         olsr_*_ffvpn_ipv4*)
             log "  network.$config"
-            uci delete network.$config
+            uci delete "network.$config"
             ;;
         *) ;;
         esac
@@ -430,9 +449,9 @@ r1_1_0_change_olsrd_lib_num() {
         local v6=$2
         local library=''
         local librarywo=''
-        config_get library $config library
-        librarywo=$(echo ${library%%.*})
-        uci set olsrd$v6.$config.library=$librarywo
+        config_get library "$config" library
+        librarywo="$(echo "${library%%.*}")"
+        uci set "olsrd$v6.$config.library=$librarywo"
         log " changed olsrd$v6 $librarywo"
     }
     reset_cb
@@ -444,7 +463,7 @@ r1_1_0_change_olsrd_lib_num() {
 }
 
 r1_1_0_notunnel_ffuplink() {
-    if [ "$(uci -q get ffberlin-uplink.preset.current)" == "no-tunnel" ]; then
+    if [ "$(uci -q get ffberlin-uplink.preset.current)" = "no-tunnel" ]; then
         log "update the ffuplink_dev to have a static macaddr if not already set"
         local macaddr=$(uci -q get network.ffuplink_dev.macaddr)
         if [ $? -eq 1 ]; then
@@ -455,13 +474,13 @@ r1_1_0_notunnel_ffuplink() {
             for byte in 2 3 4 5 6; do
                 macaddr=$macaddr$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | hexdump -e '1/1 ":%02x"')
             done
-            uci set network.ffuplink_dev.macaddr=$macaddr
+            uci set network.ffuplink_dev.macaddr="$macaddr"
         fi
     fi
 }
 
 r1_1_0_notunnel_ffuplink_ipXtable() {
-    if [ "$(uci -q get ffberlin-uplink.preset.current)" == "no-tunnel" ]; then
+    if [ "$(uci -q get ffberlin-uplink.preset.current)" = "no-tunnel" ]; then
         log "update the ffuplink no-tunnel settings to use options ip4table and ip6table"
         uci set network.ffuplink.ip4table="ffuplink"
         uci set network.ffuplink.ip6table="ffuplink"
@@ -472,13 +491,13 @@ r1_1_0_olsrd_dygw_ping() {
     olsrd_dygw_ping() {
         local config=$1
         local lib=''
-        config_get lib $config library
+        config_get lib "$config" library
         local libname=${lib%%.*}
-        if [ $lib == "olsrd_dyn_gw" ]; then
-            uci del_list olsrd.$config.Ping=213.73.91.35  # dnscache.ccc.berlin.de
-            uci add_list olsrd.$config.Ping=80.67.169.40  # www.fdn.fr/actions/dns
-            uci del_list olsrd.$config.Ping=85.214.20.141 # old digitalcourage
-            uci add_list olsrd.$config.Ping=46.182.19.48  # new digitalcourage
+        if [ "$lib" = "olsrd_dyn_gw" ]; then
+            uci del_list "olsrd.$config.Ping='213.73.91.35'"  # dnscache.ccc.berlin.de
+            uci add_list "olsrd.$config.Ping='80.67.169.40'"  # www.fdn.fr/actions/dns
+            uci del_list "olsrd.$config.Ping='85.214.20.141'" # old digitalcourage
+            uci add_list "olsrd.$config.Ping='46.182.19.48'"  # new digitalcourage
             return 1
         fi
     }
@@ -494,7 +513,7 @@ r1_0_2_update_dns_entry() {
 
 r1_0_2_add_olsrd_garbage_collection() {
     crontab -l | grep "rm -f /tmp/olsrd\*core"
-    if [ $? == 1 ]; then
+    if [ $? = 1 ]; then
         log "adding garbage collection of core files from /tmp"
         echo "23 4 * * *	rm -f /tmp/olsrd*core" >>/etc/crontabs/root
         /etc/init.d/cron restart
@@ -510,7 +529,7 @@ r1_1_0_remove_olsrd_garbage_collection() {
 r1_1_0_update_dns_entry() {
     network_interface_delete_dns() {
         local config=${1}
-        uci -q del network.${config}.dns
+        uci -q del "network.${config}.dns"
     }
     reset_cb
     config_load network
@@ -521,15 +540,15 @@ r1_1_0_update_dns_entry() {
 r1_1_0_update_uplink_notunnel_name() {
     log "update name of uplink-preset notunnel"
     local result=$(uci -q get ffberlin-uplink.preset.current)
-    [[ $? -eq 0 ]] && [[ $result == "no-tunnel" ]] && uci set ffberlin-uplink.preset.current=notunnel
+    [ $? -eq 0 ] && [ "$result" = "no-tunnel" ] && uci set ffberlin-uplink.preset.current=notunnel
     result=$(uci -q get ffberlin-uplink.preset.previous)
-    [[ $? -eq 0 ]] && [[ $result == "no-tunnel" ]] && uci set ffberlin-uplink.preset.previous=notunnel
+    [ $? -eq 0 ] && [ "$result" = "no-tunnel" ] && uci set ffberlin-uplink.preset.previous=notunnel
     log "update name of uplink-preset notunnel done"
 }
 
 r1_1_0_firewall_remove_advanced() {
     firewall_remove_advanced() {
-        uci -q delete firewall.$1
+        uci -q delete "firewall.$1"
     }
     config_load firewall
     config_foreach firewall_remove_advanced advanced
@@ -538,7 +557,7 @@ r1_1_0_firewall_remove_advanced() {
 r1_1_0_statistics_server() {
     log "Setting the statistcs server to \"monitor.berlin.freifunk.net\"."
     local result=$(uci -q get luci_statistics.\@collectd_network_server\[0\].host)
-    [ $? -eq 0 ] && [ $result == "77.87.48.12" ] &&
+    [ $? -eq 0 ] && [ "$result" = "77.87.48.12" ] &&
         uci set luci_statistics.\@collectd_network_server\[0\].host=monitor.berlin.freifunk.net
 }
 
@@ -572,19 +591,19 @@ r1_1_0_openwrt_19_07_updates() {
     uci commit uhttpd
     /etc/init.d/uhttpd restart
 
-    function handle_ucitrack_system() {
+    handle_ucitrack_system() {
         local config=${1}
-        uci set ucitrack.${config}.exec="/etc/init.d/log reload"
-        uci add_list ucitrack.${config}.affects="dhcp"
+        uci set "ucitrack.${config}.exec=/etc/init.d/log reload"
+        uci add_list "ucitrack.${config}.affects=dhcp"
     }
     reset_cb
     config_load ucitrack
     config_foreach handle_ucitrack_system system
 
-    function handle_ucitrack_fstab() {
+    handle_ucitrack_fstab() {
         local config=${1}
-        uci delete ucitrack.${config}.init
-        uci set ucitrack.${config}.exec="/sbin/block mount"
+        uci delete "ucitrack.${config}.init"
+        uci set "ucitrack.${config}.exec=/sbin/block mount"
     }
     reset_cb
     config_load ucitrack
@@ -596,14 +615,14 @@ r1_1_0_wifi_iface_names() {
     wifi_set_name() {
         local config=${1}
         # skip if there is already a name for this section
-        [ $(echo ${config%%[0-9]*}) != "cfg" ] && return
+        [ "$(echo "${config%%[0-9]*}")" != "cfg" ] && return
 
         # determine a name for this section
-        local ifname=$(uci -q get wireless.${config}.ifname)
-        [ "X${ifname}X" == "XX" ] && ifname="wifinet${count}"
-        ifname=$(echo $ifname | sed -e 's/-/_/g')
-        uci -q rename wireless.$config=$ifname
-        let "count=count+1"
+        local ifname=$(uci -q get "wireless.${config}.ifname")
+        [ "X${ifname}X" = "XX" ] && ifname="wifinet${count}"
+        ifname=$(echo "$ifname" | sed -e 's/-/_/g')
+        uci -q rename "wireless.$config=$ifname"
+        count=$(( count + 1))
     }
     config_load wireless
     config_foreach wifi_set_name wifi-iface
@@ -618,12 +637,12 @@ r1_1_0_ffwizard() {
         local config=$1
         local mode=''
         local device=''
-        config_get mode $config mode
-        config_get device $config device
-        [ $mode == "mesh" ] && mode="80211s"
-        [ $mode != "adhoc" ] && [ $mode != "80211s" ] && return
+        config_get mode "$config" mode
+        config_get device "$config" device
+        [ "$mode" = "mesh" ] && mode="80211s"
+        [ "$mode" != "adhoc" ] && [ "$mode" != "80211s" ] && return
 
-        uci set ffwizard.settings.meshmode_${device}=${mode}
+        uci set "ffwizard.settings.meshmode_${device}=${mode}"
     }
 
     reset_cb
@@ -638,7 +657,7 @@ r1_1_0_statistics() {
 
 r1_1_0_sharenet_setup() {
     local sharenet=$(uci get ffwizard.settings.sharenet)
-    if [ 1 -ne $sharenet ]; then
+    if [ 1 -ne "$sharenet" ]; then
         log "disabling ffuplink because sharenet is not set to 1"
         uci set network.ffuplink.disabled=1
     else
@@ -654,16 +673,16 @@ r1_1_1_rssiled() {
         local config=$1
         local mode=''
         local ifname=''
-        config_get mode $config mode
-        config_get ifname $config ifname
-        [ $mode != "adhoc" ] && [ $mode != "mesh" ] && return
+        config_get mode "$config" mode
+        config_get ifname "$config" ifname
+        [ "$mode" != "adhoc" ] && [ "$mode" != "mesh" ] && return
 
         local rssidev=${ifname%%-*}
-        local result=$(uci -q get system.rssid_${rssidev}.dev)
+        local result=$(uci -q get "system.rssid_${rssidev}.dev")
         if [ "X${result}X" != "XX" ]; then
             # we need to stop the rssileds service before making the new setting
             /etc/init.d/rssileds stop
-            uci set system.rssid_${rssiddev}.dev=${ifname}
+            uci set "system.rssid_${rssidev}.dev=${ifname}"
             # we need to commit the system changes early if we want the
             # rssileds service to start correctly
             uci commit system
@@ -728,18 +747,18 @@ r1_2_0_fw_zones() {
         local nets=''
         local devs=''
 
-        config_get name $cfg name
-        config_get nets $cfg network
-        config_get devs $cfg device
+        config_get name "$cfg" name
+        config_get nets "$cfg" network
+        config_get devs "$cfg" device
 
         log "ensuring that the networks and devices in zone ${name} are stored as a list"
-        uci -q delete firewall.$cfg.network
+        uci -q delete "firewall.$cfg.network"
         for net in $nets; do
-            uci add_list firewall.$cfg.network=$net
+            uci add_list "firewall.$cfg.network=$net"
         done
-        uci -q delete firewall.$cfg.device
+        uci -q delete "firewall.$cfg.device"
         for dev in $devs; do
-            uci add_list firewall.$cfg.device=$dev
+            uci add_list "firewall.$cfg.device=$dev"
         done
     }
 
@@ -761,7 +780,7 @@ r1_2_0_statistics() {
     local enabled=$(uci -q get luci_statistics.collectd_interface.enable)
     log "adding dhcpleases section to luci_statistics"
     uci set luci_statistics.collectd_dhcpleases=statistics
-    uci set luci_statistics.collectd_dhcpleases.enable=$enabled
+    uci set luci_statistics.collectd_dhcpleases.enable="$enabled"
     uci set luci_statistics.collectd_dhcpleases.Path='/tmp/dhcp.leases'
     uci commit luci_statistics
 }
@@ -771,7 +790,7 @@ r1_2_0_network() {
 
     # Make sure wan is a bridge.
     WANDEV=$(uci -q get network.wan.ifname)
-    echo ${WANDEV} | grep ^br- >/dev/null
+    echo "${WANDEV}" | grep ^br- >/dev/null
     BRIDGECHECK=$?
 
     if [ "X${WANDEV}X" = "XX" ]; then
@@ -781,8 +800,8 @@ r1_2_0_network() {
         # in the case where the user decides to use the "notunnel" variant
         log "creating a wan bridge device and wan/wan6 interfaces"
         NEWDEV=$(uci -q add network device)
-        uci -q set network.$NEWDEV.type="bridge"
-        uci -q set network.$NEWDEV.name="br-wan"
+        uci -q set "network.$NEWDEV.type=bridge"
+        uci -q set "network.$NEWDEV.name=br-wan"
 
         # create a wan interface, even if it can't do anything
         uci -q set network.wan=interface
@@ -802,10 +821,10 @@ r1_2_0_network() {
         # The wan device is not a bridge.  Change it to a bridge
         log "changing wan device to a bridge"
         NEWDEV=$(uci -q add network device)
-        uci -q set network.$NEWDEV.type="bridge"
-        uci -q set network.$NEWDEV.name="br-wan"
+        uci -q set "network.$NEWDEV.type=bridge"
+        uci -q set "network.$NEWDEV.name=br-wan"
         for port in $WANDEV; do
-            uci -q add_list network.$NEWDEV.ports=$port
+            uci -q add_list "network.$NEWDEV.ports=$port"
         done
 
         uci -q set network.wan.device="br-wan"
@@ -823,7 +842,7 @@ r1_2_0_network() {
     if [ $? -eq 0 ]; then
         log "changing ffuplink interface from ifname syntax to device"
         uci -q delete network.ffuplink.ifname
-        uci -q set network.ffuplink.device=$dev
+        uci -q set network.ffuplink.device="$dev"
         uci -q delete network.ffuplink.type
     fi
 
@@ -832,10 +851,10 @@ r1_2_0_network() {
     if [ $? -eq 0 ]; then
         log "changing dhcp interface from ifname syntax to device"
         NEWDEV=$(uci -q add network device)
-        uci -q set network.$NEWDEV.type="bridge"
-        uci -q set network.$NEWDEV.name="br-dhcp"
+        uci -q set "network.$NEWDEV.type=bridge"
+        uci -q set "network.$NEWDEV.name=br-dhcp"
         for port in $ports; do
-            uci -q add_list network.$NEWDEV.ports=$port
+            uci -q add_list "network.$NEWDEV.ports=$port"
         done
         uci -q delete network.dhcp.ifname
         uci -q set network.dhcp.device="br-dhcp"
@@ -847,7 +866,7 @@ r1_2_0_network() {
     if [ $? -eq 0 ]; then
         log "changing loopback interface from ifname sytax to device"
         uci -q delete network.loopback.ifname
-        uci -q set network.loopback.device=$dev
+        uci -q set "network.loopback.device=$dev"
     fi
 
     # change tunl0 from ifname to device
@@ -855,7 +874,7 @@ r1_2_0_network() {
     if [ $? -eq 0 ]; then
         log "changing tunl0 interface from ifname sytax to device"
         uci -q delete network.tunl0.ifname
-        uci -q set network.tunl0.device=$dev
+        uci -q set "network.tunl0.device=$dev"
     fi
 
     # ensure all interfaces created by tunneldigger are changed from
@@ -867,14 +886,14 @@ r1_2_0_network() {
     handle_tunneldigger_interface() {
         local config=$1
         local interface=''
-        config_get interface $config interface "unset"
-        if [ ${interface} != "unset" ]; then
-            local dev=$(uci -q get network.${interface}.ifname)
+        config_get interface "$config" interface "unset"
+        if [ "${interface}" != "unset" ]; then
+            local dev=$(uci -q get "network.${interface}.ifname")
             if [ "X${dev}X" != "XX" ]; then
                 log "changing ${interface} interface from ifname syntax to device"
-                uci -q delete network.${interface}.ifname
-                uci -q set network.${interface}.device=$dev
-                uci -q delete network.${interface}.type
+                uci -q delete "network.${interface}.ifname"
+                uci -q set "network.${interface}.device=$dev"
+                uci -q delete "network.${interface}.type"
             fi
         fi
     }
@@ -902,9 +921,9 @@ r1_2_0_olsrd() {
         local config=$1
         local confname=$2
         local library=""
-        config_get library $config library
-        if [ $library = "olsrd_watchdog" ]; then
-            uci -q delete $confname.$config
+        config_get library "$config" library
+        if [ "$library" = "olsrd_watchdog" ]; then
+            uci -q delete "$confname.$config"
         fi
     }
 
@@ -934,10 +953,10 @@ r1_2_0_dynbanner() {
 r1_2_0_fixbbbdigger() {
     handle_device() {
         local config=$1
-        local name=$(uci get network.$config.name)
-        if [ $name = "bbbdiggger" ]; then
+        local name=$(uci get "network.$config.name")
+        if [ "$name" = "bbbdiggger" ]; then
             log "fixing misspelling of bbbdigger device section"
-            uci set network.$config.name=bbbdigger
+            uci set "network.$config.name=bbbdigger"
             uci commit network
         fi
     }
@@ -949,21 +968,21 @@ r1_2_0_fixbbbdigger() {
 r1_2_0_tunneldigger_srv() {
     local section=$1
     local srv=$2
-    local result=$(uci -q get tunneldigger.${section})
+    local result=$(uci -q get "tunneldigger.${section}")
     # check to make sure such a section is defined}
-    if [ "$result" == "broker" ]; then
+    if [ "$result" = "broker" ]; then
         log "updating server list for $section"
-        uci -q delete tunneldigger.${section}.address
-        uci -q set tunneldigger.${section}.srv="$srv"
+        uci -q delete "tunneldigger.${section}.address"
+        uci -q set "tunneldigger.${section}.srv=$srv"
         uci commit tunneldigger
-        /etc/init.d/tunneldigger restart $section
+        /etc/init.d/tunneldigger restart "$section"
     fi
 }
 
 r1_2_0_ucitrack() {
     # in case there are multiple freifunk-policytrouing sections, remove extras
     log "removing extra freifunk-policyrouting sections from ucitrack"
-    while [ "$(uci -q get ucitrack.@freifunk-policyrouting[1])" == "freifunk-policyrouting" ]; do
+    while [ "$(uci -q get ucitrack.@freifunk-policyrouting[1])" = "freifunk-policyrouting" ]; do
         uci -q delete ucitrack.@freifunk-policyrouting[1]
     done
 
@@ -991,7 +1010,7 @@ r1_2_1_ffwizard() {
     log "removing unneeded mode_radioX options from ffwizard"
     handle_wifi_device() {
         local section=$1
-        uci -q del ffwizard.settings.mode_${section}
+        uci -q del "ffwizard.settings.mode_${section}"
     }
     reset_cb
     config_load wireless
@@ -1024,7 +1043,7 @@ r1_2_3_update_owm_cron() {
     log "make OWM cron run twice per hour"
     test -f /etc/crontabs/root || touch /etc/crontabs/root
     OWM="/usr/sbin/owm.sh"
-    SEED="$(dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi)"
+    SEED="$( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi )"
     MIN1="$((SEED % 29))"
     MIN2="$((MIN1 + 30))"
     (
@@ -1042,7 +1061,7 @@ migrate() {
     bump_repo
     ensure_profiled
 
-    if semverLT ${OLD_VERSION} "0.1.0"; then
+    if semverLT "${OLD_VERSION}" "0.1.0"; then
         update_openvpn_remote_config
         update_dhcp_lease_config
         update_wireless_ht20_config
@@ -1050,16 +1069,16 @@ migrate() {
         update_olsr_smart_gateway_threshold
     fi
 
-    if semverLT ${OLD_VERSION} "0.1.1"; then
+    if semverLT "${OLD_VERSION}" "0.1.1"; then
         update_collectd_memory_leak_hotfix
         fix_olsrd_txtinfo_port
     fi
 
-    if semverLT ${OLD_VERSION} "0.1.2"; then
+    if semverLT "${OLD_VERSION}" "0.1.2"; then
         add_openvpn_mssfix
     fi
 
-    if semverLT ${OLD_VERSION} "0.2.0"; then
+    if semverLT "${OLD_VERSION}" "0.2.0"; then
         update_berlin_owm_api
         update_collectd_ping
         fix_qos_interface
@@ -1072,11 +1091,11 @@ migrate() {
         fix_olsrd6_watchdog_file
     fi
 
-    if semverLT ${OLD_VERSION} "0.3.0"; then
+    if semverLT "${OLD_VERSION}" "0.3.0"; then
         quieten_dnsmasq
     fi
 
-    if semverLT ${OLD_VERSION} "1.0.0"; then
+    if semverLT "${OLD_VERSION}" "1.0.0"; then
         vpn03_udp4
         set_ipversion_olsrd6
         r1_0_0_vpn03_splitconfig
@@ -1088,11 +1107,11 @@ migrate() {
         r1_0_0_set_uplinktype
     fi
 
-    if semverLT ${OLD_VERSION} "1.0.1"; then
+    if semverLT "${OLD_VERSION}" "1.0.1"; then
         r1_0_1_set_uplinktype
     fi
 
-    if semverLT ${OLD_VERSION} "1.0.2"; then
+    if semverLT "${OLD_VERSION}" "1.0.2"; then
         r1_1_0_notunnel_ffuplink_ipXtable
         r1_1_0_notunnel_ffuplink
         r1_0_2_update_dns_entry
@@ -1100,7 +1119,7 @@ migrate() {
         guard "ffberlin_uplink"
     fi
 
-    if semverLT ${OLD_VERSION} "1.1.0"; then
+    if semverLT "${OLD_VERSION}" "1.1.0"; then
         r1_1_0_change_olsrd_lib_num
         r1_1_0_olsrd_dygw_ping
         r1_1_0_update_dns_entry
@@ -1115,18 +1134,18 @@ migrate() {
         r1_1_0_nosharenet_setup
     fi
 
-    if semverLT ${OLD_VERSION} "1.1.1"; then
+    if semverLT "${OLD_VERSION}" "1.1.1"; then
         r1_1_1_rssiled
     fi
 
-    if semverLT ${OLD_VERSION} "1.1.2"; then
+    if semverLT "${OLD_VERSION}" "1.1.2"; then
         r1_1_2_dnsmasq_ignore_wan
         r1_1_2_peerdns_ffuplink
         r1_1_2_new_sysctl_conf
         r1_1_2_rssiled
     fi
 
-    if semverLT ${OLD_VERSION} "1.2.0"; then
+    if semverLT "${OLD_VERSION}" "1.2.0"; then
         r1_2_0_dhcp
         r1_2_0_fw_zones
         r1_2_0_fw_synflood
@@ -1141,18 +1160,20 @@ migrate() {
         r1_2_0_ucitrack
     fi
 
-    if semverLT ${OLD_VERSION} "1.2.1"; then
+    if semverLT "${OLD_VERSION}" "1.2.1"; then
         r1_2_1_dynbanner
         r1_2_1_rpcd
         r1_2_1_ffwizard
         r1_2_1_olsrd_watchdog_crontab
     fi
 
-    if semverLT ${OLD_VERSION} "1.2.2"; then
+    if semverLT "${OLD_VERSION}" "1.2.2"; then
         r1_2_2_https_interface
     fi
 
-    if semverLT ${OLD_VERSION} "1.2.3"; then
+    if semverLT "${OLD_VERSION}" "1.2.3"; then
+        # run rssid-migration again, as there was a typo in an variable
+        r1_1_1_rssiled
         r1_2_1_dynbanner
         r1_2_2_https_interface
         r1_2_3_update_dns
@@ -1161,7 +1182,7 @@ migrate() {
 
     # overwrite version with the new version
     log "Setting new system version to ${VERSION}."
-    uci set system.@system[0].version=${VERSION}
+    uci set "system.@system[0].version=${VERSION}"
 
     uci commit
 
