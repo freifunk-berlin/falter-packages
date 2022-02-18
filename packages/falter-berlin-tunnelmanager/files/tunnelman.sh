@@ -106,7 +106,7 @@ teardown() {
 wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
-    clients=$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    clients=$(timeout 60 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
     if [ $? -ne 0 ]; then
         return 1
     fi
