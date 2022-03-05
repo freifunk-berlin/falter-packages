@@ -1,5 +1,7 @@
 #include "hna.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 char *read_file(const char *filename) {
         char *buffer;
@@ -22,31 +24,53 @@ char *read_file(const char *filename) {
         return buffer;
 }
 
-int find_host(char *name, const char *addr, const size_t addr_len, const char *hosts, const size_t hosts_len) {
-        const char *beg = hosts;
-        const char *end = hosts + hosts_len;
-        const char *p = hosts;
-        while (p < end) {
-                p = strstr(p + 1, addr);
-                if (p == NULL) {
-                        return 0;
-                }
-                if ((p == beg || *(p - 1) == '\n') && (p == end || *(p + addr_len) == '\t')) {
-                        const char *tok_beg = p + addr_len + 1;
-                        const char *tok_end = tok_beg;
-                        while (tok_end < end) {
-                                if (*tok_end == '\t' || *tok_end == '\n' || *tok_end == ' ') {
-                                        break;
-                                }
-                                tok_end += 1;
-                        }
-                        memcpy(name, tok_beg, tok_end - tok_beg);
-                        name[(tok_end - tok_beg)] = '\0';
-                        //printf("found: '%.*s'\n", (int) (tok_end - tok_beg), tok_beg);
-                        return 1;
-                }
+int open_file(const char *filename) {
+        FILE *f = fopen(filename, "rb");
+
+        if (!f) {
+                fprintf(stderr, "failed to open %s\n", filename);
+                return -1;
         }
-        return 0;
+
+        return f->_fileno;
+}
+
+int make_request(const char *addr_str, int port, const char *request) {
+        struct sockaddr_storage server_addr;
+
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+
+        if (sock < 0) {
+                printf("socket(): %s\n", strerror(errno));
+                return -1;
+        }
+
+        struct sockaddr_in *addr4 = (struct sockaddr_in *) &server_addr;
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *) &server_addr;
+
+        if (inet_pton(AF_INET, addr_str, &addr4->sin_addr) == 1) {
+                addr4->sin_family = AF_INET;
+                addr4->sin_port = htons(port);
+        } else if (inet_pton(AF_INET6, addr_str, &addr6->sin6_addr) == 1) {
+                addr6->sin6_family = AF_INET6;
+                addr6->sin6_port = htons(port);
+        } else {
+                printf("invalid address: %s\n", addr_str);
+                return -1;
+        }
+
+        if (connect(sock, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+                printf("connect(): %s\n", strerror(errno));
+                return -1;
+        }
+
+        if (send(sock, request, strlen(request), 0) != -1) {
+                return sock;
+        } else {
+                printf("send(): %s\n", strerror(errno));
+                return -1;
+        }
+
 }
 
 char *tcp_read(const char *addr_str, int port, const char *request) {
@@ -90,7 +114,7 @@ char *tcp_read(const char *addr_str, int port, const char *request) {
 }
 
 
-hna_data *serialize_hna_string(char *hna, char *gateway) {
+/*hna_data *serialize_hna_string(char *hna, char *gateway) {
         // input-data: "10.230.198.192/28", "10.31.43.188"
         hna_data* dataset = calloc(1, sizeof(hna_data));
 
@@ -104,6 +128,57 @@ hna_data *serialize_hna_string(char *hna, char *gateway) {
         inet_pton(AF_INET, gateway, &dataset->via_gateway.sin_addr);
 
         return dataset;
+}*/
+
+void paste_data(hna_data * dataset, char *hna, char *gateway) {
+        char* ipaddr = strtok(hna, "/");
+        char* netmask = strtok(NULL, "/");
+        
+        dataset->hna.netmask = netmask;
+
+        // transform char-representation to binary-addr and store in struct
+        inet_pton(AF_INET, ipaddr, &dataset->hna.base_addr.sin_addr);
+        inet_pton(AF_INET, gateway, &dataset->via_gateway.sin_addr);
+
+        //free(ipaddr);
+}
+
+#define BUFFSIZE 4096
+
+void read_hna_to_tree(struct avl_table *tree, int socket) {
+        char* buff = calloc(1, BUFFSIZE);
+        char* buff_pos = buff;
+
+        while (read(socket, buff_pos, 1) > 0) {
+                // once we reached line end, begin processing the line
+                if ( *buff_pos == '\n' ) {
+                        // make sure to end string with \0-byte
+                        buff_pos ++;
+                        *buff_pos = '\0';
+
+                        // omit lines with table-headers...
+                        if (*buff == 'T' || *buff == 'D') {
+                                // skip line and reset buffer
+                                buff_pos = buff;
+                                printf("here...\n");
+                                continue;
+                        }
+
+                        char* destination = malloc(IP_ADDR_MAX_STR_LEN);
+                        char* gateway = malloc(IP_ADDR_MAX_STR_LEN);
+
+                        if (sscanf(buff, "%s\t%s\n", destination, gateway) < 2)
+                                printf("Error while processing line with scanf...\n");
+
+                        hna_data* set = malloc(sizeof(hna_data));
+                        paste_data(set, destination, gateway);
+
+                        avl_insert(tree, set);
+                }
+                
+                buff_pos ++;
+        }
+        free(buff);
 }
 
 void read_hna_into_tree(struct avl_table *tree, char *raw_data) {
@@ -117,6 +192,7 @@ void read_hna_into_tree(struct avl_table *tree, char *raw_data) {
                 if (token == NULL) {
                         break;
                 }
+                // skip the table-headers
                 if (token[0] == 'T' || token[0] == 'D') {
                         continue;
                 }
@@ -129,7 +205,11 @@ void read_hna_into_tree(struct avl_table *tree, char *raw_data) {
                         args[j] = subtoken;
                 }
 
-                hna_data *set = serialize_hna_string(args[0], args[1]);
+                hna_data* set = calloc(1, sizeof(hna_data));
+                paste_data(set, args[0], args[1]);
+                //free(args[0]);
+                //free(args[1]);
+
                 avl_insert(tree, set);
         }
 }

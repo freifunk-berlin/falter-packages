@@ -12,13 +12,13 @@
 
 
 int main(int argc, char *argv[]) {
-        const char *hna4 = tcp_read("127.0.0.1", 2006, "/hna");
-        const char *hna6 = tcp_read("::1", 2006, "/hna");
+        //const char *hna4 = tcp_read("127.0.0.1", 2006, "/hna");
+        //const char *hna6 = tcp_read("::1", 2006, "/hna");
 
-        if (hna4 == NULL) {
+        /*if (hna4 == NULL) {
           fprintf(stderr, "failed to read ipv4 HNAs\n");
           return EXIT_FAILURE;
-        }
+        }*/
 
         //if (hna6 == NULL) {
         //  fprintf(stderr, "failed to read ipv6 HNAs\n");
@@ -30,15 +30,20 @@ int main(int argc, char *argv[]) {
         //char *hosts = read_file("raw/olsr");
         // const char *hosts = read_file("/tmp/hosts/olsr");
 
+        int hna4_fd = make_request("127.0.0.1", 2006, "/hna");
+        printf("FD: %d\n", hna4_fd);
+        //int hna6_fd = open_file("raw/hna6_2006.txt");
+        //int hosts = open_file("raw/olsr");
+
         // read data into AVL-Treee
         struct avl_traverser traverser;
         struct avl_table *tree = avl_create(&compare_node_structs, NULL, NULL);
 
-        read_hna_into_tree(tree, hna4);
-        read_hosts_into_tree(tree, hosts);
+        read_hna_to_tree(tree, hna4_fd);
+        //read_hosts_into_tree(tree, hosts);
 
         // tree: inorder-walk and print data
-        char* hna = "Announced network";
+        /*char* hna = "Announced network";
         char* gw = "OLSR gateway";
         char* v_time = "Validity Time";
         char* h_name = "OLSR Hostname";
@@ -61,17 +66,14 @@ int main(int argc, char *argv[]) {
 
                 printf("%-18s\t%-15s\t%8d%s\t%-17s\n", hna_addr, gw_addr, 0, "    ", curr->host_name);
                 curr = (hna_data *) avl_t_next(&traverser);
-        } while (curr != NULL);
+        } while (curr != NULL);*/
 
-        free(hna4);
-        free(hosts);
-        free(hna6);
-        
         // free avl-tree
         avl_destroy(tree, &free_hna_data);
 
-
-        //getchar();
+        //free(hna4);
+        //free(hosts);
+        //free(hna6);
 
         return EXIT_SUCCESS;
 }
