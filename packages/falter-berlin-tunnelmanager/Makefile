@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-tunnelmanager
-PKG_VERSION:=0.2
+PKG_VERSION:=0.3
 
 include $(INCLUDE_DIR)/package.mk
 

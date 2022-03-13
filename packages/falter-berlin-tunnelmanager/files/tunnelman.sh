@@ -29,10 +29,11 @@ Arguments:
     -D: Pre-Down Script (use too hook after connection is down. - Interface name is passed as \$1)
     -U: Post-Up Script (use too hook after connection is established - Interface name is passed as \$1)
     -E: Post-Up Script Arguments (use to pass parameters to post-up script \$2)
+    -m: mtu
 
 Example call:
     tunnelman.sh -i br-vpn_lte -a 192.168.178.100/24 -g 192.168.178.1 -n vpn_lte -T 176.74.57.43 -T 176.74.57.19 -T 77.87.51.11 -T 77.87.49.8 -c
- 1 -t 180 -o 60 -D down.sh -U up.sh -A 10.31.147.224/29
+ 1 -t 180 -o 60 -D down.sh -U up.sh -A 10.31.147.224/29 -m 1412
 \n"
 }
 
@@ -155,8 +156,9 @@ generate_keys() {
 new_tunnel() {
     local ip="$1"
     local nsname="$2"
+    local mtu="$3"
 
-    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu 1412)"
+    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu $mtu)"
 
     if [ -z "$interface" ]; then
         log "Failed to register a new tunnel."
@@ -179,8 +181,9 @@ new_tunnel() {
 # This method sets up the Tunnels and ensures everything is up and running
 manage() {
     local nsname="$1"
-    local connection_count="$2"
-    local tunnel_endpoints="$3"
+    local mtu="$2"
+    local connection_count="$3"
+    local tunnel_endpoints="$4"
     local interval=60
 
     # Check for stale tunnels and tear em down
@@ -198,7 +201,7 @@ manage() {
             ep=$(get_least_used_tunnelserver "$tmp_tunnel_endpoints")
             if [ ! -z "$ep" ]; then
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
-                if ! new_tunnel "$ep" "$nsname"; then
+                if ! new_tunnel "$ep" "$nsname" "$mtu"; then
                     # remove ep from tunnel
                     tmp_tunnel_endpoints=$(echo "$tmp_tunnel_endpoints" | sed "s/$ep//")
                 fi
@@ -222,12 +225,13 @@ manage() {
 
 ENDPOINT_COUNT=0
 
-while getopts a:c:g:i:n:o:t:T:D:U:A: option; do
+while getopts a:c:g:i:m:n:o:t:T:D:U:A: option; do
     case $option in
     a) OPT_UPLINK_IP=$OPTARG ;;
     c) OPT_TUNNEL_COUNT=$OPTARG ;;
     g) OPT_UPLINK_GW=$OPTARG ;;
     i) OPT_UPLINK_INTERFACE=$OPTARG ;;
+    m) OPT_MTU=$OPTARG ;;
     n) OPT_NAMESPACE_NAME=$OPTARG ;;
     o) OPT_INTERVAL=$OPTARG ;;
     t) OPT_TUNNEL_TIMEOUT=$OPTARG ;;
@@ -255,7 +259,8 @@ if [ -z "$OPT_UPLINK_IP" ] || [ -z "$OPT_TUNNEL_COUNT" ] ||
     [ -z "$OPT_UPLINK_GW" ] || [ -z "$OPT_UPLINK_INTERFACE" ] ||
     [ -z "$OPT_NAMESPACE_NAME" ] || [ -z "$OPT_INTERVAL" ] ||
     [ -z "$OPT_UP_SCRIPT" ] || [ -z "$OPT_TUNNEL_ENDPOINTS" ] ||
-    [ -z "$OPT_DOWN_SCRIPT" ] || [ -z "$OPT_TUNNEL_TIMEOUT" ]; then
+    [ -z "$OPT_DOWN_SCRIPT" ] || [ -z "$OPT_MTU" ] ||
+    [ -z "$OPT_TUNNEL_TIMEOUT" ]; then
     printf "Not enough options. Please give all necessary options!\n\n"
     print_help
     exit 2
@@ -267,6 +272,7 @@ log "starting tunnelmanager with
     Uplink-Interface.....: $OPT_UPLINK_INTERFACE
     Uplink-IP............: $OPT_UPLINK_IP
     Uplink-GW............: $OPT_UPLINK_GW
+    MTU..................: $OPT_MTU
     Namespace............: $OPT_NAMESPACE_NAME 
     Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
     Tunnel-Count.........: $OPT_TUNNEL_COUNT 
@@ -289,4 +295,4 @@ connections=""
 
 # contains list of managed wg interfaces
 interfaces=""
-manage "$OPT_NAMESPACE_NAME" "$OPT_TUNNEL_COUNT" "$OPT_TUNNEL_ENDPOINTS"
+manage "$OPT_NAMESPACE_NAME" "$OPT_MTU" "$OPT_TUNNEL_COUNT" "$OPT_TUNNEL_ENDPOINTS"
