@@ -2,9 +2,9 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI support for Freifunk Berlin Autoupdate
-LUCI_DEPENDS:=falter-berlin-autoupdate
+LUCI_EXTRA_DEPENDS:=falter-berlin-autoupdate
 LUCI_PKGARCH:=all
 
-include ../../luci.mk
+include ../include-luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
