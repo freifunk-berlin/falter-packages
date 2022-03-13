@@ -30,6 +30,10 @@ endef
 define Build/Compile
 endef
 
+define Package/falter-berlin-tunnelmanager/conffiles
+/etc/config/tunnelmanager
+endef
+
 define Package/falter-berlin-tunnelmanager/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(CP) ./files/tunnelmanager.init $(1)/etc/init.d/tunnelmanager
