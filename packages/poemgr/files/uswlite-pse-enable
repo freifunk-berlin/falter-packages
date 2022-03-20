@@ -1,0 +1,11 @@
+#!/bin/sh
+
+echo 487 > /sys/class/gpio/export # JK
+echo 488 > /sys/class/gpio/export # CLK
+
+echo out > /sys/class/gpio/gpio487/direction
+echo out > /sys/class/gpio/gpio488/direction
+
+echo $1 > /sys/class/gpio/gpio487/value
+echo 0 > /sys/class/gpio/gpio488/value
+echo 1 > /sys/class/gpio/gpio488/value
