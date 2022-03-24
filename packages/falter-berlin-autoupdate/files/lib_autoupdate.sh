@@ -10,6 +10,8 @@
 # work anyway. This is a little reminder to you, if you use some rare shell without
 # a builtin "local" statement.
 
+set -o pipefail
+
 log() {
     local msg="$1"
     logger -t autoupdater -s "$msg"
@@ -107,7 +109,7 @@ request_file_size() {
 
     size_bytes=$(printf "GET $file HTTP/1.0\r\nHost: $fqdn\r\nConnection: close\r\n\r\n" | nc "$fqdn" 80 | head | grep "Content-Length" | cut -d':' -f2)
 
-    return $(( size_bytes / 1024))
+    return $((size_bytes / 1024))
 }
 
 get_download_link_and_hash() {
