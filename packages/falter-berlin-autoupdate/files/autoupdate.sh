@@ -52,12 +52,13 @@ Example call:
 
 SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
-INTERVALL=$(uci_get autoupdate cfg check_intervall)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
 PATH_DIR="/tmp/autoupdate"
 PATH_BIN="$PATH_DIR/freifunk_syupgrade.bin"
 KEY_DIR="/etc/autoupdate/keys/"
+
+MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-download
 
 # load lib-autoupdate after configuration-load, to substitute global vars...
 . /lib/autoupdate/lib_autoupdate.sh
@@ -99,18 +100,26 @@ log "starting autoupdate..."
 ##################
 #  Update-stuff
 
-latest_release=$(get_latest_stable "$SELECTOR_URL")
-
+if echo "$FREIFUNK_RELEASE" | grep "snapshot"; then
+    log "automatic updates aren't supported for development-firmwares. Please update manually."
+    exit 2
+fi
 
 if [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; then
     log "autoupdate is disabled. Change the configs at /et/config/autoupdate to enable it."
     exit 2
 fi
 
-UPTIME=$(cut -d'.' -f1 < /proc/uptime)
+UPTIME=$(cut -d'.' -f1 </proc/uptime)
 # only update, if router runs for at least two hours (so the update probably won't get disrupted)
 if [ "$UPTIME" -lt 7200 ]; then
     log "Router didn't run for two hours. It might be just plugged in for testing. Aborting..."
+    exit 2
+fi
+
+latest_release=$(get_latest_stable "$SELECTOR_URL")
+if [ $? != 0 ]; then
+    log "wasn't able to fetch latest stable version. Probably no internet connection."
     exit 2
 fi
 
@@ -138,7 +147,7 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
     size=$?
     freemem=$(free | grep Mem | sed -e 's| \+| |g' | cut -d' ' -f 4)
     # only load the firmware, if there would be 1.5 MiB left in RAM
-    if [ $(( freemem - 1536)) -lt $size ]; then
+    if [ $((freemem - MIN_RAM_FREE)) -lt $size ]; then
         log "there is not enough ram on your device to download the image. You might free some memory by stopping some services before the update."
         exit 2
     fi
@@ -188,5 +197,5 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         log "done."
     fi
 else
-    log "v$FREIFUNK_RELEASE is the latest version. Nothing to do. I will recheck in $INTERVALL days."
+    log "v$FREIFUNK_RELEASE is the latest version. Nothing to do. I will recheck tomorrow."
 fi
