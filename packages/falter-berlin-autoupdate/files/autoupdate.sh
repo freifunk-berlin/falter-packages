@@ -100,7 +100,7 @@ log "starting autoupdate..."
 ##################
 #  Update-stuff
 
-if echo "$FREIFUNK_RELEASE" | grep "snapshot"; then
+if ! echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     log "automatic updates aren't supported for development-firmwares. Please update manually."
     exit 2
 fi
