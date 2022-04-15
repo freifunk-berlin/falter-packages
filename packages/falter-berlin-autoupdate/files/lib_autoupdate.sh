@@ -194,19 +194,20 @@ pop_element() {
     echo "$list_new"
 }
 
-count_valid_certificates() {
+min_valid_certificates() {
     # for every certificate, iterate over known public keys and
     # count matches. Assure that we don't validate against a key two times
     # by removing it from list, once it was used.
-    # returns number of valid certs
+    # returns true, if we got minimum certificates, false if not.
 
     local signed_file="$1"
+    local min_cnt="$2"
     local cert_list=""
     local key_list=""
     local cert_cnt=0
 
-    cert_list=$(ls "$PATH_DIR/" | grep sig)
-    key_list=$(ls "$KEY_DIR")
+    cert_list=$(find "$PATH_DIR/" -name *.sig)
+    key_list=$(find "$KEY_DIR" -name *.pub)
 
     for cert in $cert_list; do
         for key in $key_list; do
@@ -214,6 +215,9 @@ count_valid_certificates() {
                 cert_cnt=$((cert_cnt + 1))
                 #pop key from list. Thus one key cannot validate multiple certs.
                 key_list=$(pop_element "$key_list" "$key")
+            fi
+            if [ $cert_cnt = $min_cnt ]; then
+                return 255
             fi
         done
     done

@@ -35,11 +35,14 @@ Optional arguments:
             Don't prove the images origin by checking the certificates
     -m INT: minimum certs
             flash image, if it was signed by minimum amount of certs
+    -n: wipe data
+            flash the image and wipe configuration. So you will start
+            with a new wizard-run.
     -t: test-run
             this will perform everything like in automatic-mode, except
             that it won't flash the image and won't tidy up afterwards.
     -f: force update
-            CAUTION: This will wipe all config on this node!
+            CAUTION: This will ignore all checks except the certificates!
 
 Example call:
     autoupdate
@@ -70,7 +73,7 @@ MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-downlo
 ########################
 #  Commandline parsing
 
-while getopts him:tf option; do
+while getopts himn:tf option; do
     case $option in
     h)
         print_help
@@ -78,6 +81,7 @@ while getopts him:tf option; do
         ;;
     i) OPT_IGNORE_CERTS=1 ;;
     m) MIN_CERTS=$OPTARG ;;
+    n) OPT_N=1 ;;
     t) OPT_TESTRUN=1 ;;
     f) OPT_FORCE=1 ;;
     *)
@@ -100,19 +104,19 @@ log "starting autoupdate..."
 ##################
 #  Update-stuff
 
-if ! echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+if [ -z $OPT_FORCE ] && ! echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     log "automatic updates aren't supported for development-firmwares. Please update manually."
     exit 2
 fi
 
-if [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; then
+if [ -z $OPT_FORCE ] && { [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ] ;}; then
     log "autoupdate is disabled. Change the configs at /et/config/autoupdate to enable it."
     exit 2
 fi
 
 UPTIME=$(cut -d'.' -f1 </proc/uptime)
 # only update, if router runs for at least two hours (so the update probably won't get disrupted)
-if [ "$UPTIME" -lt 7200 ]; then
+if [ -z $OPT_FORCE ] && [ "$UPTIME" -lt 7200 ]; then
     log "Router didn't run for two hours. It might be just plugged in for testing. Aborting..."
     exit 2
 fi
@@ -138,6 +142,23 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
 
     log "fetching download-link and images hashsum..."
     link_and_hash=$(get_download_link_and_hash "$latest_release" "$flavour")
+    log "done."
+
+    log "Verifying image-signatures..."
+    # proove to be signed by minimum amount of certs
+    if [ -z $OPT_IGNORE_CERTS ]; then
+        min_valid_certificates "$PATH_DIR/overview.json" "$MIN_CERTS"
+        ret_code=$?
+        if [ $ret_code != 255 ]; then
+            log "The image was signed by $ret_code certificates only. At least $MIN_CERTS required."
+            exit 2
+        else
+            log "Image was signed by at least $MIN_CERTS certificates. Continuing..."
+        fi
+    else
+        log "ignoring certificates as requested..."
+    fi
+
     link=$(echo "$link_and_hash" | cut -d' ' -f 1)
     hash_sum=$(echo "$link_and_hash" | cut -d' ' -f 2)
     log "download link is: $link. Try loading new firmware..."
@@ -172,24 +193,10 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         log "Image hash is correct. sha256_hash: $hash_sum"
     fi
 
-    # proove to be signed by minimum amount of certs
-    if [ -z $OPT_IGNORE_CERTS ]; then
-        count_valid_certificates "$PATH_DIR/overview.json"
-        ret_code=$?
-        if [ $ret_code -lt "$MIN_CERTS" ]; then
-            log "The image was signed by $ret_code certificates only. At least $MIN_CERTS required."
-            exit 2
-        else
-            log "Image was signed by $ret_code certificates. Continuing..."
-        fi
-    else
-        log "ignoring certificates as requested..."
-    fi
-
     # flash image
     if [ -z $OPT_TESTRUN ]; then
         log "start flashing the image..."
-        if [ -n "$OPT_FORCE" ]; then
+        if [ -n "$OPT_N" ]; then
             sysupgrade -n "$PATH_BIN"
         else
             sysupgrade "$PATH_BIN"
