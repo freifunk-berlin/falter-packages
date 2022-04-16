@@ -28,25 +28,25 @@ get_latest_stable() {
 }
 
 load_overview_and_certs() {
-    # we assume, that the overview.json was signed by different developers. The
+    # we assume, that the autoupdate.json was signed by different developers. The
     # files are named in this order:
-    # overview.json.1.sig
-    # overview.json.2.sig
-    # overview.json.3.sig and so forth
+    # autoupdate.json.1.sig
+    # autoupdate.json.2.sig
+    # autoupdate.json.3.sig and so forth
 
-    local selector_url="$1"
+    local fw_server_url="$1"
     local fw_version="$2"
-    local fw_flavour="$3"
 
-    # load overview
-    wget -q "https://${selector_url}/${fw_version}/${fw_flavour}/overview.json" -O "$PATH_DIR/overview.json"
+    # load autoupdate.json
+    wget -q "https://${fw_server_url}/stable/${fw_version}/autoupdate.json" -O "$PATH_DIR/autoupdate.json"
     ret_code=$?
     if [ $ret_code != 0 ]; then
         return $ret_code
     fi
 
+    # load certificates
     local cnt=1
-    while wget -q "https://${selector_url}/${fw_version}/${fw_flavour}/overview.json.$cnt.sig" -O "$PATH_DIR/overview.json.$cnt.sig"; do
+    while wget -q "https://${fw_server_url}/stable/${fw_version}/autoupdate.json.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
         cnt=$((cnt + 1))
     done
 }
@@ -86,16 +86,17 @@ get_board_target() {
 
 iter_images() {
     # iterates over the images available for a board
-    # and finds the sysupgrade-image. Sets global vars
+    # and finds the file name of the sysupgrade-image.
+    # Sets global vars (named in CAPS)
 
     json_select "$2"
     json_get_var "image_type" "type"
 
     if [ "$image_type" = "sysupgrade" ]; then
         json_get_var image_name name
-        json_get_var image_hash sha256
+        #json_get_var image_hash sha256
         IMAGE_NAME="$image_name"
-        IMAGE_HASH="$image_hash"
+        # don't take image hash from unsigned file, but from signed autoupdate.json
     fi
 
     json_select ..
@@ -120,27 +121,35 @@ get_download_link_and_hash() {
 
     local version="$1"
     local flavour="$2"
-    local json_overview=""
+    local autoupdate_json=""
     local curr_target=""
     local NEW_TARGET=""
     local BOARD=""
     local board_json=""
     local IMAGE_NAME=""
-    local IMAGE_HASH=""
+    local image_hash=""
 
-    load_overview_and_certs "$SELECTOR_URL" "$version" "$flavour"
-    json_overview=$(cat "$PATH_DIR/overview.json")
+    load_overview_and_certs "$FW_SERVER_URL" "$version"
+    autoupdate_json=$(cat "$PATH_DIR/autoupdate.json")
 
     BOARD=$(get_board_name)
 
     # extract download-link from json-string
     # whith jshn it takes ages to parse that big json-file. As we only need the image-base-url, scrape it with sed
-    base_url=$(echo "$json_overview" | grep image_url | sed -e 's|.*\(http.*{target}\).*|\1|g')
+    base_url=$(echo "$autoupdate_json" | grep image_url | sed -e 's|.*\(http.*{target}\).*|\1|g')
 
     # Idea: Don't check for target-change. If the Target changed, the download will fail anyway.
     curr_target=$(get_board_target)
 
-    # load board-specifi json with links
+    # get secure hash from signed autoupdate.json
+    json_init
+    json_load_file "$PATH_DIR/autoupdate.json"
+    json_select target
+    json_select "$curr_target"
+    json_select "$BOARD"
+    json_get_var image_hash "$flavour"
+
+    # load board-specific json with download-links from selector
     board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
 
     json_init
@@ -153,7 +162,7 @@ get_download_link_and_hash() {
     fi
 
     # construct download-link
-    echo "$base_url" | sed -e "s|{target}|$curr_target/$IMAGE_NAME $IMAGE_HASH|g"
+    echo "$base_url" | sed -e "s|{falter-version}|$version|g;s|{flavour}|$flavour|g;s|{target}|$curr_target/$IMAGE_NAME $image_hash|g"
 }
 
 verify_image_hash() {

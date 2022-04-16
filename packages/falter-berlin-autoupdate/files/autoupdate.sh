@@ -54,6 +54,7 @@ Example call:
 ##########################
 
 SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
+FW_SERVER_URL=$(uci_get autoupdate cfg fw_server_fqdn)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
@@ -140,14 +141,14 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         exit 1
     fi
 
-    log "fetching download-link and images hashsum..."
+    log "fetching download-link and images hashsum (takes around 30 seconds)..."
     link_and_hash=$(get_download_link_and_hash "$latest_release" "$flavour")
     log "done."
 
     log "Verifying image-signatures..."
     # proove to be signed by minimum amount of certs
     if [ -z $OPT_IGNORE_CERTS ]; then
-        min_valid_certificates "$PATH_DIR/overview.json" "$MIN_CERTS"
+        min_valid_certificates "$PATH_DIR/autoupdate.json" "$MIN_CERTS"
         ret_code=$?
         if [ $ret_code != 255 ]; then
             log "The image was signed by $ret_code certificates only. At least $MIN_CERTS required."
@@ -161,6 +162,13 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
 
     link=$(echo "$link_and_hash" | cut -d' ' -f 1)
     hash_sum=$(echo "$link_and_hash" | cut -d' ' -f 2)
+
+    # delete json and signatures to save space in RAM
+    json_sig_files=$(find /tmp/autoupdate/ -name "autoupdate.json*")
+    for f in $json_sig_files; do
+        rm "$f"
+    done
+
     log "download link is: $link. Try loading new firmware..."
 
     # check if the firmware-bin would fit into tmpfs
