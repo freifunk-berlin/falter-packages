@@ -123,7 +123,6 @@ get_download_link_and_hash() {
     local flavour="$2"
     local autoupdate_json=""
     local curr_target=""
-    local NEW_TARGET=""
     local BOARD=""
     local board_json=""
     local IMAGE_NAME=""
@@ -215,8 +214,8 @@ min_valid_certificates() {
     local key_list=""
     local cert_cnt=0
 
-    cert_list=$(find "$PATH_DIR/" -name *.sig)
-    key_list=$(find "$KEY_DIR" -name *.pub)
+    cert_list=$(find "$PATH_DIR/" -name "*.sig")
+    key_list=$(find "$KEY_DIR" -name "*.pub")
 
     for cert in $cert_list; do
         for key in $key_list; do
