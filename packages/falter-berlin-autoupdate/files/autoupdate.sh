@@ -164,10 +164,12 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
     hash_sum=$(echo "$link_and_hash" | cut -d' ' -f 2)
 
     # delete json and signatures to save space in RAM
-    json_sig_files=$(find /tmp/autoupdate/ -name "autoupdate.json*")
-    for f in $json_sig_files; do
-        rm "$f"
-    done
+    if [ -z $OPT_TESTRUN ]; then
+        json_sig_files=$(find /tmp/autoupdate/ -name "autoupdate.json*")
+        for f in $json_sig_files; do
+            rm "$f"
+        done
+    fi
 
     log "download link is: $link. Try loading new firmware..."
 
