@@ -42,7 +42,8 @@ Optional arguments:
             this will perform everything like in automatic-mode, except
             that it won't flash the image and won't tidy up afterwards.
     -f: force update
-            CAUTION: This will ignore all checks except the certificates!
+            CAUTION: This will ignore all checks except the certificates
+            and checksums!
 
 Example call:
     autoupdate
@@ -107,7 +108,7 @@ log "starting autoupdate..."
 
 is_stable_release=$(echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')
 if [ -z $OPT_FORCE ] && [ -z "$is_stable_release" ]; then
-    log "automatic updates aren't supported for development-firmwares. Please update manually."
+    log "automatic updates aren't supported for development-firmwares. Please update manually or use the force update option '-f' or new-install option '-n'."
     exit 2
 fi
 
@@ -178,6 +179,8 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
     link=$(echo "$link_and_hash" | cut -d' ' -f 1)
     hash_sum=$(echo "$link_and_hash" | cut -d' ' -f 2)
 
+    log "download link is: $link."
+
     # delete json and signatures to save space in RAM
     if [ -z $OPT_TESTRUN ]; then
         json_sig_files=$(find "$PATH_DIR" -name "autoupdate.json*")
@@ -186,7 +189,7 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         done
     fi
 
-    log "download link is: $link. Try loading new firmware..."
+    log "Try loading new firmware..."
 
     # check if the firmware-bin would fit into tmpfs
     request_file_size "$link"
