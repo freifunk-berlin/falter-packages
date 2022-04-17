@@ -96,7 +96,7 @@ get_ips_from_prefix "$prefix"
 # unconditionally wipe all configured ips from available ips.
 available_ips="$_ret_prefixes"
 for i in $(get_configured_ips); do
-    available_ips="$(echo $available_ips | sed "s/$i//")"
+    available_ips="$(echo $available_ips | sed "s/\b$i\b//")"
 done
 
 next_ip="$(echo $available_ips | awk '{print $1}')"
