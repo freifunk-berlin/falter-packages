@@ -17,16 +17,6 @@ log() {
     logger -t autoupdater -s "$msg"
 }
 
-get_latest_stable() {
-    # loads the configuration-file of the firmware-selector
-    # and scans for the firmware selected by default (-> latest stable)
-
-    local selector_url="$1"
-
-    wget -qO - "https://${selector_url}/config.js" | grep default_version | sed -e 's|.*\([0-9].[0-9].[0-9]\).*|\1|'
-    return $?
-}
-
 load_overview_and_certs() {
     # we assume, that the autoupdate.json was signed by different developers. The
     # files are named in this order:
@@ -35,10 +25,9 @@ load_overview_and_certs() {
     # autoupdate.json.3.sig and so forth
 
     local fw_server_url="$1"
-    local fw_version="$2"
 
     # load autoupdate.json
-    wget -q "https://${fw_server_url}/stable/${fw_version}/autoupdate.json" -O "$PATH_DIR/autoupdate.json"
+    wget -q "https://${fw_server_url}/stable/autoupdate.json" -O "$PATH_DIR/autoupdate.json"
     ret_code=$?
     if [ $ret_code != 0 ]; then
         return $ret_code
@@ -46,9 +35,19 @@ load_overview_and_certs() {
 
     # load certificates
     local cnt=1
-    while wget -q "https://${fw_server_url}/stable/${fw_version}/autoupdate.json.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
+    while wget -q "https://${fw_server_url}/stable/autoupdate.json.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
         cnt=$((cnt + 1))
     done
+}
+
+read_latest_stable() {
+    # reads the latest firmware version from the autoupdate.json
+
+    local path_autoupdate_json="$1"
+
+    sed -e 's|.*"\([0-9]*\.[0-9]*\.[0-9]*\)".*|\1|' "$path_autoupdate_json"
+
+    return $?
 }
 
 get_firmware_flavour() {
@@ -128,17 +127,12 @@ get_download_link_and_hash() {
     local IMAGE_NAME=""
     local image_hash=""
 
-    load_overview_and_certs "$FW_SERVER_URL" "$version"
     autoupdate_json=$(cat "$PATH_DIR/autoupdate.json")
 
-    BOARD=$(get_board_name)
-
-    # extract download-link from json-string
-    # whith jshn it takes ages to parse that big json-file. As we only need the image-base-url, scrape it with sed
-    base_url=$(echo "$autoupdate_json" | grep image_url | sed -e 's|.*\(http.*{target}\).*|\1|g')
-
-    # Idea: Don't check for target-change. If the Target changed, the download will fail anyway.
+    # Idea: Don't check for target-change. If the Target changed, the download
+    # will fail anyway at fetching the board-json
     curr_target=$(get_board_target)
+    BOARD=$(get_board_name)
 
     # get secure hash from signed autoupdate.json
     json_init
@@ -148,7 +142,7 @@ get_download_link_and_hash() {
     json_select "$BOARD"
     json_get_var image_hash "$flavour"
 
-    # load board-specific json with download-links from selector
+    # load board-specific json with image-name from selector
     board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
 
     json_init
@@ -156,12 +150,12 @@ get_download_link_and_hash() {
     json_for_each_item "iter_images" "images"
 
     if [ -z "$IMAGE_NAME" ]; then
-        log "Failed to get image download link. There might be no automatic update for your Router. This can have several reasons. You may try to find newer frimware by yourself."
+        log "Failed to get image download link. There might be no automatic update for your Router. This can have several reasons. You may try to find a newer frimware by yourself."
         exit 2
     fi
 
     # construct download-link
-    echo "$base_url" | sed -e "s|{falter-version}|$version|g;s|{flavour}|$flavour|g;s|{target}|$curr_target/$IMAGE_NAME $image_hash|g"
+    echo "https://${FW_SERVER_URL}/stable/${version}/${flavour}/${curr_target}/${IMAGE_NAME} $image_hash"
 }
 
 verify_image_hash() {
