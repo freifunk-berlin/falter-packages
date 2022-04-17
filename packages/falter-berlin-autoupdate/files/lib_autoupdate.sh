@@ -93,8 +93,8 @@ iter_images() {
 
     if [ "$image_type" = "sysupgrade" ]; then
         json_get_var image_name name
-        #json_get_var image_hash sha256
         IMAGE_NAME="$image_name"
+        #json_get_var image_hash sha256
         # don't take image hash from unsigned file, but from signed autoupdate.json
     fi
 
@@ -120,14 +120,11 @@ get_download_link_and_hash() {
 
     local version="$1"
     local flavour="$2"
-    local autoupdate_json=""
     local curr_target=""
     local BOARD=""
     local board_json=""
     local IMAGE_NAME=""
     local image_hash=""
-
-    autoupdate_json=$(cat "$PATH_DIR/autoupdate.json")
 
     # Idea: Don't check for target-change. If the Target changed, the download
     # will fail anyway at fetching the board-json
