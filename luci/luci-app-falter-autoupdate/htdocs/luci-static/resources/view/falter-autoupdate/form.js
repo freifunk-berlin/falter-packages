@@ -21,7 +21,10 @@ return view.extend({
     s.anonymous = true;
 
     s.option(form.Value, 'selector_fqdn', _('Selector-FQDN'),
-      _('Selector-URL witout protocol, i.e.: selector.berlin.freifunk.net'));
+      _('URL of the firmware-selector without protocol. Usally: selector.berlin.freifunk.net'));
+
+    s.option(form.Value, 'fw_server_fqdn', _('Firmware-Server-FQDN'),
+      _('URL of the firmware server without protocol. Usally firmware.berlin.freifunk.net'));
 
     s.option(form.Value, 'minimum_certs', _('Minimum Certs'),
       _('Minimum amount of certificates that must be valid. Otherwise autoupdate will not perform an upgrade.'));

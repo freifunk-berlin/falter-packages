@@ -17,38 +17,37 @@ log() {
     logger -t autoupdater -s "$msg"
 }
 
-get_latest_stable() {
-    # loads the configuration-file of the firmware-selector
-    # and scans for the firmware selected by default (-> latest stable)
-
-    local selector_url="$1"
-
-    wget -qO - "https://${selector_url}/config.js" | grep default_version | sed -e 's|.*\([0-9].[0-9].[0-9]\).*|\1|'
-    return $?
-}
-
 load_overview_and_certs() {
-    # we assume, that the overview.json was signed by different developers. The
+    # we assume, that the autoupdate.json was signed by different developers. The
     # files are named in this order:
-    # overview.json.1.sig
-    # overview.json.2.sig
-    # overview.json.3.sig and so forth
+    # autoupdate.json.1.sig
+    # autoupdate.json.2.sig
+    # autoupdate.json.3.sig and so forth
 
-    local selector_url="$1"
-    local fw_version="$2"
-    local fw_flavour="$3"
+    local fw_server_url="$1"
 
-    # load overview
-    wget -q "https://${selector_url}/${fw_version}/${fw_flavour}/overview.json" -O "$PATH_DIR/overview.json"
+    # load autoupdate.json
+    wget -q "https://${fw_server_url}/stable/autoupdate.json" -O "$PATH_DIR/autoupdate.json"
     ret_code=$?
     if [ $ret_code != 0 ]; then
         return $ret_code
     fi
 
+    # load certificates
     local cnt=1
-    while wget -q "https://${selector_url}/${fw_version}/${fw_flavour}/overview.json.$cnt.sig" -O "$PATH_DIR/overview.json.$cnt.sig"; do
+    while wget -q "https://${fw_server_url}/stable/autoupdate.json.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
         cnt=$((cnt + 1))
     done
+}
+
+read_latest_stable() {
+    # reads the latest firmware version from the autoupdate.json
+
+    local path_autoupdate_json="$1"
+
+    sed -e 's|.*"falter-version":\s*"\([0-9]*\.[0-9]*\.[0-9]*\)".*|\1|' "$path_autoupdate_json"
+
+    return $?
 }
 
 get_firmware_flavour() {
@@ -86,16 +85,17 @@ get_board_target() {
 
 iter_images() {
     # iterates over the images available for a board
-    # and finds the sysupgrade-image. Sets global vars
+    # and finds the file name of the sysupgrade-image.
+    # Sets global vars (named in CAPS)
 
     json_select "$2"
     json_get_var "image_type" "type"
 
     if [ "$image_type" = "sysupgrade" ]; then
         json_get_var image_name name
-        json_get_var image_hash sha256
         IMAGE_NAME="$image_name"
-        IMAGE_HASH="$image_hash"
+        #json_get_var image_hash sha256
+        # don't take image hash from unsigned file, but from signed autoupdate.json
     fi
 
     json_select ..
@@ -120,27 +120,26 @@ get_download_link_and_hash() {
 
     local version="$1"
     local flavour="$2"
-    local json_overview=""
     local curr_target=""
-    local NEW_TARGET=""
     local BOARD=""
     local board_json=""
     local IMAGE_NAME=""
-    local IMAGE_HASH=""
+    local image_hash=""
 
-    load_overview_and_certs "$SELECTOR_URL" "$version" "$flavour"
-    json_overview=$(cat "$PATH_DIR/overview.json")
-
+    # Idea: Don't check for target-change. If the Target changed, the download
+    # will fail anyway at fetching the board-json
+    curr_target=$(get_board_target)
     BOARD=$(get_board_name)
 
-    # extract download-link from json-string
-    # whith jshn it takes ages to parse that big json-file. As we only need the image-base-url, scrape it with sed
-    base_url=$(echo "$json_overview" | grep image_url | sed -e 's|.*\(http.*{target}\).*|\1|g')
+    # get secure hash from signed autoupdate.json
+    json_init
+    json_load_file "$PATH_DIR/autoupdate.json"
+    json_select target
+    json_select "$curr_target"
+    json_select "$BOARD"
+    json_get_var image_hash "$flavour"
 
-    # Idea: Don't check for target-change. If the Target changed, the download will fail anyway.
-    curr_target=$(get_board_target)
-
-    # load board-specifi json with links
+    # load board-specific json with image-name from selector
     board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
 
     json_init
@@ -148,12 +147,12 @@ get_download_link_and_hash() {
     json_for_each_item "iter_images" "images"
 
     if [ -z "$IMAGE_NAME" ]; then
-        log "Failed to get image download link. There might be no automatic update for your Router. This can have several reasons. You may try to find newer frimware by yourself."
+        log "Failed to get image download link. There might be no automatic update for your Router. This can have several reasons. You may try to find a newer frimware by yourself."
         exit 2
     fi
 
     # construct download-link
-    echo "$base_url" | sed -e "s|{target}|$curr_target/$IMAGE_NAME $IMAGE_HASH|g"
+    echo "https://${FW_SERVER_URL}/stable/${version}/${flavour}/${curr_target}/${IMAGE_NAME} $image_hash"
 }
 
 verify_image_hash() {
@@ -194,19 +193,20 @@ pop_element() {
     echo "$list_new"
 }
 
-count_valid_certificates() {
+min_valid_certificates() {
     # for every certificate, iterate over known public keys and
     # count matches. Assure that we don't validate against a key two times
     # by removing it from list, once it was used.
-    # returns number of valid certs
+    # returns true, if we got minimum certificates, false if not.
 
     local signed_file="$1"
+    local min_cnt="$2"
     local cert_list=""
     local key_list=""
     local cert_cnt=0
 
-    cert_list=$(ls "$PATH_DIR/" | grep sig)
-    key_list=$(ls "$KEY_DIR")
+    cert_list=$(find "$PATH_DIR/" -name "*.sig")
+    key_list=$(find "$KEY_DIR" -name "*.pub")
 
     for cert in $cert_list; do
         for key in $key_list; do
@@ -214,6 +214,9 @@ count_valid_certificates() {
                 cert_cnt=$((cert_cnt + 1))
                 #pop key from list. Thus one key cannot validate multiple certs.
                 key_list=$(pop_element "$key_list" "$key")
+            fi
+            if [ $cert_cnt = $min_cnt ]; then
+                return 255
             fi
         done
     done
