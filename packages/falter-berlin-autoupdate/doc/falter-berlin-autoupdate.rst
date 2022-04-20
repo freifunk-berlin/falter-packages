@@ -6,11 +6,11 @@ Autoupdate ist ein Paket, dass Skripte für automatische Updates bereitstellt. S
 Funktionsweise
 --------------
 
-Autoupdate fragt täglich beim Firmware-selector (selector.berlin.freifunk.net) die Versionnummer der aktuellen Stable-Version an. Ist diese höher als die eigene Versionsnummer, wird ein Update-Prozess angestoßen:
+Autoupdate lädt täglich vom Firmware-Server (firmware.berlin.freifunk.net) eine Datei ``auotupdate.json`` herunter. In dieser ist u.A. die aktuelle Versionsnummer kodiert. Ist diese höher als die eigene Versionsnummer, wird der Update-Prozess angestoßen:
 
 1. Es wird die Liste mit Download-Links aller Router-Modelle heruntergeladen und der für das eigene Modell passende Link herausgesucht.
-2. Die Linkliste ist von mehreren Community-Mitlgiedern signiert worden. Die Signaturen werden heruntergeladen und gegen die lokal vorhandenen Schlüssel geprüft. Nur dann, wenn mindestens drei gültige Unterschriften vorhanden sind, wird mit dem Update fortgefahren.
-3. Die Firmware-Datei wird nach ``/tmp/`` geladen und mit dem Hash-Wert aus der Linkliste verglichen, um die Integrität der Datei zu prüfen.
+2. Die ``autoupdate.json`` ist von mehreren Community-Mitlgiedern signiert worden. Die Signaturen werden heruntergeladen und gegen die lokal vorhandenen Schlüssel geprüft. Nur dann, wenn mindestens drei gültige Unterschriften vorhanden sind, wird mit dem Update fortgefahren.
+3. Die Firmware-Datei wird nach ``/tmp/`` geladen und mit dem Hash-Wert aus der ``autoupdate.json`` verglichen, um die Integrität der Datei zu prüfen.
 4. Falls alle Tests erfolgreich waren, wird das Update mit ``sysupgrade UPDATE-DATEI`` eingespielt. Die bisherigen Einstellungen bleiben dabei erhalten.
 
 Der Update-Process lässt sich über mehrere Kommandozeilen-parameter zusätzlich beeinflussen (z.B. Debugging-Modus, etc.). Nähere Infos dazu liefert der Aufruf ``autoupdate -h``.
@@ -20,7 +20,7 @@ Hinweise
 
 - Autoupdate unterstützt nur die Updates, welche von OpenWrts ``sysupgrade``-Routine unterstützt werden. Insbesondere funktionieren Upgrades z.B. nicht, wenn das Target wechselt (ar71xx -> ath79).
 - Es kann passieren, dass sich die Konfigurations-Dateien von Paketen in unterschiedlichen OpenWrt-Versionen ändern. Da die Firmware-Entwickler nicht alle Konfigurationen testen können, kann es passieren, dass Inkompatibilitäten in Spezialfällen nicht behandelt werden. Wir empfehlen daher, immer ein funktionierendes Backup der Routereinstellungen aufzubewahren.
-- Nach einem Update sind nur die Basis-Pakete installiert, welche im Image sowieso vorhanden sind. Ein Zusatzpaket, wie z.B. bbbdigger, muss nach einem Update selbstständig nachinstalliert werden. Dies wird in einem späteren Release evtl. noch automatisiert.
+- Nach einem Update sind nur die Basis-Pakete installiert, welche im Image sowieso vorhanden sind. Pakete, welche durch den Nutzer nachinstalliert wurden, müssen nach einem Update wieder selbst nachinstalliert werden.
 
 Für Contributer: Ein Release signieren
 --------------------------------------
@@ -31,7 +31,7 @@ Die öffentlichen Schlüssel der Schlüsselträger sind im ``keys/``-Ordner abge
 
 Um ein Autoupdate im Netz anzustoßen, müssen (standardmäßig) mindestens 3 Schlüsselträger unterschrieben haben. Eine Signatur kann man so erzeugen:
 
-1. Link-Liste herunterladen mit: ``wget https://selector.berlin.freifunk.net/$VERSION/tunneldigger/overview.json``. Bitte daran denken, auch die notunnel-liste zu signieren: ``wget https://selector.berlin.freifunk.net/$VERSION/notunnel/overview.json``
-2. Signatur erzeugen mit: ``./usign -S -m overview.json -s akira.sec``. Die Signatur ist die Datei ``overview.json.sig``
-3. Die Signatur-Datei unter ``https://selector.berlin.freifunk.net/$VERSION/$FLAVOUR/overview.json.$NUM.sig`` hochladen. ``$NUM`` ist eine fortlaufende Nummer, beginnend ab 1. Wenn du keinen Zugang zum selector-Server hast, schicke die Signatur-Datei bitte an einen Maintainer.
+1. ``autoupdate.json`` herunterladen mit: ``wget https://firmware.berlin.freifunk.net/stable/autoupdate.json``.
+2. Signatur erzeugen mit: ``./usign -S -m autoupdate.json -s geheimer_Schluessel.sec``. Die Signatur ist die Datei ``autoupdate.json.sig``
+3. Die Signatur-Datei unter ``https://firmware.berlin.freifunk.net/stable/autoupdate.json.$NUM.sig`` hochladen. ``$NUM`` ist eine fortlaufende Nummer, beginnend ab 1. Wenn du keinen Zugang zum selector-Server hast, schicke die Signatur-Datei bitte an einen Maintainer.
 4. Sich zurücklehnen und feuen, dass mehr aktuelle Firmware im Netz läuft.

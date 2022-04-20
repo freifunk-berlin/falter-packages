@@ -35,11 +35,15 @@ Optional arguments:
             Don't prove the images origin by checking the certificates
     -m INT: minimum certs
             flash image, if it was signed by minimum amount of certs
+    -n: new installation
+            flash the image and wipe configuration. So you will start
+            with a new wizard-run.
     -t: test-run
             this will perform everything like in automatic-mode, except
             that it won't flash the image and won't tidy up afterwards.
     -f: force update
-            CAUTION: This will wipe all config on this node!
+            CAUTION: This will ignore all checks except the certificates
+            and checksums!
 
 Example call:
     autoupdate
@@ -51,6 +55,7 @@ Example call:
 ##########################
 
 SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
+FW_SERVER_URL=$(uci_get autoupdate cfg fw_server_fqdn)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
@@ -67,10 +72,10 @@ MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-downlo
 #   Main Programm   #
 #####################
 
-########################
+#########################
 #  Commandline parsing
 
-while getopts him:tf option; do
+while getopts him:ntf option; do
     case $option in
     h)
         print_help
@@ -78,6 +83,7 @@ while getopts him:tf option; do
         ;;
     i) OPT_IGNORE_CERTS=1 ;;
     m) MIN_CERTS=$OPTARG ;;
+    n) OPT_N=1 ;;
     t) OPT_TESTRUN=1 ;;
     f) OPT_FORCE=1 ;;
     *)
@@ -97,50 +103,93 @@ fi
 
 log "starting autoupdate..."
 
-##################
-#  Update-stuff
+#############################
+#  Checks and Checks again
 
-if ! echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-    log "automatic updates aren't supported for development-firmwares. Please update manually."
+is_stable_release=$(echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')
+if [ -z $OPT_FORCE ] && [ -z "$is_stable_release" ]; then
+    log "automatic updates aren't supported for development-firmwares. Please update manually or use the force update option '-f' or new-install option '-n'."
     exit 2
 fi
 
-if [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; then
+if [ -z $OPT_FORCE ] && { [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; }; then
     log "autoupdate is disabled. Change the configs at /et/config/autoupdate to enable it."
     exit 2
 fi
 
 UPTIME=$(cut -d'.' -f1 </proc/uptime)
 # only update, if router runs for at least two hours (so the update probably won't get disrupted)
-if [ "$UPTIME" -lt 7200 ]; then
+if [ -z $OPT_FORCE ] && [ "$UPTIME" -lt 7200 ]; then
     log "Router didn't run for two hours. It might be just plugged in for testing. Aborting..."
     exit 2
 fi
 
-latest_release=$(get_latest_stable "$SELECTOR_URL")
+# create tmp-dir
+rm -rf "$PATH_DIR"
+mkdir -p "$PATH_DIR"
+
+log "fetch autoupdate.json from $FW_SERVER_URL ..."
+load_overview_and_certs "$FW_SERVER_URL"
 if [ $? != 0 ]; then
-    log "wasn't able to fetch latest stable version. Probably no internet connection."
+    log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
 fi
+log "done."
+
+# prove to be signed by minimum amount of certs
+if [ -z $OPT_IGNORE_CERTS ]; then
+    log "Verifying image-signatures..."
+    min_valid_certificates "$PATH_DIR/autoupdate.json" "$MIN_CERTS"
+    ret_code=$?
+    if [ $ret_code != 255 ]; then
+        log "autoupdate.json was signed by $ret_code certificates only. At least $MIN_CERTS required."
+        exit 2
+    else
+        log "autoupdate.json was signed by at least $MIN_CERTS certificates. Continuing..."
+    fi
+else
+    log "ignoring certificates as requested."
+fi
+
+latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json")
+if [ $? != 0 ]; then
+    log "wasn't able to read latest stable version from autoupdate.json"
+    exit 2
+else
+    log "latest release is $latest_release"
+fi
+
+##################
+#  Update-stuff
 
 if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
-    # create tmp-dir
-    rm -rf "$PATH_DIR"
-    mkdir -p "$PATH_DIR"
 
     router_board=$(get_board_name)
     flavour=$(get_firmware_flavour)
     log "router board is: $router_board. firmware-flavour is: $flavour."
     if [ "$flavour" = "unknown" ]; then
-        log "failed to determine the firmware-type of your installation. Please consider a manual update. Aborting..."
+        log "failed to determine the firmware-type of your installation. Please consider a manual update."
         exit 1
     fi
 
-    log "fetching download-link and images hashsum..."
+    log "parsing download-link and images hashsum (takes up to 40 seconds)..."
     link_and_hash=$(get_download_link_and_hash "$latest_release" "$flavour")
+    log "done."
+
     link=$(echo "$link_and_hash" | cut -d' ' -f 1)
     hash_sum=$(echo "$link_and_hash" | cut -d' ' -f 2)
-    log "download link is: $link. Try loading new firmware..."
+
+    log "download link is: $link."
+
+    # delete json and signatures to save space in RAM
+    if [ -z $OPT_TESTRUN ]; then
+        json_sig_files=$(find "$PATH_DIR" -name "autoupdate.json*")
+        for f in $json_sig_files; do
+            rm "$f"
+        done
+    fi
+
+    log "Try loading new firmware..."
 
     # check if the firmware-bin would fit into tmpfs
     request_file_size "$link"
@@ -169,27 +218,13 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         log "The expected hash of the loaded image didn't match the real one."
         exit 2
     else
-        log "Image hash is correct. sha256_hash: $hash_sum"
-    fi
-
-    # proove to be signed by minimum amount of certs
-    if [ -z $OPT_IGNORE_CERTS ]; then
-        count_valid_certificates "$PATH_DIR/overview.json"
-        ret_code=$?
-        if [ $ret_code -lt "$MIN_CERTS" ]; then
-            log "The image was signed by $ret_code certificates only. At least $MIN_CERTS required."
-            exit 2
-        else
-            log "Image was signed by $ret_code certificates. Continuing..."
-        fi
-    else
-        log "ignoring certificates as requested..."
+        log "Image hash is correct. sha256sum: $hash_sum"
     fi
 
     # flash image
     if [ -z $OPT_TESTRUN ]; then
         log "start flashing the image..."
-        if [ -n "$OPT_FORCE" ]; then
+        if [ -n "$OPT_N" ]; then
             sysupgrade -n "$PATH_BIN"
         else
             sysupgrade "$PATH_BIN"
