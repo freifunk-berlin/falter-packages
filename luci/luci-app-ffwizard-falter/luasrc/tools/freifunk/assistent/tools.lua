@@ -77,22 +77,28 @@ function firewall_find_zone(name)
 end
 
 
--- checks if root-password has been set via CGI has_root-pass 
+-- checks if root-password has been set via CGI has_root-pass
 function hasRootPass()
 	local jsonc = require "luci.jsonc"
+	local ubus = require "ubus"
 	local isPasswordSet = true
 
-	local f = io.popen("wget http://localhost/ubus -q -O - --post-data '{ \"jsonrpc\": \"2.0\", \"method\": \"call\", \"params\": [ \"00000000000000000000000000000000\", \"ffwizard-berlin\", \"has_root-pass\", {} ] }'")
-	local ret = f:read("*a")
-	f:close()
+	-- build ubus connection
+	local conn = ubus.connect()
+	if not conn then
+			error("Failed to connect to ubusd")
+	end
 
-	local content = jsonc.parse(ret)
-	local result = content.result
-	local test = result[2]
-	logger ("checking for root-password ..." .. test.password_is_set)
+	-- provide alternative table, if we got an really enerving nil from ubus-call
+	local alternative = {}
+	alternative["password_is_set"] = "no"
 
-	if test.password_is_set == "no" then
-		isPasswordSet = false
+	status = conn:call("ffwizard-berlin", "has_root-pass", {}) or alternative
+	conn:close()
+	logger ("checking for root-password ..." .. status.password_is_set)
+
+	if status.password_is_set == "no" then
+			isPasswordSet = false
 	end
 	return isPasswordSet
 end
