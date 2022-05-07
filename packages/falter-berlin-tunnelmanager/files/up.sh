@@ -3,7 +3,15 @@
 interface="$1"
 
 # can be controlled using tunnelmanagers "-A" parameter
-prefix="$2"
+extra_args="$2"
+
+prefix=$(echo "$extra_args" | cut -d ' ' -f1)
+
+argc=$(echo $extra_args | wc -w)
+if [ "$argc" -gt "2" ]; then
+    metric=$(echo "$extra_args" | cut -d ' ' -f2)
+    lqm=$(echo "$extra_args" | cut -d ' ' -f3)
+fi
 
 get_ips_from_prefix() {
     local prefix="$1"
@@ -121,6 +129,9 @@ UCIREF="$(uci add olsrd Interface)"
 uci set "olsrd.$UCIREF.ignore=0"
 uci set "olsrd.$UCIREF.interface=$interface"
 uci set "olsrd.$UCIREF.Mode=ether"
+if [[ ! -z "$lqm" ]]; then
+    uci set "olsrd.$UCIREF.LinkQualityMult=default $lqm"
+fi
 uci commit olsrd
 
 # check if olsrd is started and ubus is available
@@ -130,7 +141,11 @@ if [ $? -eq 1 ]; then
     /etc/init.d/olsrd start
 else
     # instead of reloading add interface via ipc to make it seamless
-    ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
+    if [[ ! -z "$lqm" ]]; then
+        ubus call olsrd add_interface '{"ifname":'\""$interface"\"',"lqm":'\""$lqm"\"'}'
+    else
+        ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
+    fi
 fi
 
 # Configure babeld
@@ -140,6 +155,17 @@ uci set "babeld.$UCIREF.ifname=$interface"
 uci set "babeld.$UCIREF.split_horizon=true"
 uci commit babeld
 
+if [[ ! -z "$metric" ]]; then
+    uci revert babeld
+    UCIREF="$(uci add babeld filter)"
+    uci set "babeld.$UCIREF.type=in"
+    uci set "babeld.$UCIREF.if=$interface"
+    uci set "babeld.$UCIREF.ip=::/0"
+    uci set "babeld.$UCIREF.eq=0"
+    uci set "babeld.$UCIREF.action=metric $metric"
+    uci commit babeld
+fi
+
 # check if babeld is started and ubus is available
 ubus list | grep -qF babeld
 if [ $? -eq 1 ]; then
@@ -147,4 +173,7 @@ if [ $? -eq 1 ]; then
 else
     # instead of reloading add interface via ipc to make it seamless
     ubus call babeld add_interface '{"ifname":'\""$interface"\"'}'
+    if [[ ! -z "$metric" ]]; then
+        ubus call babeld add_filter '{"ifname":'\""$interface"\"',"type":0,"metric":'$metric'}'
+    fi
 fi
