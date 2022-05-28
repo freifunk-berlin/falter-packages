@@ -1,7 +1,7 @@
 falter-berlin-autoupdate
 ========================
 
-Autoupdate ist ein Paket, dass Skripte für automatische Updates bereitstellt. Sobald eine neue Firmware-Version verfügbar ist, wird diese über das ``sysupgrade``-Komando von OpenWrt eingespielt. Es gibt zusätzlich eine LuCI-App mit der man auch über die Web-GUI Autoupdates ein- oder ausschalten kann.
+Autoupdate ist ein Paket, dass Skripte für automatische Updates bereitstellt. Sobald eine neue Firmware-Version verfügbar ist, wird diese über das ``sysupgrade``-Kommando von OpenWrt eingespielt. Es gibt zusätzlich eine LuCI-App mit der man auch über die Web-GUI Autoupdates ein- oder ausschalten kann.
 
 Funktionsweise
 --------------
@@ -9,7 +9,7 @@ Funktionsweise
 Autoupdate lädt täglich vom Firmware-Server (firmware.berlin.freifunk.net) eine Datei ``auotupdate.json`` herunter. In dieser ist u.A. die aktuelle Versionsnummer kodiert. Ist diese höher als die eigene Versionsnummer, wird der Update-Prozess angestoßen:
 
 1. Es wird die Liste mit Download-Links aller Router-Modelle heruntergeladen und der für das eigene Modell passende Link herausgesucht.
-2. Die ``autoupdate.json`` ist von mehreren Community-Mitlgiedern signiert worden. Die Signaturen werden heruntergeladen und gegen die lokal vorhandenen Schlüssel geprüft. Nur dann, wenn mindestens drei gültige Unterschriften vorhanden sind, wird mit dem Update fortgefahren.
+2. Die ``autoupdate.json`` ist von mehreren Community-Mitgliedern signiert worden. Die Signaturen werden heruntergeladen und gegen die lokal vorhandenen Schlüssel geprüft. Nur dann, wenn mindestens drei gültige Unterschriften vorhanden sind, wird mit dem Update fortgefahren.
 3. Die Firmware-Datei wird nach ``/tmp/`` geladen und mit dem Hash-Wert aus der ``autoupdate.json`` verglichen, um die Integrität der Datei zu prüfen.
 4. Falls alle Tests erfolgreich waren, wird das Update mit ``sysupgrade UPDATE-DATEI`` eingespielt. Die bisherigen Einstellungen bleiben dabei erhalten.
 
@@ -34,4 +34,4 @@ Um ein Autoupdate im Netz anzustoßen, müssen (standardmäßig) mindestens 3 Sc
 1. ``autoupdate.json`` herunterladen mit: ``wget https://firmware.berlin.freifunk.net/stable/autoupdate.json``.
 2. Signatur erzeugen mit: ``./usign -S -m autoupdate.json -s geheimer_Schluessel.sec``. Die Signatur ist die Datei ``autoupdate.json.sig``
 3. Die Signatur-Datei unter ``https://firmware.berlin.freifunk.net/stable/autoupdate.json.$NUM.sig`` hochladen. ``$NUM`` ist eine fortlaufende Nummer, beginnend ab 1. Wenn du keinen Zugang zum selector-Server hast, schicke die Signatur-Datei bitte an einen Maintainer.
-4. Sich zurücklehnen und feuen, dass mehr aktuelle Firmware im Netz läuft.
+4. Sich zurücklehnen und freuen, dass mehr aktuelle Firmware im Netz läuft.
