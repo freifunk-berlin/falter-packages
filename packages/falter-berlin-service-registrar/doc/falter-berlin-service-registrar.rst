@@ -21,7 +21,7 @@ installiert.
 
 Falls man den Service-Registrar ausschließlich über die Kommandozeile nutzen möchte, geht auch ein ``opkg install falter-berlin-service-registrar``.
 
-Beide Varianten haben den gleicen Funktionsumfang und unterscheiden sich ausschließlich in der Bedienung.
+Beide Varianten haben den gleichen Funktionsumfang und unterscheiden sich ausschließlich in der Bedienung.
 
 
 LuCI-App (Webinterface)
@@ -29,7 +29,7 @@ LuCI-App (Webinterface)
 
 Der Service-Registrar befindet sich in der Admin-Oberfläche unter *Freifunk* -> *Freifunkdienste registrieren*. In der App können entweder Webseiten oder Allgemeine Dienste angelegt werden.
 
-Webeiten sind Dienste, bei denen der Freifunk-Router selbst eine (statische) Webseite ausliefert. Es wird also nicht nur entsprechend OLSR konfiguriert, sondern auch der Webserver auf dem Freifunkrouter so eingestellt, dass er die Webseite ausliefert.
+Webseiten sind Dienste, bei denen der Freifunk-Router selbst eine (statische) Webseite ausliefert. Es wird also nicht nur entsprechend OLSR konfiguriert, sondern auch der Webserver auf dem Freifunkrouter so eingestellt, dass er die Webseite ausliefert.
 
 Allgemeine Dienste sind etwas anders. Sie eignen für Dienste, die auf einem anderen Gerät im lokalen Freifunknetzwerk laufen. Wenn man z.B. eine Webcam bereitstellen möchte, oder irgendeine andere Art von Server hat, eignet sich diese Art von Diensten am besten dafür.
 
@@ -43,9 +43,9 @@ Bis der Service im kompletten Freifunknetz verfügbar ist, können bis zu 5 Minu
 Kommandozeile
 ^^^^^^^^^^^^^
 
-Um einen Dienst über die Kommondozeile einzutragen, muss zuerst die Konfigurationsdatei unter ``/etc/config/ffservices`` angepasst werden und anschließend das Skript ``register-services`` ausgeführt werden.
+Um einen Dienst über die Kommandozeile einzutragen, muss zuerst die Konfigurationsdatei unter ``/etc/config/ffservices`` angepasst werden und anschließend das Skript ``register-services`` ausgeführt werden.
 
-Je nachdem, ob man eine Webseite oder einen Allgemeinen Dienst eintragen möchte, gibt es zwei unterscheidliche Typen von UCI-Sections. Einmal den Typen ``website`` und einmal den Typen ``service``. Beide Typen unterscheiden sich geringfügig in ihren Feldern:
+Je nachdem, ob man eine Webseite oder einen Allgemeinen Dienst eintragen möchte, gibt es zwei unterschiedliche Typen von UCI-Sections. Einmal den Typen ``website`` und einmal den Typen ``service``. Beide Typen unterscheiden sich geringfügig in ihren Feldern:
 
 ..
     config website "testsite"
