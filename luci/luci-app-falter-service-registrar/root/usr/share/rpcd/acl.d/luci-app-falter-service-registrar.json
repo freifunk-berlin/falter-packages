@@ -1,0 +1,25 @@
+{
+	"luci-app-falter-service-registrar": {
+	  "description": "Grant UCI access to LuCI app falter-service-registrar",
+	  "read": {
+		"ubus": {
+		  "uci": [
+			"get"
+		  ]
+		},
+		"uci": [
+		  "service-registrar"
+		]
+	  },
+	  "write": {
+		"ubus": {
+		  "uci": [
+			"set", "commit"
+		  ]
+		},
+		"uci": [
+		  "service-registrar"
+		]
+	  }
+	}
+  }

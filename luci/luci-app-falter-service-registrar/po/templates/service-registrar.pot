@@ -1,0 +1,114 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:15
+msgid ""
+"<br> <p>This site gives you the chance to define your own services for the "
+"Freifunk network. If you enter the service details here, they will get "
+"announced to the mesh and other Freifunkers can use them. It's quite similar "
+"to regular web services, except this ones only live in Freifunk network. But "
+"there are other ways to get your service exposed to the internet. Just ask "
+"us, if you are interested in that.</p> <p>You can find two tabs in this app: "
+"<b>Websites</b> and <b>Generic Services</b>. They differ in what you want to "
+"do and how much you are experienced.</p> <p><b>Websites</b> will configure "
+"you a (static) website on your router. It will not only announce it to the "
+"mesh, but will additionally set up OpenWrts <i>uhttpd</i>-webserver, to "
+"serve your site. Please mind: As by the limitations of <i>uhttpd</i>, every "
+"Website must have it's own port. Especially you cannot use port 80, unless "
+"you deactivate the LuCI web-ui, which uses that port per default.</p> <p>The "
+"<b>Generic Services</b> gives you more flexibility in that way, that you can "
+"configure services that run on some other host in your local Freifunk net. "
+"If you are going to expose a webcam or some kind of server, this option is "
+"the right one for you.</p><br>"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:46
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:69
+msgid "Description"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:61
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:85
+msgid "Disabled"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:85
+msgid "Don't publish this service"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:61
+msgid "Don't publish this site"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:43
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:66
+msgid "FQDN"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/root/usr/share/luci/menu.d/luci-app-falter-service-registrar.json:3
+msgid "Freifunk"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:38
+msgid "Generic Services"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:46
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:69
+msgid "Give a short description or title"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:58
+msgid "Give the directory where your site lives."
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/root/usr/share/rpcd/acl.d/luci-app-falter-service-registrar.json:3
+msgid "Grant UCI access to LuCI app falter-service-registrar"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:82
+msgid "IP-Address"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:82
+msgid "Must be a valid address from the routers host network."
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:55
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:79
+msgid "Port"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:50
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:73
+msgid "Protocol"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:10
+msgid ""
+"Require string with characters, numbers and whitespace only. It must be less "
+"than 75 characters long."
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:15
+#: luci/luci-app-falter-service-registrar/root/usr/share/luci/menu.d/luci-app-falter-service-registrar.json:14
+msgid "Set up Freifunk services"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:66
+msgid "The FQDN of your website, i.e.: \"example.olsr\""
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:43
+msgid ""
+"The Fully-Qualified-Domain-Name of your website, i.e.: \"example.olsr\". "
+"This is URL on which your service will be available in the Freifunk network."
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:58
+msgid "Web Root"
+msgstr ""
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:34
+msgid "Websites"
+msgstr ""
