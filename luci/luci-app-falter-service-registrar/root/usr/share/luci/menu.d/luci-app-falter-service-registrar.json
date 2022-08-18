@@ -1,0 +1,21 @@
+{
+	"admin/freifunk/": {
+	  "title": "Freifunk",
+	  "order": 1,
+	  "action": {
+		"type": "firstchild"
+	  },
+	  "depends": {
+		"acl": [ "luci-app-falter-service-registrar" ]
+	  }
+	},
+
+	"admin/freifunk/service-registrar": {
+	  "title": "Set up Freifunk services",
+	  "order": 27,
+	  "action": {
+		"type": "view",
+		"path": "falter-service-registrar/form"
+	  }
+	}
+  }

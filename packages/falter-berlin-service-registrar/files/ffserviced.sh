@@ -16,6 +16,6 @@ start_service() {
     procd_set_param stdout 1
     procd_set_param stderr 1
     procd_set_param pidfile /var/run/ffserviced.pid
-    procd_set_param term_timeout 10
+    procd_set_param term_timeout 60
     procd_close_instance
 }
