@@ -1,0 +1,202 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: Martin Hübner <martin.hubner@web.de>\n"
+"Language-Team: \n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.2.2\n"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:15
+msgid ""
+"<br> <p>This site gives you the chance to define your own services for the "
+"Freifunk network. If you enter the service details here, they will get "
+"announced to the mesh and other Freifunkers can use them. It's quite similar "
+"to regular web services, except this ones only live in Freifunk network. But "
+"there are other ways to get your service exposed to the internet. Just ask "
+"us, if you are interested in that.</p> <p>You can find two tabs in this app: "
+"<b>Websites</b> and <b>Generic Services</b>. They differ in what you want to "
+"do and how much you are experienced.</p> <p><b>Websites</b> will configure "
+"you a (static) website on your router. It will not only announce it to the "
+"mesh, but will additionally set up OpenWrts <i>uhttpd</i>-webserver, to "
+"serve your site. Please mind: As by the limitations of <i>uhttpd</i>, every "
+"Website must have it's own port. Especially you cannot use port 80, unless "
+"you deactivate the LuCI web-ui, which uses that port per default.</p> <p>The "
+"<b>Generic Services</b> gives you more flexibility in that way, that you can "
+"configure services that run on some other host in your local Freifunk net. "
+"If you are going to expose a webcam or some kind of server, this option is "
+"the right one for you.</p><br>"
+msgstr ""
+"<br> <p>Auf dieser Seite kannst du deine eigenen Dienste für das "
+"Freifunknetz definieren. Wenn du hier die Daten deines Dienstes eingibst, "
+"werden sie im Mesh verteilt und andere Freifunker können deinen Dienst "
+"nutzen. Es ist so ähnlich wie das Internet, außer das diese Dienste nur "
+"innerhalb des Freifunknetzes erreichbar sind. Aber es gibt andere "
+"Möglichkeiten, deinen Dienst auch ins Internet zu bringen. Sprich uns "
+"einfach an, wenn du darauf Lust hast.</p> <p>In dieser App gibt es zwei "
+"Tabs: <b>Webseiten</b> und <b>Allgemeine Dienste</b>. Welchen du wählen "
+"solltest hängt davon ab, was du erreichen möchtest und wie viel Vorerfahrung "
+"du mitbringst.</p> <p><b>Webseiten</b> wird eine (statische) Webseite auf "
+"deinem Router konfigurieren. Es wird nicht nur das Registrieren erledigt, "
+"sondern zusätzlich wird OpenWrts <i>uhttpd</i>-Webserver so konfiguriert, "
+"dass er deine Seite auch ausliefert. Bitte beachte: Wegen ein paar "
+"Einschränkungen mit <i>uhttpd</i>, muss jede Webseite ihren eigenen Port "
+"haben. Insbesondere kann man nicht Port 80 nutzen, außer du deaktivierst das "
+"LuCI-Webinterface, das standardmäßig dort läuft.</p> <p>Der Tab "
+"<b>Allgemeine Dienste</b> hat eine größere Flexibilität: Man kann hier "
+"Dienste definieren, die auf einem anderen Gerät in deinem lokalen "
+"Freifunknetz laufen. Wenn du z.B. eine Webcam teilen möchtest, oder eine Art "
+"Server betreibst, ist diese Option genau richtig für dich.</p><br>"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:46
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:69
+msgid "Description"
+msgstr "Beschreibung"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:61
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:85
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:85
+msgid "Don't publish this service"
+msgstr "Dienst nicht veröffentlichen"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:61
+msgid "Don't publish this site"
+msgstr "Seite nicht veröffentlichen"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:43
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:66
+msgid "FQDN"
+msgstr "FQDN"
+
+#: luci/luci-app-falter-service-registrar/root/usr/share/luci/menu.d/luci-app-falter-service-registrar.json:3
+msgid "Freifunk"
+msgstr "Freifunk"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:38
+msgid "Generic Services"
+msgstr "Allgemeine Dienste"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:46
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:69
+msgid "Give a short description or title"
+msgstr "Kurze Beschreibung oder Titel angeben"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:58
+msgid "Give the directory where your site lives."
+msgstr "Verzeichnis, in dem die Seite liegt, angeben."
+
+#: luci/luci-app-falter-service-registrar/root/usr/share/rpcd/acl.d/luci-app-falter-service-registrar.json:3
+msgid "Grant UCI access to LuCI app falter-service-registrar"
+msgstr "UCI-Zugriff für LuCI app falter-service-registrar gewähren"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:82
+msgid "IP-Address"
+msgstr "IP-Adresse"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:82
+msgid "Must be a valid address from the routers host network."
+msgstr "Muss eine gültige Adresse aus dem Host-Netzwerk des Routers sein."
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:55
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:79
+msgid "Port"
+msgstr "Port"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:50
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:73
+msgid "Protocol"
+msgstr "Protokoll"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:10
+msgid ""
+"Require string with characters, numbers and whitespace only. It must be less "
+"than 75 characters long."
+msgstr ""
+"Text darf nur Buchstaben, Zahlen und Leerzeichen enthalten. Er muss weniger "
+"als 75 Zeichen lang sein."
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:15
+#: luci/luci-app-falter-service-registrar/root/usr/share/luci/menu.d/luci-app-falter-service-registrar.json:14
+msgid "Set up Freifunk services"
+msgstr "Freifunkdienste aufsetzen"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:66
+msgid "The FQDN of your website, i.e.: \"example.olsr\""
+msgstr "Der FQDN deiner Webseite, z.B. \"example.olsr\"."
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:43
+msgid ""
+"The Fully-Qualified-Domain-Name of your website, i.e.: \"example.olsr\". "
+"This is URL on which your service will be available in the Freifunk network."
+msgstr ""
+"Der FQDN deiner Webseite, z.B. \"example.olsr\". Das ist die URL unter "
+"welcher dein Service im Freifunknetz erreichbar sein wird."
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:58
+msgid "Web Root"
+msgstr "Webroot"
+
+#: luci/luci-app-falter-service-registrar/htdocs/luci-static/resources/view/falter-service-registrar/form.js:34
+msgid "Websites"
+msgstr "Webseiten"
+
+#~ msgid "Set Up Freifunk Services"
+#~ msgstr "Freifunkdienste aufsetzen"
+
+#~ msgid ""
+#~ "<br> <p>This site gives you the chance to define your own services for "
+#~ "the Freifunk Network. If you enter the service details here, they will "
+#~ "get announced to the mesh and other Freifunkers can use them. It's quite "
+#~ "similar to regular web services, except this ones only live in Freifunk "
+#~ "Network. But there are other ways to get your service exposed to the "
+#~ "internet. Just ask us, if you are interested in that.</p> <p>You can find "
+#~ "two tabs in this app: <b>Websites</b> and <b>Generic Services</b>. They "
+#~ "differ in what you want to do and how much you are experienced.</p> "
+#~ "<p><b>Websites</b> will configure you a (static) website on your router. "
+#~ "It will not only announce it to the mesh, but will aditionally set up "
+#~ "OpenWrts <i>uhttpd</i>-webserver, to serve your site. Please mind: As by "
+#~ "the limitations of <i>uhttpd</i>, every Website must have it's own port. "
+#~ "Especially you cannot use port 80, unless you deactivate the luci web-ui, "
+#~ "which uses that port per default.</p> <p>The <b>Generic Services</b> "
+#~ "gives you more flexibility in that way, that you can configure services "
+#~ "that run on some other host in your local Freifunk Net. If you are going "
+#~ "to expose a webcam or some kind of server, this option is the right one "
+#~ "for you.</p><br>"
+#~ msgstr ""
+#~ "<br> <p>Auf dieser Seite kannst du deine eigenen Dienste für das "
+#~ "Freifunknetz definieren. Wenn du hier die Daten deines Dienstes eingibst, "
+#~ "werden sie im Mesh verteilt und andere Freifunker können deinen Dienst "
+#~ "nutzen. Es ist so ähnlich wie das Internet, außer das diese Dienste nur "
+#~ "innerhalb des Freifunknetzes erreichbar sind. Aber es gibt andere "
+#~ "Möglichkeiten, deinen Dienst auch ins Internet zu bringen. Sprich uns "
+#~ "einfach an, wenn du darauf Lust hast.</p> <p>In dieser App gibt es zwei "
+#~ "Tabs: <b>Webseiten</b> und <b>Allgemeine Dienste</b>. Welchen du wählen "
+#~ "solltest hängt davon ab, was du erreichen möchtest und wie viel "
+#~ "Vorerfahrung du mitbringst.</p> <p><b>Webseiten</b> wird eine (statische) "
+#~ "Webseite auf deinem Router konfigurieren. Es wird nicht nur das "
+#~ "Registrieren erledigt, sondern zusätzlich wird OpenWrts <i>uhttpd</i>-"
+#~ "Webserver so konfiguriert, dass er deine Seite auch ausliefert. Bitte "
+#~ "beachte: Wegen ein paar Einschränkungen mit <i>uhttpd</i>, muss jede "
+#~ "Webseite ihren eigenen Port haben. Insbesondere kann man nicht Port 80 "
+#~ "nutzen, außer du deaktivierst das LuCI-Webinterface, das standardmäßig "
+#~ "dort läuft.</p> <p>Der Tab <b>Allgemeine Dienste</b> hat eine größere "
+#~ "Flexibilität: Man kann hier Dienste definieren, die auf einem anderen "
+#~ "Gerät in deinem lokalen Freifunknetz laufen. Wenn du z.B. eine Webcam "
+#~ "teilen möchtest, oder eine Art Server betreibst, ist diese Option genau "
+#~ "richtig für dich.</p><br>"
+
+#~ msgid "Set up Freifunk Services"
+#~ msgstr "Freifunkdienste aufsetzen"
+
+#~ msgid "The FQDN of your Website, i.e.: \"example.olsr\""
+#~ msgstr "Der FQDN deiner Webseite, z.B. \"example.olsr\""
+
+#~ msgid "Register Freifunk Services"
+#~ msgstr "Freifunk-Dienste registrieren"
