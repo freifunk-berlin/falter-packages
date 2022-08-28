@@ -1,11 +1,12 @@
 #!/bin/sh
 
+# shellcheck shell=dash
+
 # kept for debugging purpose
 # logger -t "ssid net/hotplug" "ssidchanger ACTION = $ACTION INTERFACE = $INTERFACE DEVICE = $DEVICE IFUPDATE_ADDRESSES = $IFUPDATE_ADDRESSES IFUPDATE_DATA = $IFUPDATE_DATA"
 
 . /lib/functions.sh
 . /lib/lib_ssid-changer.sh
-
 
 # exit early, if ssid-changer is disabled or interface doesn't matter for wifi
 ENABLED=$(uci_get ffwizard ssid_changer enabled)
@@ -17,7 +18,6 @@ if [ "$INTERFACE" != "ffuplink" ] || !(echo "$INTERFACE" | grep -Eq 'tnl_.*'); t
     exit 0
 fi
 
-
 # check, if we are online
 is_internet_reachable # 0 success - online; 1 failure - offline
 NET_STATE=$?
@@ -26,11 +26,11 @@ ONLINE_SSIDS=$(get_interfaces)
 CHK_SSID=$(echo "$ONLINE_SSIDS" | cut -d' ' -f 1) # makes checking easier
 CHANGE=0
 
-
 if [ $NET_STATE = 0 ]; then # router online: switch to online, if not present already
     # abort if SSID is "online" already
-    for HOSTAPD in $(ls /var/run/hostapd-phy*); do
-        CURRSSID=$(grep -e "^ssid=" $HOSTAPD | cut -d'=' -f 2)
+    for HOSTAPD in /var/run/hostapd-phy*; do
+        [ -e "$HOSTAPD" ] || break
+        CURRSSID=$(grep -e "^ssid=" "$HOSTAPD" | cut -d'=' -f 2)
         if [ "$CURRSSID" = "$CHK_SSID" ]; then
             log "SSID online already. Nothing to change."
             exit 0
@@ -38,17 +38,19 @@ if [ $NET_STATE = 0 ]; then # router online: switch to online, if not present al
     done
 
     # loop over hostapd configs and try to switch any matching ID.
-    for HOSTAPD in $(ls /var/run/hostapd-phy*); do
+    for HOSTAPD in /var/run/hostapd-phy*; do
+        [ -e "$HOSTAPD" ] || break
         for ONLINE_SSID in $ONLINE_SSIDS; do
             log "Internet was reached. Change SSID back to online..."
-            sed -i "s~^ssid=$OFFLINE_SSID~ssid=$ONLINE_SSID~" $HOSTAPD
+            sed -i "s~^ssid=$OFFLINE_SSID~ssid=$ONLINE_SSID~" "$HOSTAPD"
             CHANGE=1
         done
     done
 else # router offline: adjust ssid accordingly, if needed
     # abort if SSID is "offline" already
-    for HOSTAPD in $(ls /var/run/hostapd-phy*); do
-        CURRSSID=$(grep -e "^ssid=" $HOSTAPD | cut -d'=' -f2)
+    for HOSTAPD in /var/run/hostapd-phy*; do
+        [ -e "$HOSTAPD" ] || break
+        CURRSSID=$(grep -e "^ssid=" "$HOSTAPD" | cut -d'=' -f2)
         if [ "$CURRSSID" = "$OFFLINE_SSID" ]; then
             log "SSID offline already. Nothing to change."
             exit 0
@@ -56,10 +58,11 @@ else # router offline: adjust ssid accordingly, if needed
     done
 
     # loop over hostapd configs and try to switch any matching ID.
-    for HOSTAPD in $(ls /var/run/hostapd-phy*); do
+    for HOSTAPD in /var/run/hostapd-phy*; do
+        [ -e "$HOSTAPD" ] || break
         for ONLINE_SSID in $ONLINE_SSIDS; do
             log "Didn't reach the internet. Change SSID to offline..."
-            sed -i "s~^ssid=$ONLINE_SSID~ssid=$OFFLINE_SSID~" $HOSTAPD
+            sed -i "s~^ssid=$ONLINE_SSID~ssid=$OFFLINE_SSID~" "$HOSTAPD"
         done
     done
 fi
