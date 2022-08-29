@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# This software originates from Freifunk Berlin and implements a basic autoupdate mechanism
+# by using OpenWrts built-in sysupgrade.
+# It is licensed under GNU General Public License v3.0 or later
+# Copyright (C) 2022   Martin Hübner and Tobias Schwarz
+
 # shellcheck shell=dash
 
 # jshn assigns the variables for us, but shellcheck doesn't get it.
