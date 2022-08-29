@@ -1,5 +1,31 @@
 #!/bin/sh
 
+# This software originates from Freifunk Berlin and registers nodes
+# from the Freifunk Berlin Network at our online map at https://openwifimap.net.
+# This is a reimplementation of a former lua-script.
+# It is licensed under GNU General Public License v3.0 or later
+# Copyright (C) 2021   Patrick Grimm
+# Copyright (C) 2021   Martin Hübner
+
+
+# Omit warning for missing local statement. busybox-ash has them included
+# shellcheck shell=dash
+
+# jshn assigns the variables for us, but shellcheck doesn't get this.
+# shellcheck disable=SC2154
+# We use printf for consistency, even though it has no vars.
+# shellcheck disable=SC2182
+# We've used a hack for embedding a json-string into a json-string with sed. Having '$OLSRCONFIG' in single-quotes is by intention.
+# shellcheck disable=SC2016
+# using printf with variables and nc didn't work correctly. Thus this hack
+# shellcheck disable=SC2059
+# by full intention: jshn needs to get numeric values without double-quotes!
+# shellcheck disable=SC2086
+# The unused variables remain for future use. We intend to use them later on.
+# shellcheck disable=SC2034
+
+# we can't acess those libraries at compile-time. Thus ignoring.
+# shellcheck source=/dev/null
 . /lib/functions.sh
 . /usr/share/libubox/jshn.sh
 
@@ -52,10 +78,10 @@ handle_contact() {
 
 # Draft for OLSRv2-Links currently not used
 olsr2_links() {
-	json_select $2
+	json_select "$2"
 	json_get_var localIP link_bindto
 	json_get_var remoteIP neighbor_originator
-	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' -e 's/\..*//')"".olsr"
+	remotehost="$(nslookup "$remoteIP" | grep name | sed -e 's/.*name = \(.*\)/\1/' -e 's/\..*//')"".olsr"
 	# Maybe add some stuff here.
 	json_get_var linkQuality domain_metric_out_raw
 	#json_get_var linkQuality domain_metric_in_raw
@@ -65,10 +91,10 @@ olsr2_links() {
 }
 
 olsr4_links() {
-	json_select $2
+	json_select "$2"
 	json_get_var localIP localIP
 	json_get_var remoteIP remoteIP
-	remotehost="$(nslookup $remoteIP | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
+	remotehost="$(nslookup "$remoteIP" | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
 	json_get_var linkQuality linkQuality
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
