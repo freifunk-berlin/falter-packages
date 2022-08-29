@@ -1,5 +1,11 @@
 #!/bin/sh
 
+#shellcheck shell=dash
+
+# minor stuff. Not important in this place
+# shellcheck disable=SC2034
+
+# shellcheck source=/dev/null
 . /lib/functions/guard.sh
 
 create_ffuplink() {
@@ -29,8 +35,8 @@ generate_random_mac_hex() {
   # Create a static macaddr starting with "prefix" for ffuplink devices
   # See the website https://www.itwissen.info/MAC-Adresse-MAC-address.html
   for byte in 2 3 4 5 6; do
-    macaddr=$macaddr`dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"'`
+    macaddr=$macaddr$(dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"')
   done
 
-  echo $prefix$macaddr
+  echo "$prefix$macaddr"
 }

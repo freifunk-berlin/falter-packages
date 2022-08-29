@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# shellcheck source=/dev/null
 . /lib/functions.sh
 
 # remove the sta interface, leaving only wan

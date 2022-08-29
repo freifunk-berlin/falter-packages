@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck disable=SC2086
+
+# shellcheck source=/dev/null
 . /lib/functions/guard.sh
 guard "network"
 
@@ -7,7 +10,7 @@ guard "network"
 uci set network.lan.ipaddr=192.168.42.1
 
 WANDEV=$(uci -q get network.wan.device)
-echo ${WANDEV} | grep ^br- > /dev/null
+echo "${WANDEV}" | grep ^br- > /dev/null
 BRIDGECHECK=$?
 
 # setup wan as a bridge
@@ -39,13 +42,13 @@ else
   NEWDEV=$(uci add network device)
   uci set network.$NEWDEV.type="bridge"
   uci set network.$NEWDEV.name="br-wan"
-  uci add_list network.$NEWDEV.ports=${WANDEV}
+  uci add_list network.$NEWDEV.ports="${WANDEV}"
 
   uci set network.wan.device="br-wan"
   uci set network.wan6.device="br-wan"
 fi
 
-# do not use dns servers provided by dhcp - we maintain a static list of 
+# do not use dns servers provided by dhcp - we maintain a static list of
 # dns servers instead
 uci set network.wan.peerdns=0
 uci set network.wan6.peerdns=0
