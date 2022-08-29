@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# This software originates from Freifunk Berlin and registers nodes
+# from the Freifunk Berlin Network at our online map at https://openwifimap.net.
+# This is a reimplementation of a former lua-script.
+# It is licensed under GNU General Public License v3.0 or later
+# Copyright (C) 2021   Patrick Grimm
+# Copyright (C) 2021   Martin Hübner
+
+
 # jshn assigns the variables for us, but shellcheck doesn't get this.
 # shellcheck disable=SC2154
 # We use printf for consistency, even though it has no vars.
