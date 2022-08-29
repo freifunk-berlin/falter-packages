@@ -2,6 +2,11 @@
 # Freifunk Init
 # $Id$
 
+# START var is mandatory part of openwrt init-script syntax, though it appears unused
+# shellcheck disable=SC2034
+# don't follow that file in line 21...
+# shellcheck disable=SC1090
+
 START=99
 
 boot() {
