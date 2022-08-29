@@ -1,10 +1,7 @@
-# Copyright (C) 2011 Manuel Munz <freifunk at somakoma de>
-# This is free software, licensed under the Apache 2.0 license.
-
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-common
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 
