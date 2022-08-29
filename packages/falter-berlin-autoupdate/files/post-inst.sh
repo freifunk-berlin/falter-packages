@@ -1,5 +1,8 @@
 #!/bin/sh
-#
+
+# I can remember, that this script was fairly horrible to get it working as
+# intended. You better shouldn't touch anything here.
+# shellcheck disable=all
 
 # if autoupdate is not present in crontab, include it.
 crontab -l | grep /usr/bin/autoupdate >>/dev/null
