@@ -1,5 +1,9 @@
 #!/usr/bin/env sh
 
+# don't care for shellcheck here, as this is a third party-lib. The
+# author probably knows better, what he was doing.
+# shellcheck disable=all
+
 # Copyright (c) 2013, Ray Bejjani
 # All rights reserved.
 #

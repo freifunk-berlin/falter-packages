@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-migration
-PKG_VERSION:=9
+PKG_VERSION:=2022.08.29
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
