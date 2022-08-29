@@ -1,8 +1,16 @@
 #!/bin/sh
 
+# shellcheck shell=dash
+
+# shellcheck source=/dev/null
+
+# shellcheck disable=SC2034
+# shellcheck disable=SC2155
+# shellcheck disable=SC2140
+
 THIS_UPLINKNAME="notunnel"
 
-. /lib/functions/freifunk-berlin-network.sh 
+. /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 . /lib/functions.sh
 
@@ -11,11 +19,11 @@ uci set firewall.zone_ffuplink.masq=1
 uci commit firewall
 
 current_preset=$(uci get ffberlin-uplink.preset.current)
-if [ ${current_preset} != ${THIS_UPLINKNAME} ]; then
+if [ "${current_preset}" != ${THIS_UPLINKNAME} ]; then
   # do not track preset when it was 'undefined', aka never configured
-  if [ ${current_preset} != "undefined" ]; then
+  if [ "${current_preset}" != "undefined" ]; then
     logger -t "ffuplink" "uplink-preset has been changed."
-    uci set ffberlin-uplink.preset.previous=${current_preset}
+    uci set ffberlin-uplink.preset.previous="${current_preset}"
     create_ffuplink
   fi
   uci set ffberlin-uplink.preset.current=${THIS_UPLINKNAME}
@@ -24,7 +32,7 @@ fi
 uci set ffberlin-uplink.uplink.auth=none
 
 # disable tunneldigger for ffuplink, if tunneldigger was the previous setup
-if [ ${current_preset} == "tunnelberlin_tunneldigger" ]; then
+if [ "${current_preset}" = "tunnelberlin_tunneldigger" ]; then
   uci set tunneldigger.ffuplink.enabled=0
   uci commit tunneldigger
 fi
@@ -32,7 +40,7 @@ fi
 macaddr=$(uci -q get ffberlin-uplink.uplink.macaddr)
 if [ -z "$macaddr" ]; then
   macaddr=$(generate_random_mac_hex "fe")
-  uci set ffberlin-uplink.uplink.macaddr=$macaddr
+  uci set ffberlin-uplink.uplink.macaddr="$macaddr"
 fi
 
 uci commit ffberlin-uplink
@@ -44,25 +52,25 @@ uci set network.ffuplink_dev=device
 uci set network.ffuplink_dev.type=veth
 uci set network.ffuplink_dev.name=ffuplink
 uci set network.ffuplink_dev.peer_name=ffuplink_wan
-uci set network.ffuplink_dev.macaddr=$macaddr
+uci set network.ffuplink_dev.macaddr="$macaddr"
 uci commit network.ffuplink_dev
 
 # add ffuplink_dev to the br-wan bridge if not there
 devname=$(uci get network.wan.device)
 handle_wan_device() {
-  local config=$1
+  local config="$1"
   local name=""
   local ports=""
-  local wandev=$(uci -q get network.wan.device)
-  if [ -z $wandev ]; then
+  local wandev="$(uci -q get network.wan.device)"
+  if [ -z "$wandev" ]; then
     return
   fi
 
-  config_get name $config name
-  if [ "X${name}X" == "Xbr-wanX" ]; then
-    config_get ports $config ports
-    list_contains ports ffuplink_wan || uci add_list network.${config}.ports="ffuplink_wan"
-    uci commit network.${config}
+  config_get name "$config" name
+  if [ "X${name}X" = "Xbr-wanX" ]; then
+    config_get ports "$config" ports
+    list_contains ports ffuplink_wan || uci add_list network."${config}".ports="ffuplink_wan"
+    uci commit network."${config}"
   fi
 }
 
@@ -71,6 +79,6 @@ config_load network
 config_foreach handle_wan_device device
 
 uci set network.ffuplink.proto=dhcp
-uci set network.ffuplink.hostname=freifunk-$(echo $macaddr|tr -d :)-uplink
+uci set network.ffuplink.hostname=freifunk-"$(echo "$macaddr"|tr -d :)"-uplink
 uci commit network.ffuplink
 
