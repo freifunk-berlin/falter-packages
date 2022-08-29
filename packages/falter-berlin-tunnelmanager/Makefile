@@ -1,18 +1,16 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-tunnelmanager
-PKG_VERSION:=0.3.1
+PKG_VERSION:=0.4
 
 include $(INCLUDE_DIR)/package.mk
-
-# todo: add dependency on jshn
 
 define Package/falter-berlin-tunnelmanager
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin tunnelmanager
   URL:=http://github.com/Freifunk-Spalter/packages
-  EXTRA_DEPENDS:=coreutils-timeout, ip-full, kmod-macvlan, wg-installer-client
+  EXTRA_DEPENDS:=coreutils-timeout, ip-full, kmod-macvlan, wg-installer-client, jshn
   PKGARCH:=all
 endef
 

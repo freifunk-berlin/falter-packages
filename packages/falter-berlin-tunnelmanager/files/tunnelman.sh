@@ -1,5 +1,12 @@
 #! /bin/sh
 
+# shellcheck shell=dash
+
+# in most cases this directive alarms, we don't care for the return values, as we do other checks.
+# shellcheck disable=SC2155
+# in that case it doesn't work to do it another way. We need that value twice.
+# shellcheck disable=SC2181
+
 # except than noted, this script is not posix-compliant in one way: we use "local"
 # variables definition. As nearly all shells out there implement local, this should
 # work anyway. This is a little reminder to you, if you use some rare shell without
@@ -98,7 +105,7 @@ get_age() {
 
 teardown() {
     local interface="$1"
-    local endpoint="$(wg show $interface endpoints | awk -F '\t|:' '{print $2}')"
+    local endpoint="$(wg show "$interface" endpoints | awk -F '\t|:' '{print $2}')"
 
     sh "$OPT_DOWN_SCRIPT" "$interface"
     ip link delete "$interface"
@@ -110,17 +117,17 @@ teardown() {
 wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
-    clients=$(timeout 60 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    clients=$(timeout 60 ip netns exec "$OPT_NAMESPACE_NAME" wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
     if [ $? -ne 0 ]; then
         return 1
     fi
-    echo "$(echo "$clients" | cut -d' ' -f2)"
+    echo "$clients" | cut -d' ' -f2
 }
 
 get_least_used_tunnelserver() {
     local tunnel_endpoints="$1"
 
-    # Dont check tunnelserver we already have a connection with
+    # Don't check tunnelserver we already have a connection with
     for i in $(wg show all endpoints | awk -F '\t|:' '{print $3}'); do
         # remove ip from connections:
         tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$i//")
@@ -135,7 +142,7 @@ get_least_used_tunnelserver() {
         if [ $? -ne 0 ]; then
             log "Error while querying tunnelserver $i for utilization"
 
-        elif [ $current -le $usercount ]; then
+        elif [ "$current" -le $usercount ]; then
             best=$i
             usercount=$current
         fi
@@ -161,7 +168,7 @@ new_tunnel() {
     local nsname="$2"
     local mtu="$3"
 
-    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu $mtu)"
+    local interface="$(timeout 5 ip netns exec "$OPT_NAMESPACE_NAME" wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu "$mtu")"
 
     if [ -z "$interface" ]; then
         log "Failed to register a new tunnel."
@@ -192,7 +199,7 @@ manage() {
     # Check for stale tunnels and tear em down
     while true; do
         for interface in $interfaces; do
-            if [ $(get_age "$interface") -ge $OPT_TUNNEL_TIMEOUT ]; then
+            if [ "$(get_age "$interface")" -ge "$OPT_TUNNEL_TIMEOUT" ]; then
                 log "Tunnel to $interface timed out."
                 teardown "$interface"
             fi
@@ -200,9 +207,9 @@ manage() {
 
         tmp_tunnel_endpoints="$tunnel_endpoints"
 
-        while [ $(echo $connections | wc -w) -lt $connection_count ]; do
+        while [ "$(echo "$connections" | wc -w)" -lt "$connection_count" ]; do
             ep=$(get_least_used_tunnelserver "$tmp_tunnel_endpoints")
-            if [ ! -z "$ep" ]; then
+            if [ -n "$ep" ]; then
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
                 if ! new_tunnel "$ep" "$nsname" "$mtu"; then
                     # remove ep from tunnel
@@ -276,9 +283,9 @@ log "starting tunnelmanager with
     Uplink-IP............: $OPT_UPLINK_IP
     Uplink-GW............: $OPT_UPLINK_GW
     MTU..................: $OPT_MTU
-    Namespace............: $OPT_NAMESPACE_NAME 
-    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
-    Tunnel-Count.........: $OPT_TUNNEL_COUNT 
+    Namespace............: $OPT_NAMESPACE_NAME
+    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS
+    Tunnel-Count.........: $OPT_TUNNEL_COUNT
     Tunnel-Timeout.......: $OPT_TUNNEL_TIMEOUT
     Work-Interval........: $OPT_INTERVAL
     Up_Script............: $OPT_UP_SCRIPT
