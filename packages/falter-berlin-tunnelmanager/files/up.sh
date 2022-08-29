@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# shellcheck shell=dash
+
+# in most cases this directive alarms, we don't care for the return values, as we do other checks.
+# shellcheck disable=SC2155
+# in that case it doesn't work to do it another way. We need that value twice.
+# shellcheck disable=SC2181
+
 interface="$1"
 
 # can be controlled using tunnelmanagers "-A" parameter
@@ -7,7 +14,7 @@ extra_args="$2"
 
 prefix=$(echo "$extra_args" | cut -d ' ' -f1)
 
-argc=$(echo $extra_args | wc -w)
+argc=$(echo "$extra_args" | wc -w)
 if [ "$argc" -gt "2" ]; then
     metric=$(echo "$extra_args" | cut -d ' ' -f2)
     lqm=$(echo "$extra_args" | cut -d ' ' -f3)
@@ -16,7 +23,7 @@ fi
 get_ips_from_prefix() {
     local prefix="$1"
     local amount="$(owipcalc "$prefix" howmany 32)"
-    local command="owipcalc "$prefix" network print"
+    local command="owipcalc $prefix network print"
     for i in $(seq 2 "$amount"); do
         command="$command next 32 print add 1"
     done
@@ -40,7 +47,7 @@ cleanup_olsr_wg_config() {
         fi
 
         # skip non wireguard interfaces
-        slicedint=$(echo $int_name | cut -c1-3)
+        slicedint=$(echo "$int_name" | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
             continue
@@ -76,7 +83,7 @@ cleanup_babel_wg_config() {
         fi
 
         # skip non wireguard interfaces
-        slicedint=$(echo $int_name | cut -c1-3)
+        slicedint=$(echo "$int_name" | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
             continue
@@ -104,10 +111,10 @@ get_ips_from_prefix "$prefix"
 # unconditionally wipe all configured ips from available ips.
 available_ips="$_ret_prefixes"
 for i in $(get_configured_ips); do
-    available_ips="$(echo $available_ips | sed "s/\b$i\b//")"
+    available_ips="$(echo "$available_ips" | sed "s/\b$i\b//")"
 done
 
-next_ip="$(echo $available_ips | awk '{print $1}')"
+next_ip="$(echo "$available_ips" | awk '{print $1}')"
 
 # Configure IPs
 ip address add "$next_ip/32" dev "$interface"
@@ -129,7 +136,7 @@ UCIREF="$(uci add olsrd Interface)"
 uci set "olsrd.$UCIREF.ignore=0"
 uci set "olsrd.$UCIREF.interface=$interface"
 uci set "olsrd.$UCIREF.Mode=ether"
-if [[ ! -z "$lqm" ]]; then
+if [ -n "$lqm" ]; then
     uci set "olsrd.$UCIREF.LinkQualityMult=default $lqm"
 fi
 uci commit olsrd
@@ -141,7 +148,7 @@ if [ $? -eq 1 ]; then
     /etc/init.d/olsrd start
 else
     # instead of reloading add interface via ipc to make it seamless
-    if [[ ! -z "$lqm" ]]; then
+    if [ -n "$lqm" ]; then
         ubus call olsrd add_interface '{"ifname":'\""$interface"\"',"lqm":'\""$lqm"\"'}'
     else
         ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
@@ -155,7 +162,7 @@ uci set "babeld.$UCIREF.ifname=$interface"
 uci set "babeld.$UCIREF.split_horizon=true"
 uci commit babeld
 
-if [[ ! -z "$metric" ]]; then
+if [ -n "$metric" ]; then
     uci revert babeld
     UCIREF="$(uci add babeld filter)"
     uci set "babeld.$UCIREF.type=in"
@@ -173,7 +180,7 @@ if [ $? -eq 1 ]; then
 else
     # instead of reloading add interface via ipc to make it seamless
     ubus call babeld add_interface '{"ifname":'\""$interface"\"'}'
-    if [[ ! -z "$metric" ]]; then
-        ubus call babeld add_filter '{"ifname":'\""$interface"\"',"type":0,"metric":'$metric'}'
+    if [ -n "$metric" ]; then
+        ubus call babeld add_filter '{"ifname":'\""$interface"\"',"type":0,"metric":'"$metric"'}'
     fi
 fi
