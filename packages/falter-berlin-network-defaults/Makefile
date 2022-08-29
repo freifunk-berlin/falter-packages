@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-network-defaults
-PKG_VERSION:=4
+PKG_VERSION:=5
 
 include $(INCLUDE_DIR)/package.mk
 
