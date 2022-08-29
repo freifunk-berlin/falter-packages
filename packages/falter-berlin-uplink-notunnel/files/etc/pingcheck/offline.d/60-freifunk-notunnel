@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck source=/dev/null
+# shellcheck disable=SC2154
+
 [ "$INTERFACE" = wan ] || exit
 
 . /lib/functions.sh
