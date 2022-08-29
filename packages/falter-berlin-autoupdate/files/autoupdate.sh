@@ -1,10 +1,17 @@
 #! /bin/sh
 
+# shellcheck shell=dash
+
 # except than noted, this script is not posix-compliant in one way: we use "local"
 # variables definition. As nearly all shells out there implement local, this should
 # work anyway. This is a little reminder to you, if you use some rare shell without
 # a builtin "local" statement.
 
+# We don't need the return values and check the correct execution in other ways.
+# shellcheck disable=SC2155
+
+# we can't check those dependencies at the CI
+# shellcheck source=/dev/null
 . /lib/functions.sh
 . /lib/config/uci.sh
 . /etc/freifunk_release
@@ -54,14 +61,14 @@ Example call:
 #   Load Configuration   #
 ##########################
 
-SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
+export SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
 FW_SERVER_URL=$(uci_get autoupdate cfg fw_server_fqdn)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
 PATH_DIR="/tmp/autoupdate"
 PATH_BIN="$PATH_DIR/freifunk_syupgrade.bin"
-KEY_DIR="/etc/autoupdate/keys/"
+export KEY_DIR="/etc/autoupdate/keys/"
 
 MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-download
 
@@ -129,8 +136,7 @@ rm -rf "$PATH_DIR"
 mkdir -p "$PATH_DIR"
 
 log "fetch autoupdate.json from $FW_SERVER_URL ..."
-load_overview_and_certs "$FW_SERVER_URL"
-if [ $? != 0 ]; then
+if load_overview_and_certs "$FW_SERVER_URL"; then
     log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
 fi
@@ -151,8 +157,7 @@ else
     log "ignoring certificates as requested."
 fi
 
-latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json")
-if [ $? != 0 ]; then
+if latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json"); then
     log "wasn't able to read latest stable version from autoupdate.json"
     exit 2
 else

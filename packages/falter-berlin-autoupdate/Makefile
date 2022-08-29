@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-autoupdate
-PKG_VERSION:=0.1
+PKG_VERSION:=2022.08.29
 
 include $(INCLUDE_DIR)/package.mk
 

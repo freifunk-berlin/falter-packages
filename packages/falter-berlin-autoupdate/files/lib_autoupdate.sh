@@ -1,5 +1,18 @@
 #!/bin/sh
 
+# shellcheck shell=dash
+
+# jshn assigns the variables for us, but shellcheck doesn't get it.
+# shellcheck disable=SC2154
+# We don't need the return values and check the correct execution in other ways.
+# shellcheck disable=SC2155
+# using printf with variables and nc didn't work correctly. Thus this hack
+# shellcheck disable=SC2059
+# FW_SERVER_URL isn't mispelled, but a global variable defined in autoupdate.sh
+# shellcheck disable=SC2153
+
+# Those dependencies aren't available for CI checking.
+# shellcheck source=/dev/null
 . /lib/functions.sh
 . /lib/functions/semver.sh
 . /lib/config/uci.sh
@@ -215,7 +228,7 @@ min_valid_certificates() {
                 #pop key from list. Thus one key cannot validate multiple certs.
                 key_list=$(pop_element "$key_list" "$key")
             fi
-            if [ $cert_cnt = $min_cnt ]; then
+            if [ $cert_cnt = "$min_cnt" ]; then
                 return 255
             fi
         done
