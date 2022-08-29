@@ -3,7 +3,7 @@
 interface="$1"
 
 uci revert olsrd
-section="$(uci show olsrd | grep $interface | awk -F '.interface' '{print $1}')"
+section="$(uci show olsrd | grep "$interface" | awk -F '.interface' '{print $1}')"
 uci delete "$section"
 uci commit olsrd
 
@@ -11,8 +11,8 @@ uci commit olsrd
 ubus call olsrd del_interface '{"ifname":'\""$interface"\"'}'
 
 uci revert babeld
-section="$(uci show babeld | grep interface | grep $interface | awk -F '.ifname' '{print $1}')"
-filter="$(uci show babeld | grep filter | grep $interface | awk -F '.if' '{print $1}')"
+section="$(uci show babeld | grep interface | grep "$interface" | awk -F '.ifname' '{print $1}')"
+filter="$(uci show babeld | grep filter | grep "$interface" | awk -F '.if' '{print $1}')"
 uci delete "$section"
 uci delete "$filter"
 uci commit babeld
