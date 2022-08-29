@@ -1,8 +1,12 @@
 #!/bin/sh
 
+# shellcheck source=/dev/null
+# shellcheck disable=SC2034
+
+
 THIS_UPLINKNAME="tunnelberlin_tunneldigger"
 
-. /lib/functions/freifunk-berlin-network.sh 
+. /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 . /lib/functions/system.sh
 
@@ -11,13 +15,13 @@ uci set firewall.zone_ffuplink.masq=1
 uci commit firewall
 
 current_preset=$(uci get ffberlin-uplink.preset.current)
-if [ ${current_preset} != ${THIS_UPLINKNAME} ]; then
-  if [ ${current_preset} != "undefined" ]; then
+if [ "${current_preset}" != ${THIS_UPLINKNAME} ]; then
+  if [ "${current_preset}" != "undefined" ]; then
       # when the uplink-preset has changed, recreate remember the preset we are coming from
       # and prepare for reinit of the relevant settings via freifunk-berlin-ffuplink-defaults
       # uci-defaults
       logger -t "ffuplink" "uplink-preset has been changed."
-      uci set ffberlin-uplink.preset.previous=${current_preset}
+      uci set ffberlin-uplink.preset.previous="${current_preset}"
       create_ffuplink
   fi
   uci set ffberlin-uplink.preset.current=${THIS_UPLINKNAME}
@@ -28,7 +32,7 @@ uci set ffberlin-uplink.uplink.auth=none
 macaddr=$(uci -q get ffberlin-uplink.uplink.macaddr)
 if [ -z "$macaddr" ]; then
   macaddr=$(generate_random_mac_hex "fe")
-  uci set ffberlin-uplink.uplink.macaddr=$macaddr
+  uci set ffberlin-uplink.uplink.macaddr="$macaddr"
 fi
 
 uci commit ffberlin-uplink
@@ -38,7 +42,7 @@ guard "tunnelberlin_tunneldigger"
 uci delete network.ffuplink_dev
 uci set network.ffuplink_dev=device
 uci set network.ffuplink_dev.name=ffuplink
-uci set network.ffuplink_dev.macaddr=$macaddr
+uci set network.ffuplink_dev.macaddr="$macaddr"
 uci commit network.ffuplink_dev
 
 uci set network.ffuplink.proto=dhcp
@@ -49,7 +53,7 @@ UUID=$(uci -q get tunneldigger.ffuplink.uuid)
 if [ $? -eq 1 ]; then
   UUID=$macaddr
   for byte in 7 8 9 10; do
-    UUID=$UUID`dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"'`
+    UUID=$UUID$(dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"')
   done
 fi
 
@@ -58,7 +62,7 @@ uci set tunneldigger.ffuplink=broker
 # Remove old address list in excahange with srv
 uci -q delete tunneldigger.ffuplink.address
 uci set tunneldigger.ffuplink.srv='_tunnel._udp.berlin.freifunk.net'
-uci set tunneldigger.ffuplink.uuid=$UUID
+uci set tunneldigger.ffuplink.uuid="$UUID"
 uci set tunneldigger.ffuplink.interface=ffuplink
 uci set tunneldigger.ffuplink.broker_selection=usage
 uci set tunneldigger.ffuplink.bind_interface=wan
