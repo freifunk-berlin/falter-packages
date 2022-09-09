@@ -32,6 +32,18 @@ if [ -n "$CMD_1" ] && [ "$CMD_1" != "--dry-run" ]; then
 fi
 
 
+# calback function: This function aggregates all items of the 'contact'
+# option list from /etc/config/freifunk into one single string for better
+# transport
+handle_contact() {
+    local value="$1"
+
+    if [ -n "$value" ]; then
+        CONTACT_AGGREGATOR="$CONTACT_AGGREGATOR|$value"
+    fi
+}
+
+
 ######################
 #                    #
 #  Collect OWM-Data  #
@@ -162,6 +174,13 @@ phone="$(uci_get freifunk contact phone)"
 homepage="$(uci_get freifunk contact homepage)" # whitespace-separated, with single quotes, if string contains whitspace
 note="$(uci_get freifunk contact note)"
 
+# aggregate contacts-list into one string
+config_load freifunk
+config_list_foreach contact contact handle_contact
+# omit the first pipe-symbol.
+contacts=$(echo "$CONTACT_AGGREGATOR" | sed 's/|//')
+
+
 # community info
 ssid="$(uci_get freifunk community ssid)"
 mesh_network="$(uci_get freifunk community mesh_network)"
@@ -187,7 +206,12 @@ json_add_object freifunk
 
 	json_add_object contact
 		if [ -n "$name" ]; then json_add_string name "$name"; fi
-		if [ -n "$mail" ]; then json_add_string mail "$mail"; fi
+		# contact list superseeds the use of mail option
+		if [ -n "$contacts" ]; then
+			json_add_string mail "$contacts"
+		else
+			if [ -n "$mail" ]; then json_add_string mail "$mail"; fi
+		fi
 		if [ -n "$nick" ]; then json_add_string nickname "$nick"; fi
 		if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
 		if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi # was array of homepages
