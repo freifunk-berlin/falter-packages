@@ -17,3 +17,5 @@ uci delete "$section"
 uci delete "$filter"
 uci commit babeld
 /etc/init.d/babeld reload
+
+ip link del $interface
