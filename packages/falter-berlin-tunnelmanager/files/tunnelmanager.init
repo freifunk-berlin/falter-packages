@@ -2,8 +2,8 @@
 
 USE_PROCD=1
 
-START=95
-STOP=01
+START=40
+STOP=10
 
 tm_start() {
     local instance="$1"
