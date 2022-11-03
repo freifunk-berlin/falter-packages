@@ -69,11 +69,14 @@ setup_namespace() {
 
     if ! ip link add "$final_uplink_interface" link "$uplink_interface" type macvlan mode bridge; then
         log "Error while setting up macvlan-based uplink interface $final_uplink_interface attached to $uplink_interface"
+        ip netns del "$namespace_name"
         exit 1
     fi
 
     if ! ip link set dev "$final_uplink_interface" netns "$namespace_name"; then
         log "Error while moving uplink interface $final_uplink_interface attached to $uplink_interface"
+        ip netns del "$namespace_name"
+        ip link del "$final_uplink_interface"
         exit 1
     fi
 
