@@ -19,9 +19,10 @@ function usage() {
 [ -n "$2" ] && arch="$2" || usage
 [ -n "$3" ] && dest="$3" || usage
 
-destdir="$dest/snapshots/packages/$arch"
-[ "$branch" == "openwrt-22.03" ] && destdir="$dest/packages-22.03/$arch"
-[ "$branch" == "openwrt-21.02" ] && destdir="$dest/packages-21.02/$arch"
+destdir="$dest/$arch"
+# destdir="$dest/snapshots/packages/$arch"
+# [ "$branch" == "openwrt-22.03" ] && destdir="$dest/packages-22.03/$arch"
+# [ "$branch" == "openwrt-21.02" ] && destdir="$dest/packages-21.02/$arch"
 mkdir -p "$destdir"
 destdir=$(realpath "$destdir")
 
@@ -36,7 +37,7 @@ unbuf="stdbuf --output=0 --error=0"
   [ "$branch" == "openwrt-22.03" ] && mirrordir="releases/22.03-SNAPSHOT"
   [ "$branch" == "openwrt-21.02" ] && mirrordir="releases/21.02-SNAPSHOT"
 
-  target=$(cat "./build/targets-$branch.txt" | grep -v '#' | grep -F "$arch" | cut -d ' ' -f 2)
+  target=$(cat "./build/targets-$branch.txt" | grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2)
   sdk=$(curl -s "$mirror/$mirrordir/targets/$target/sha256sums" | cut -d '*' -f 2 | grep -i sdk)
 
   mkdir -p "./tmp/dl/$branch"
