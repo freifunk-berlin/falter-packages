@@ -1,26 +1,46 @@
 # Installation
 
-Clone OpenWrt
+This tutorial gives a short view in how you could incorporate falter-packages, if you compile all of your OpenWrt-images by yourself. This is not the preffered method though. The falter project prefers using OpenWrts SDK and imagebuilders, to get full binary compatibility to OpenWrt.
 
-    git clone https://git.openwrt.org/openwrt/openwrt.git
+1. Clone OpenWrt
 
-Change into OpenWrt folder by
+```sh
+git clone https://git.openwrt.org/openwrt/openwrt.git
+```
 
-    cd openwrt
+2. Change into OpenWrt folder by
 
-Copy `feeds.conf.default` to `feeds.conf`
+```sh
+cd openwrt
+```
 
-    cp feeds.conf.default feeds.conf
+3. Copy `feeds.conf.default` to `feeds.conf`
 
-after that add to feeds.conf
+```sh
+cp feeds.conf.default feeds.conf
+```
 
-    src-git falter https://github.com/Freifunk-Spalter/packages.git
+4. after that add to feeds.conf
 
-Then do
+```sh
+src-git falter https://github.com/freifunk-berlin/falter-packages.git
+```
 
-    ./scripts/feeds update -a
-    ./scripts/feeds install -a
+5. Then do
 
-Select packages using
+```sh
+./scripts/feeds update -a
+./scripts/feeds install -a
+```
 
-    make menuconfig
+6. Select packages using
+
+```sh
+make menuconfig
+```
+
+7. Start compiling your custom OpenWrt:
+
+```sh
+make
+```
