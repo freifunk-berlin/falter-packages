@@ -1,7 +1,12 @@
 <div class="alert-message">
   <p class="info">
-    <%= translate("Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der Oberflaeche des Routers angezeigt sowie an monitor.berlin.freifunk.net geschickt. \
-    Es werden keine Statistiken erhoben, wenn du den Haken nicht setzt. Du kannst die Statistiken spaeter ueber Administration &gt; Statistics &gt; Collectd einschalten. \
-    Auf Routern mit nur 4MB ROM steht das Monitoring nicht zur Verfuegung. Auf Routern mit nur 32MB RAM werden die Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in der Router-Oberflaeche.") %>
+    <%= translate("By enabling this option, the router shows statistic data \
+    (like memory-usage, CPU-usage, bandwidth-use, etc) in the user interface \
+    and sends them to monitor.berlin.freifunk.net. The router won't log statistic \
+    data, if you don't check the box. Under <em>Administration &gt; Statistics &gt; Collectd</em> \
+    you can activate the statistics afterwards. On routers with only 4MiB of flash, \
+    monitoring is not available. On routers with only 32MiB of memory, statistics \
+    data will be only send to monitor.berlin.freifunk.net, but not displayed in the \
+    local user interface.") %>
   </p>
 </div>

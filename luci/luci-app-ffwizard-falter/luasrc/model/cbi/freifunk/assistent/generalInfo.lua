@@ -24,19 +24,19 @@ for v in fs.glob(profiles.."*") do
   community:value(n, name)
 end
 
-hostname = f:field(Value, "hostname", translate("Name dieses Freifunk-Knotens"), "")
+hostname = f:field(Value, "hostname", translate("Name of this Freifunk node"), "")
 hostname.datatype = "hostname"
 function hostname.cfgvalue(self, section)
   return uci:get_first("system", "system","hostname") or sys.hostname()
 end
 
-nickname = f:field(Value, "nickname", translate("Dein Nickname"),"")
+nickname = f:field(Value, "nickname", translate("Your Nickname"),"")
 nickname.datatype = "string"
 function nickname.cfgvalue(self, section)
   return uci:get("freifunk", "contact", "nickname")
 end
 
-realname = f:field(Value, "realname", translate("Dein Realname"),"")
+realname = f:field(Value, "realname", translate("Your Realname"),"")
 realname.datatype = "string"
 function realname.cfgvalue(self, section)
   return uci:get("freifunk", "contact", "name")
@@ -48,25 +48,25 @@ function mail.cfgvalue(self, section)
   return uci:get("freifunk", "contact", "mail")
 end
 
-location = f:field(Value, "location", translate("Standort"), "")
+location = f:field(Value, "location", translate("Location"), "")
 location.datatype = "string"
 function location.cfgvalue(self, section)
   return uci:get_first("system", "system", "location") or uci:get("freifunk", "contact", "location")
 end
 
-lat = f:field(Value, "lat", translate("Geographischer Breitengrad"), "")
+lat = f:field(Value, "lat", translate("Latitude"), "")
 lat.datatype = "float"
 function lat.cfgvalue(self, section)
   return uci:get_first("system", "system","latitude")
 end
 
-lon = f:field(Value, "lon", translate("Geographischer Längengrad"), "")
+lon = f:field(Value, "lon", translate("Longitude"), "")
 lon.datatype = "float"
 function lon.cfgvalue(self, section)
   return uci:get_first("system", "system","longitude")
 end
 
-alt = f:field(Value, "alt", translate("Höhe über Grund"), "")
+alt = f:field(Value, "alt", translate("Height above the ground"), "")
 alt.datatype = "float"
 function alt.cfgvalue(self, section)
   return uci:get_first("system", "system","altitude")
