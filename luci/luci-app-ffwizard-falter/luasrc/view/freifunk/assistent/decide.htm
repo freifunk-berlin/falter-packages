@@ -7,25 +7,22 @@
 
   <div class="info alert-message">
     <p class="success">
-<%= translate("Als naechstes kommen die Einstellungen für das Freifunk-Netzwerk. \
-Halte die IPs bereit, die du ueber den Wizard von config.berlin.freifunk.net \
-bekommen hast.") %>
+<%= translate("Next we set the options for the Freifunk network. \
+Have the IPs ready that you received from the config.berlin.freifunk.net wizard") %>
     </p>
   </div>
 
   <div class="tile">
     <div style="text-align: center; margin: 10px">
       <a class="cbi-button cbi-button-save" href="<%=luci.dispatcher.build_url("admin/freifunk/assistent/optionalConfigs")%>?sharenet=0">
-        <%= translate("Am Freifunk-Netz teilnehmen") %>
+        <%= translate("Participate in the Freifunk-Network") %>
       </a>
     </div>
     <div class="alert-message">
       <p class="info">
-        <%= translate("Erweitere das Freifunk-Netz. Du benoetigst dazu eine \
-        WLAN-Verbindung zu einem anderen Freifunk-Router. \
-        Du kannst auf der Freifunk-Karte \
-        nachschauen, wer in deiner Naehe ist, und sie kontaktieren, \
-        damit ihr die Verbindung optimal ausrichten koennt.") %>
+        <%= translate("Expand the Freifunk-Network. You need a WiFi-connection to another \
+        Freifunk router for that. You can check whom is in your neighbourhood on the Freifunk map. \
+        Then you can contact them, to adjust the mesh connection to optimum.") %>
       </p>
     </div>
   </div>
@@ -33,13 +30,13 @@ bekommen hast.") %>
   <div class="tile">
     <div style="text-align: center; margin: 10px">
       <a class="cbi-button cbi-button-save" href="<%=luci.dispatcher.build_url("/admin/freifunk/assistent/sharedInternet")%>">
-        <%= translate("Am Freifunk-Netz teilnehmen und Internet teilen") %>
+        <%= translate("Participate in the Freifunk-Network and share Internet") %>
       </a>
     </div>
     <div class="alert-message">
       <p class="info">
-        <%= translate("Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk freigibst. \
-        Diese Option ist sowohl mit als auch ohne Verbindung zu anderen Freifunk-Routern sinnvoll.") %>
+        <%= translate("Support the community by sharing your internet to the Freifunk-Network. \
+        This option is sensible in any context, whether you are connected to other Freifunk-Nodes or not.") %>
       </p>
     </div>
   </div>
