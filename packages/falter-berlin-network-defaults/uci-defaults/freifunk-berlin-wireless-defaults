@@ -1,0 +1,57 @@
+#!/bin/sh
+
+#
+## Setup a wifi for connecting to the router before
+## the first wizard run
+#
+
+. /lib/functions.sh
+. /lib/config/uci.sh
+. /lib/functions/system.sh
+
+mac_addr=$(get_mac_label | cut -c 10-)
+
+if [ -z "$mac_addr" ]; then
+    # get propable labels-MAC manually instead
+    mac_addr=$(ubus call network.device status | sed -n 's/.*macaddr": "\(.*\)".*/\1/p' |
+        sort | uniq | grep -v "00:00:00:00:00:00" | sed -n '1p' | cut -c 10-)
+fi
+
+if [ -z "$mac_addr" ]; then
+    # use device name instead
+    mac_addr=$(board_name | cut -d',' -f2)
+fi
+
+if [ ${#mac_addr} -gt 16 ]; then
+    # crop it, if string got too long
+    mac_addr=$(echo "$mac_addr" | cut -c -16)
+fi
+
+ssid="freifunk-setup $mac_addr"
+
+enable_device() {
+    local config="$1"
+
+    if [ "$(uci_get wireless "$config" disabled)" = "1" ]; then
+        uci_set wireless "$config" disabled 0
+    fi
+}
+
+modify_ssid() {
+    local config="$1"
+
+    if [ "$(uci_get wireless "$config" ssid)" = "OpenWrt" ]; then
+        uci_set wireless "$config" ssid "$ssid"
+        uci_set wireless "$config" disabled 0
+    fi
+}
+
+reset_cb
+config_load wireless
+config_foreach enable_device wifi-device
+
+reset_cb
+config_load wireless
+config_foreach modify_ssid wifi-iface
+
+uci_commit wireless
