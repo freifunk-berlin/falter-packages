@@ -1,19 +1,13 @@
 <div class="alert-message">
   <p>
-    <%= translate("Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> lassen, \
-    sofern sich nicht in unmittelbarer Naehe ein weiterer Access Point \
-    mit der gleichen SSID befindet. Auf diese Weise koennen sich \
-    Gaeste z.B. mit ihrem Smartphone in der ganzen Gegend mit dem \
-    Freifunk-Netzwerk verbinden, ohne spezielle Einstellungen fuer \
-    jeden einzelnen Router vornehmen zu muessen. \
-    <br/>Diese Einstellung bezieht sich auf den WLAN-AP, <em>nicht</em> das Adhoc-Netzwerk, \
-    das fuer das Freifunk-Meshing benutzt wird.") %>
+    <%= translate("You should leave the SSID at <em>berlin.freifunk.net</em>, as long as there is \
+    not an access point with the same SSID nearby. Thus, people can connect to the Freifunk network \
+    in the whole area, without having to connect to every node individually. <br/>This option \
+    influences the WiFi-AP, <em>not</em> the mesh-network for the mesh connections.") %>
   </p>
   <p class="info">
-    <%= translate("Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines \
-    Freifunk-Netzwerkes. \
-    Die noetige Angabe solltest du von \
-    config.berlin.freifunk.net bekommen haben. \
-    Dabei wird die CIDR-Schreibweise benutzt (Beispiel: 10.42.42.42/28).") %>
+    <%= translate("The DHCP-options controls the distribution of IP-addresses to the clients of your \
+    Freifunk-WiFi. You should have gotten the addresses from <em>config.berlin.freifunk.net</em>. We \
+    use the CIDR-notation (i.e. 10.42.42.42/28).") %>
   </p>
 </div>
