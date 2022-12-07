@@ -23,7 +23,7 @@ css.template = "freifunk/assistent/snippets/css"
 enableStatsInfo = f:field(DummyValue, "statsInfo", "")
 enableStatsInfo.template = "freifunk/assistent/snippets/enableStats"
 
-enableStats = f:field(Flag, "stats", translate("Monitoring anschalten"))
+enableStats = f:field(Flag, "stats", translate("Enable monitoring"))
 enableStats.default = 0 -- this does not work
 function enableStats.cfgvalue(self, section)
   return tostring(uci:get("ffwizard", "settings" , "enableStats")) or "0"

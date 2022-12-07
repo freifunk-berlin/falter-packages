@@ -45,7 +45,7 @@ uci:foreach("wireless", "wifi-device",
     end
     f:field(DummyValue, device:upper(), devicename)
     wifi_tbl[device] = {}
-    local meship = f:field(Value, "meship_" .. device, translate("Mesh-IP"), "")
+    local meship = f:field(Value, "meship_" .. device, translate("Mesh IP"), "")
     meship.rmempty = false
     meship.datatype = "ip4addr"
     function meship.cfgvalue(self, section)
@@ -65,7 +65,7 @@ uci:foreach("wireless", "wifi-device",
       meshmode.default = "80211s"
     end
     if supportedModes["adhoc"] == true then
-      meshmode:value("adhoc", translate("Ad-Hoc (veraltet)"))
+      meshmode:value("adhoc", translate("Ad-Hoc (outdated)"))
       if supportedModes["80211s"] ~= true then
         meshmode.default = "adhoc"
       end
@@ -83,14 +83,14 @@ if vap == "1" then
   ipinfo = f:field(DummyValue, "ipinfo", "")
   ipinfo.template = "freifunk/assistent/snippets/ipinfo"
 
-  ssid = f:field(Value, "ssid", translate("Freifunk-SSID"), "")
+  ssid = f:field(Value, "ssid", translate("Freifunk SSID"), "")
   ssid.rmempty = false
   function ssid.cfgvalue(self, section)
     return uci:get("ffwizard", "settings", "ssid")
       or uci:get(community, "profile", "ssid")
   end
 
-  dhcpmesh = f:field(Value, "dhcpmesh", translate("DHCP-Network"), "")
+  dhcpmesh = f:field(Value, "dhcpmesh", translate("DHCP Network"), "")
   dhcpmesh.rmempty = false
   dhcpmesh.datatype = "ip4addr"
   function dhcpmesh.cfgvalue(self, section)
