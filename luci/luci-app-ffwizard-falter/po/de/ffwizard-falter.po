@@ -1,15 +1,15 @@
 msgid ""
 msgstr ""
-"Content-Type: text/plain; charset=UTF-8\n"
 "Project-Id-Version: luci-app-ffwizard-falter\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: \n"
 "Last-Translator: Martin Hübner <martin.hubner@web.de>\n"
 "Language-Team: Martin\n"
-"MIME-Version: 1.0\n"
-"Content-Transfer-Encoding: 8bit\n"
 "Language: de\n"
-"X-Generator: Poedit 3.0\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.2.2\n"
 
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:42
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:25
@@ -43,49 +43,39 @@ msgstr "Greife ohne Login auf Statusdaten zu"
 msgid "Ad-Hoc"
 msgstr "Ad-Hoc"
 
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:68
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:54
 msgid "Ad-Hoc (outdated)"
 msgstr "Ad-Hoc (veraltet)"
 
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:68
-msgid "Ad-Hoc (veraltet)"
-msgstr "Ad-Hoc (veraltet)"
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:10
-msgid ""
-"Als naechstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte die "
-"IPs bereit, die du ueber den Wizard von config.berlin.freifunk.net bekommen "
-"hast."
-msgstr ""
-"Als nächstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte die "
-"IPs bereit, die du über den Wizard von config.berlin.freifunk.net bekommen "
-"hast."
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:19
-msgid "Am Freifunk-Netz teilnehmen"
-msgstr "Am Freifunk-Netz teilnehmen"
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:36
-msgid "Am Freifunk-Netz teilnehmen und Internet teilen"
-msgstr "Am Freifunk-Netz teilnehmen und Internet teilen"
-
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:17
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:25
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:50
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:47
 msgid "Back"
 msgstr "Zurück"
 
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:16
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/enableStats.htm:3
 msgid ""
-"Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
-"erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist er "
-"auch unter dem Namen <em>frei.funk</em> zu erreichen."
+"By enabling this option, the router shows statistic data (like memory-usage, "
+"CPU-usage, bandwidth-use, etc) in the user interface and sends them to "
+"monitor.berlin.freifunk.net. The router won't log statistic data, if you "
+"don't check the box. Under <em>Administration &gt; Statistics &gt; Collectd</"
+"em> you can activate the statistics afterwards. On routers with only 4MiB of "
+"flash, monitoring is not available. On routers with only 32MiB of memory, "
+"statistics data will be only send to monitor.berlin.freifunk.net, but not "
+"displayed in the local user interface."
 msgstr ""
-"Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
-"erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist er "
-"auch unter dem Namen <em>frei.funk</em> zu erreichen."
+"Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-"
+"Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der "
+"Oberfläche des Routers angezeigt sowie an monitor.berlin.freifunk.net "
+"geschickt. Es werden keine Statistiken erhoben, wenn du den Haken nicht "
+"setzt. Du kannst die Statistiken später über Administration &gt; Statistiken "
+"&gt; Collectd einschalten. Auf Routern mit nur 4MB Flash steht das "
+"Monitoring nicht zur Verfügung. Auf Routern mit nur 32MB RAM werden die "
+"Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in der "
+"Router-Oberfläche."
 
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:51
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:48
 msgid "Cancel"
 msgstr "Abbrechen"
 
@@ -93,24 +83,215 @@ msgstr "Abbrechen"
 msgid "Confirmation"
 msgstr "Bestätigen"
 
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:93
-msgid "DHCP-Network"
-msgstr "DHCP-Netz"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:33
-msgid "Dein Nickname"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:39
-msgid "Dein Realname"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:13
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/welcome.htm:3
 msgid ""
-"Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
-"Freifunk-Netzwerkes. Die noetige Angabe solltest du von config.berlin."
-"freifunk.net bekommen haben. Dabei wird die CIDR-Schreibweise benutzt "
-"(Beispiel: 10.42.42.42/28)."
+"Congratulations! <br/>You've installed the Freifunk firmware successfully on "
+"your device. This assistant helps you with the configuration. If you don't "
+"need help with that, you can safely skip this, go to the admin interface and "
+"do the configuration on your own. <br/>Beforehand, change your password "
+"please. Please use a strong password, because the router is visible to the "
+"Freifunk network. Later on, you will find this option at <em>System &gt; "
+"Administration.</em>"
+msgstr ""
+"Herzlichen Glückwunsch! <br/>Du hast deinen Router erfolgreich mit der "
+"Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim Einrichten "
+"deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
+"Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
+">Ändere hier zunächst dein Password. Bitte wähle ein sicheres Passwort, da "
+"der Router nach außen sichtbar ist. Später findest du diese Option im "
+"Bereich <em>System &gt; Administration.</em>"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:93
+msgid "DHCP Network"
+msgstr "DHCP-Netzwerk"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpncertreupload.htm:3
+msgid "Delete key and upload again"
+msgstr "Schlüssel löschen und erneut hochladen"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:11
+msgid ""
+"Done! You made all the necessary configuration. Your router will reboot now. "
+"Consider drinking a cup of tea or coffee. :D Once all lights blink again, "
+"you will be a Freifunkeer!"
+msgstr ""
+"Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu gestartet. "
+"Am besten, du machst dir kurz einen Kaffee oder einen Tee :D und sobald alle "
+"Lichter wieder blinken, bist du Freifunkerin!"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:16
+msgid "Download bandwidth in Mbit/s"
+msgstr "Download-Bandbreite in Mbit/s"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:45
+msgid "E-Mail"
+msgstr "E-Mail"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:26
+msgid "Enable monitoring"
+msgstr "Monitoring anschalten"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:23
+msgid ""
+"Expand the Freifunk-Network. You need a WiFi-connection to another Freifunk "
+"router for that. You can check whom is in your neighbourhood on the Freifunk "
+"map. Then you can contact them, to adjust the mesh connection to optimum."
+msgstr ""
+"Erweitere das Freifunk-Netz. Du benötigst dazu eine WLAN-Verbindung zu einem "
+"anderen Freifunk-Router. Du kannst auf der Freifunk-Karte nachschauen, wer "
+"in deiner Nähe ist, und sie kontaktieren, damit ihr die Verbindung optimal "
+"ausrichten könnt."
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:86
+msgid "Freifunk SSID"
+msgstr "Freifunk SSID"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:16
+msgid "Freifunk-Community"
+msgstr "Freifunk-Community"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:69
+msgid "Height above the ground"
+msgstr "Höhe über Grund"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/generalInfo.htm:3
+msgid ""
+"If you like, you can paste your contact details here. Those get displayed on "
+"the routers info page and the Freifunk map. This way, other Freifunk peers "
+"can contact you if they would like to make a mesh-connection to you. If you "
+"don't like to give that information, you could simply skip that page or "
+"leave some forms empty. But you must set the (unique) Name of this Freifunk-"
+"node. You can update this data later on by using the contact page in the "
+"routers web interface at <em>Freifunk &gt; Contact</em>."
+msgstr ""
+"Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
+"Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
+"Karte angezeigt. So koennen dich andere Freifunkerinnen finden und dich "
+"ansprechen, falls sie Ihren Router mit deinem verbinden moechten. <br/>Falls "
+"du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
+"ueberspringen oder einzelne Felder leerlassen. <br/>Den (eindeutigen) Namen "
+"dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst diese "
+"Daten auch später noch ändern, indem du in der Weboberfläche des Routers die "
+"Kontaktseite aufrufst: <em>Freifunk &gt; Kontakt</em>."
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:57
+msgid "Latitude"
+msgstr "Geographischer Breitengrad"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
+msgid "Local Certificate"
+msgstr "Lokales Zertifikat"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
+msgid "Local Key"
+msgstr "Lokaler Schlüssel"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:51
+msgid "Location"
+msgstr "Standort"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:63
+msgid "Longitude"
+msgstr "Geographischer Längengrad"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:48
+msgid "Mesh IP"
+msgstr "Mesh-IP"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:61
+msgid "Mesh Mode"
+msgstr "Mesh-Modus"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:27
+msgid "Name of this Freifunk node"
+msgstr "Name dieses Freifunk-Knotens"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:5
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:7
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:16
+msgid "Next"
+msgstr "Weiter"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:10
+msgid ""
+"Next we set the options for the Freifunk network. Have the IPs ready that "
+"you received from the config.berlin.freifunk.net wizard"
+msgstr ""
+"Als nächstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte die "
+"IPs bereit, die du über den Wizard von config.berlin.freifunk.net bekommen "
+"hast"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/meshipinfo.htm:3
+msgid ""
+"Next, we enter the IP-addresses that we got from <em>config.berlin.freifunk."
+"net</em>. With this addresses, your router connects to other Freifunk "
+"routers in range. You can display them at <em>Network &gt; Interfaces and "
+"Network &gt; Wireless</em> later on."
+msgstr ""
+"Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
+"berlin.freifunk.net bekommen hast. Über diese Adresse(n) verbindet sich dein "
+"Router mit anderen Freifunk-Routern in deiner Nähe. Später kannst du dir die "
+"Einstellungen unter <em>Netzwerk &gt; Schnittstellen und Netzwerk &gt; "
+"Drahtlos</em> anschauen."
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpninfo.htm:3
+msgid ""
+"Now we need the key for the tunnel/VPN. Please unzip the file you got by "
+"email and upload the certificate and the key here."
+msgstr ""
+"Im Folgenden wird dein Schlüssel zum Tunnel/VPN gebraucht. Du entpackst die "
+"Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und deinen "
+"Schlüssel hoch."
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:18
+msgid "Participate in the Freifunk-Network"
+msgstr "Am Freifunk-Netz teilnehmen"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:33
+msgid "Participate in the Freifunk-Network and share Internet"
+msgstr "Am Freifunk-Netz teilnehmen und Internet teilen"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
+msgid "Password"
+msgstr "Passwort"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:15
+msgid ""
+"Please mind, that the router router will be reachable by its new Freifunk-IP-"
+"address. From devices connected by WiFi or Ethernet you could use <em>frei."
+"funk</em> also."
+msgstr ""
+"Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
+"erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist er "
+"auch unter dem Namen <em>frei.funk</em> zu erreichen."
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:24
+msgid "Save and reboot"
+msgstr "Speichern und Neustarten"
+
+#: luci/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
+msgid "Super user access role"
+msgstr "Super user access role"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:38
+msgid ""
+"Support the community by sharing your internet to the Freifunk-Network. This "
+"option is sensible in any context, whether you are connected to other "
+"Freifunk-Nodes or not."
+msgstr ""
+"Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
+"freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu anderen "
+"Freifunk-Routern sinnvoll."
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
+msgid "The"
+msgstr "Die"
+
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:9
+msgid ""
+"The DHCP-options controls the distribution of IP-addresses to the clients of "
+"your Freifunk-WiFi. You should have gotten the addresses from <em>config."
+"berlin.freifunk.net</em>. We use the CIDR-notation (i.e. 10.42.42.42/28)."
 msgstr ""
 "Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
 "Freifunk-Netzwerkes. Die nötige Angabe solltest du von config.berlin."
@@ -119,15 +300,14 @@ msgstr ""
 
 #: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/shareBandwidth.htm:3
 msgid ""
-"Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des kuerzesten "
-"Wegs und der hoechsten Bandbreite weiter. Dazu muss bekannt sein, wieviel "
-"Bandbreite ins Internet du auf deinem Knoten zur Verfuegung stellen kannst "
-"und willst. Typische Gesamtbandbreiten sind z.B. bei <em>DSL 6000</em> 6.0 "
-"Mbit/s Download und 0.5 Mbit/s Upload oder bei <em>VDSL 50000</em> 50.0 Mbit/"
-"s Download und 10.0 Mbit/s Upload. Am besten testest du z.B. unter speedof."
-"me mehrmals, wieviel Bandbreite dir tatsaechlich zur Verfuegung steht. Dann "
-"gib hier an, wieviel du mit deinen Nachbarn teilen moechtest. Sei "
-"grosszuegig, aber nicht ueberbieten. :-)"
+"The nodes of the Freifunk network forward data based on shortest paths and "
+"highest bandwidth. Therefore we need to know, how much bandwidth to the "
+"internet there is and how much do you want to share. Typical values are 6.0 "
+"Mbit/s download and 0.5 Mbit/s upload with <em>DSL 6000</em> or 50.0 Mbit/s "
+"download and 10.0 Mbit/s upload with <em>VDSL 50000</em>. Preferably you "
+"test the actual bandwidth multiple times with a tool like <em>speedof.me</"
+"em>. Then you can fill in how much bandwidth you are willing to share with "
+"your peers. Please be generous, but don't overestimate. :-)"
 msgstr ""
 "Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des kürzesten "
 "Wegs und der höchsten Bandbreite weiter. Dazu muss bekannt sein, wie viel "
@@ -138,180 +318,6 @@ msgstr ""
 "me mehrmals, wie viel Bandbreite dir tatsächlich zur Verfügung steht. Dann "
 "gib hier an, wie viel du mit deinen Nachbarn teilen möchtest. Sei großzügig, "
 "aber nicht überbieten. :-)"
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:3
-msgid ""
-"Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> "
-"lassen, sofern sich nicht in unmittelbarer Naehe ein weiterer Access Point "
-"mit der gleichen SSID befindet. Auf diese Weise koennen sich Gaeste z.B. mit "
-"ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk verbinden, "
-"ohne spezielle Einstellungen fuer jeden einzelnen Router vornehmen zu "
-"muessen. <br/>Diese Einstellung bezieht sich auf den WLAN-AP, <em>nicht</em> "
-"das Adhoc-Netzwerk, das fuer das Freifunk-Meshing benutzt wird."
-msgstr ""
-"Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> "
-"lassen, sofern sich nicht in unmittelbarer Nähe ein weiterer Access Point "
-"mit der gleichen SSID befindet. Auf diese Weise können sich Gäste z.B. mit "
-"ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk verbinden, "
-"ohne spezielle Einstellungen für jeden einzelnen Router vornehmen zu müssen. "
-"<br/>Diese Einstellung bezieht sich auf den WLAN-AP, <em>nicht</em> das "
-"Adhoc-Netzwerk, das für das Freifunk-Meshing benutzt wird."
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:16
-msgid "Download-Bandbreite in Mbit/s"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:11
-msgid ""
-"Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu gestartet. "
-"Am besten, du machst dir kurz einen Kaffee oder einen Tee :D und sobald alle "
-"Lichter wieder blinken, bist du Freifunkerin!"
-msgstr ""
-"Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu gestartet. "
-"Am besten, du machst dir kurz einen Kaffee oder einen Tee :D und sobald alle "
-"Lichter wieder blinken, bist du Freifunkerin!"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:45
-msgid "E-Mail"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:24
-msgid ""
-"Erweitere das Freifunk-Netz. Du benoetigst dazu eine WLAN-Verbindung zu "
-"einem anderen Freifunk-Router. Du kannst auf der Freifunk-Karte nachschauen, "
-"wer in deiner Naehe ist, und sie kontaktieren, damit ihr die Verbindung "
-"optimal ausrichten koennt."
-msgstr ""
-"Erweitere das Freifunk-Netz. Du benötigst dazu eine WLAN-Verbindung zu einem "
-"anderen Freifunk-Router. Du kannst auf der Freifunk-Karte nachschauen, wer "
-"in deiner Nähe ist, und sie kontaktieren, damit ihr die Verbindung optimal "
-"ausrichten könnt."
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:22
-msgid ""
-"Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im Freifunk-"
-"Hauptmenu unter <em>Services</em> ansehen, sobald dein Router neugestartet "
-"hat."
-msgstr ""
-"Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im Freifunk-"
-"Hauptmenü unter <em>Services</em> ansehen, sobald dein Router neu gestartet "
-"hat."
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:16
-msgid "Freifunk-Community"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:86
-msgid "Freifunk-SSID"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:57
-msgid "Geographischer Breitengrad"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:63
-msgid "Geographischer Längengrad"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/welcome.htm:3
-msgid ""
-"Herzlichen Glueckwunsch! <br/>Du hast deinen Router erfolgreich mit der "
-"Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim Einrichten "
-"deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
-"Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
-">Aendere hier zunaechst dein Password. Bitte waehle ein sicheres Passwort, "
-"da der Router nach aussen sichtbar ist. Spaeter findest du diese Option im "
-"Bereich <em>System &gt; Administration.</em>"
-msgstr ""
-"Herzlichen Glückwunsch! <br/>Du hast deinen Router erfolgreich mit der "
-"Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim Einrichten "
-"deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
-"Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
-">Ändere hier zunächst dein Password. Bitte wähle ein sicheres Passwort, da "
-"der Router nach außen sichtbar ist. Später findest du diese Option im "
-"Bereich <em>System &gt; Administration.</em>"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:69
-msgid "Höhe über Grund"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/meshipinfo.htm:3
-msgid ""
-"Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
-"berlin.freifunk.net bekommen hast. Ueber diese Adresse(n) verbindet sich "
-"dein Router mit anderen Freifunk-Routern in deiner Naehe. Spaeter kannst du "
-"dir die Einstellungen unter <em>Network &gt; Interfaces und Network &gt; "
-"Wireless</em> anschauen."
-msgstr ""
-"Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
-"berlin.freifunk.net bekommen hast. Über diese Adresse(n) verbindet sich dein "
-"Router mit anderen Freifunk-Routern in deiner Nähe. Später kannst du dir die "
-"Einstellungen unter <em>Netzwerk &gt; Interfaces und Netzwerk &gt; Drahtlos</"
-"em> anschauen."
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpninfo.htm:3
-msgid ""
-"Im Folgenden wird dein Schluessel zum Tunnel/VPN gebraucht. Du entpackst die "
-"Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und deinen "
-"Schlüssel hoch."
-msgstr ""
-"Im Folgenden wird dein Schlüssel zum Tunnel/VPN gebraucht. Du entpackst die "
-"Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und deinen "
-"Schlüssel hoch."
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:42
-msgid "Local Certificate"
-msgstr "Lokales Zertifikat"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:47
-msgid "Local Key"
-msgstr "Lokaler Schlüssel"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:61
-msgid "Mesh Mode"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:48
-msgid "Mesh-IP"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:26
-msgid "Monitoring anschalten"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:27
-msgid "Name dieses Freifunk-Knotens"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:5
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:7
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/optionalConfigs.lua:16
-msgid "Next"
-msgstr "Weiter"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/changePassword.lua:18
-msgid "Password"
-msgstr "Passwort"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/wireless.lua:24
-msgid "Save and reboot"
-msgstr "Speichern und Neustarten"
-
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/vpncertreupload.htm:3
-msgid "Schluessel loeschen und erneut hochladen"
-msgstr "Schlüssel löschen und erneut hochladen"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:51
-msgid "Standort"
-msgstr ""
-
-#: luci/luci-app-ffwizard-falter/root/usr/share/rpcd/acl.d/luci-app-ffwizard-falter.json:3
-msgid "Super user access role"
-msgstr "Super user access role"
-
-#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:42
-msgid "The"
-msgstr "Die"
 
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:5
 msgid ""
@@ -333,71 +339,315 @@ msgstr ""
 "verwendet werden soll. <em>Du kannst diese Änderungen auch später über die "
 "Seite <strong>Freifunk->WLAN-Mesh-Einstellungen</strong> vornehmen.</em>\""
 
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/decide.htm:41
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/reboot.htm:19
 msgid ""
-"Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
-"freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu anderen "
-"Freifunk-Routern sinnvoll."
+"There are even exclusive services in Freifunk-Network. You can get a list of "
+"them in the Freifunk-main menu under <em>Services</em>, once your router "
+"restarted."
 msgstr ""
-"Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
-"freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu anderen "
-"Freifunk-Routern sinnvoll."
+"Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im Freifunk-"
+"Hauptmenü unter <em>Services</em> ansehen, sobald dein Router neugestartet "
+"hat."
 
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:4
 msgid "Update Wireless-Mesh Settings"
 msgstr "Aktualisiere WLAN-Mesh Einstellungen"
 
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/shareInternet.lua:23
-msgid "Upload-Bandbreite in Mbit/s"
-msgstr ""
+msgid "Upload bandwidth in Mbit/s"
+msgstr "Upload-Bandbreite in Mbit/s"
 
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/enableStats.htm:3
+#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/ipinfo.htm:3
 msgid ""
-"Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-"
-"Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der "
-"Oberflaeche des Routers angezeigt sowie an monitor.berlin.freifunk.net "
-"geschickt. Es werden keine Statistiken erhoben, wenn du den Haken nicht "
-"setzt. Du kannst die Statistiken spaeter ueber Administration &gt; "
-"Statistics &gt; Collectd einschalten. Auf Routern mit nur 4MB ROM steht das "
-"Monitoring nicht zur Verfuegung. Auf Routern mit nur 32MB RAM werden die "
-"Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in der "
-"Router-Oberflaeche."
+"You should leave the SSID at <em>berlin.freifunk.net</em>, as long as there "
+"is not an access point with the same SSID nearby. Thus, people can connect "
+"to the Freifunk network in the whole area, without having to connect to "
+"every node individually. <br/>This option influences the WiFi-AP, <em>not</"
+"em> the mesh-network for the mesh connections."
 msgstr ""
-"Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, CPU-"
-"Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in der "
-"Oberfläche des Routers angezeigt sowie an monitor.berlin.freifunk.net "
-"geschickt. Es werden keine Statistiken erhoben, wenn du den Haken nicht "
-"setzt. Du kannst die Statistiken später über Administration &gt; Statistiken "
-"&gt; Collectd einschalten. Auf Routern mit nur 4MB ROM steht das Anzeigen "
-"von Statistiken nicht zur Verfügung. Auf Routern mit nur 32MB RAM werden die "
-"Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in der "
-"Router-Oberfläche."
+"Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</em> "
+"lassen, sofern sich nicht in unmittelbarer Nähe ein weiterer Access Point "
+"mit der gleichen SSID befindet. Auf diese Weise können sich Gäste z.B. mit "
+"ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk verbinden, "
+"ohne spezielle Einstellungen für jeden einzelnen Router vornehmen zu müssen. "
+"<br/>Diese Einstellung bezieht sich auf den WLAN-AP, <em>nicht</em> das "
+"Adhoc-Netzwerk, das für das Freifunk-Meshing benutzt wird."
 
-#: luci/luci-app-ffwizard-falter/luasrc/view/freifunk/assistent/snippets/generalInfo.htm:3
-msgid ""
-"Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
-"Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
-"Karte angezeigt. So koennen dich andere Freifunkerinnen finden und dich "
-"ansprechen, falls sie Ihren Router mit deinem verbinden moechten. <br/>Falls "
-"du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
-"ueberspringen oder einzelne Felder leerlassen. <br/>Den (eindeutigen) Namen "
-"dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst diese "
-"Daten auch später noch ändern, indem du nur diese Seite des Assistenten "
-"benutzt."
-msgstr ""
-"Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
-"Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
-"Karte angezeigt. So können dich andere Freifunkerinnen finden und dich "
-"ansprechen, falls sie Ihren Router mit deinem verbinden möchten. <br/>Falls "
-"du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
-"überspringen oder einzelne Felder leer lassen. <br/>Den (eindeutigen) Namen "
-"dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst diese "
-"Daten auch später noch ändern, indem du nur diese Seite des Assistenten "
-"benutzt."
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:33
+msgid "Your Nickname"
+msgstr "Dein Nickname"
+
+#: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistent/generalInfo.lua:39
+msgid "Your Realname"
+msgstr "Dein Realname"
 
 #: luci/luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/upgrades/005-wireless-mesh.lua:43
 msgid "device is currently set to <strong>"
 msgstr "Das Gerät nutzt aktuell <strong>"
+
+#~ msgid ""
+#~ "If you like, you can paste your contact details here. Those get displayed "
+#~ "on the routers info page and the Freifunk map. This way, other Freifunk "
+#~ "peers can contact you if they would like to make a mesh-connection to "
+#~ "you. If you don't like to give that information, you could simply skip "
+#~ "that page or leave some forms empty. But you must set the (unique) Name "
+#~ "of this Freifunk-node. You can update this data later on by using only "
+#~ "the first page of this assistant."
+#~ msgstr ""
+#~ "Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
+#~ "Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
+#~ "Karte angezeigt. So können dich andere Freifunkerinnen finden und dich "
+#~ "ansprechen, falls sie Ihren Router mit deinem verbinden möchten. <br/"
+#~ ">Falls du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
+#~ "überspringen oder einzelne Felder leer lassen. <br/>Den (eindeutigen) "
+#~ "Namen dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst "
+#~ "diese Daten auch später noch ändern, indem du nur diese Seite des "
+#~ "Assistenten benutzt."
+
+#~ msgid ""
+#~ "Next we set the options for the Freifunk network. Keep the IPs ready that "
+#~ "you got from the config.berlin.freifunk.net wizard."
+#~ msgstr ""
+#~ "Als nächstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte "
+#~ "die IPs bereit, die du über den Wizard von config.berlin.freifunk.net "
+#~ "bekommen hast."
+
+#~ msgid ""
+#~ "Next, we enter the IP-addresses that we got from <em>config.berlin."
+#~ "freifunk.net</em>. With this addresses, your router connects to other "
+#~ "Freifunk routers in range. You can display them at <em>Network &gt; "
+#~ "Interfaces und Network &gt; Wireless</em> later on."
+#~ msgstr ""
+#~ "Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
+#~ "berlin.freifunk.net bekommen hast. Über diese Adresse(n) verbindet sich "
+#~ "dein Router mit anderen Freifunk-Routern in deiner Nähe. Später kannst du "
+#~ "dir die Einstellungen unter <em>Netzwerk &gt; Schnittstellen und Netzwerk "
+#~ "&gt; Drahtlos</em> anschauen."
+
+#~ msgid ""
+#~ "The nodes of the Freifunk network foward data based on shortest paths and "
+#~ "highest bandwidth. Therefor we need to know, how much bandwidth to the "
+#~ "internet there is and how much do you want to share. Typical values are "
+#~ "6.0 Mbit/s download and 0.5 Mbit/s upload with <em>DSL 6000</em> or 50.0 "
+#~ "Mbit/s download and 10.0 Mbit/s upload with <em>VDSL 50000</em>. "
+#~ "Preferably you test the actual bandwidth multiple time with a tool like "
+#~ "<em>speedof.me</em>. Then you can fill in how much bandwidth you are "
+#~ "willing to share with your peers. Please be generous, but don't "
+#~ "overestimate. :-)"
+#~ msgstr ""
+#~ "Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des "
+#~ "kürzesten Wegs und der höchsten Bandbreite weiter. Dazu muss bekannt "
+#~ "sein, wie viel Bandbreite ins Internet du auf deinem Knoten zur Verfügung "
+#~ "stellen kannst und willst. Typische Gesamtbandbreiten sind z.B. bei "
+#~ "<em>DSL 6000</em> 6.0 Mbit/s Download und 0.5 Mbit/s Upload oder bei "
+#~ "<em>VDSL 50000</em> 50.0 Mbit/s Download und 10.0 Mbit/s Upload. Am "
+#~ "besten testest du z.B. unter speedof.me mehrmals, wie viel Bandbreite dir "
+#~ "tatsächlich zur Verfügung steht. Dann gib hier an, wie viel du mit deinen "
+#~ "Nachbarn teilen möchtest. Sei großzügig, aber nicht überbieten. :-)"
+
+#~ msgid "Ad-Hoc (veraltet)"
+#~ msgstr "Ad-Hoc (veraltet)"
+
+#~ msgid ""
+#~ "Als naechstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte "
+#~ "die IPs bereit, die du ueber den Wizard von config.berlin.freifunk.net "
+#~ "bekommen hast."
+#~ msgstr ""
+#~ "Als nächstes kommen die Einstellungen für das Freifunk-Netzwerk. Halte "
+#~ "die IPs bereit, die du über den Wizard von config.berlin.freifunk.net "
+#~ "bekommen hast."
+
+#~ msgid "Am Freifunk-Netz teilnehmen"
+#~ msgstr "Am Freifunk-Netz teilnehmen"
+
+#~ msgid "Am Freifunk-Netz teilnehmen und Internet teilen"
+#~ msgstr "Am Freifunk-Netz teilnehmen und Internet teilen"
+
+#~ msgid ""
+#~ "Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
+#~ "erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist "
+#~ "er auch unter dem Namen <em>frei.funk</em> zu erreichen."
+#~ msgstr ""
+#~ "Bitte beachte, dass der Router dann unter seiner neuen Freifunk-IP zu "
+#~ "erreichen ist. Von direkt per WLAN oder LAN angeschlossenen Rechnern ist "
+#~ "er auch unter dem Namen <em>frei.funk</em> zu erreichen."
+
+#~ msgid "DHCP-Network"
+#~ msgstr "DHCP-Netz"
+
+#~ msgid ""
+#~ "Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
+#~ "Freifunk-Netzwerkes. Die noetige Angabe solltest du von config.berlin."
+#~ "freifunk.net bekommen haben. Dabei wird die CIDR-Schreibweise benutzt "
+#~ "(Beispiel: 10.42.42.42/28)."
+#~ msgstr ""
+#~ "Die DHCP-Einstellung regelt die Vergabe von IP-Adressen an Clients deines "
+#~ "Freifunk-Netzwerkes. Die nötige Angabe solltest du von config.berlin."
+#~ "freifunk.net bekommen haben. Dabei wird die CIDR-Schreibweise benutzt "
+#~ "(Beispiel: 10.42.42.42/28)."
+
+#~ msgid ""
+#~ "Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des "
+#~ "kuerzesten Wegs und der hoechsten Bandbreite weiter. Dazu muss bekannt "
+#~ "sein, wieviel Bandbreite ins Internet du auf deinem Knoten zur Verfuegung "
+#~ "stellen kannst und willst. Typische Gesamtbandbreiten sind z.B. bei "
+#~ "<em>DSL 6000</em> 6.0 Mbit/s Download und 0.5 Mbit/s Upload oder bei "
+#~ "<em>VDSL 50000</em> 50.0 Mbit/s Download und 10.0 Mbit/s Upload. Am "
+#~ "besten testest du z.B. unter speedof.me mehrmals, wieviel Bandbreite dir "
+#~ "tatsaechlich zur Verfuegung steht. Dann gib hier an, wieviel du mit "
+#~ "deinen Nachbarn teilen moechtest. Sei grosszuegig, aber nicht "
+#~ "ueberbieten. :-)"
+#~ msgstr ""
+#~ "Die Knoten des Freifunk-Netzes leiten die Daten auf der Basis des "
+#~ "kürzesten Wegs und der höchsten Bandbreite weiter. Dazu muss bekannt "
+#~ "sein, wie viel Bandbreite ins Internet du auf deinem Knoten zur Verfügung "
+#~ "stellen kannst und willst. Typische Gesamtbandbreiten sind z.B. bei "
+#~ "<em>DSL 6000</em> 6.0 Mbit/s Download und 0.5 Mbit/s Upload oder bei "
+#~ "<em>VDSL 50000</em> 50.0 Mbit/s Download und 10.0 Mbit/s Upload. Am "
+#~ "besten testest du z.B. unter speedof.me mehrmals, wie viel Bandbreite dir "
+#~ "tatsächlich zur Verfügung steht. Dann gib hier an, wie viel du mit deinen "
+#~ "Nachbarn teilen möchtest. Sei großzügig, aber nicht überbieten. :-)"
+
+#~ msgid ""
+#~ "Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</"
+#~ "em> lassen, sofern sich nicht in unmittelbarer Naehe ein weiterer Access "
+#~ "Point mit der gleichen SSID befindet. Auf diese Weise koennen sich Gaeste "
+#~ "z.B. mit ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk "
+#~ "verbinden, ohne spezielle Einstellungen fuer jeden einzelnen Router "
+#~ "vornehmen zu muessen. <br/>Diese Einstellung bezieht sich auf den WLAN-"
+#~ "AP, <em>nicht</em> das Adhoc-Netzwerk, das fuer das Freifunk-Meshing "
+#~ "benutzt wird."
+#~ msgstr ""
+#~ "Die SSID des Freifunk-WLAN-APs solltest du auf <em>berlin.freifunk.net</"
+#~ "em> lassen, sofern sich nicht in unmittelbarer Nähe ein weiterer Access "
+#~ "Point mit der gleichen SSID befindet. Auf diese Weise können sich Gäste z."
+#~ "B. mit ihrem Smartphone in der ganzen Gegend mit dem Freifunk-Netzwerk "
+#~ "verbinden, ohne spezielle Einstellungen für jeden einzelnen Router "
+#~ "vornehmen zu müssen. <br/>Diese Einstellung bezieht sich auf den WLAN-AP, "
+#~ "<em>nicht</em> das Adhoc-Netzwerk, das für das Freifunk-Meshing benutzt "
+#~ "wird."
+
+#~ msgid ""
+#~ "Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu "
+#~ "gestartet. Am besten, du machst dir kurz einen Kaffee oder einen Tee :D "
+#~ "und sobald alle Lichter wieder blinken, bist du Freifunkerin!"
+#~ msgstr ""
+#~ "Du hast alle Einstellungen geschafft. Dein Router wird jetzt neu "
+#~ "gestartet. Am besten, du machst dir kurz einen Kaffee oder einen Tee :D "
+#~ "und sobald alle Lichter wieder blinken, bist du Freifunkerin!"
+
+#~ msgid ""
+#~ "Erweitere das Freifunk-Netz. Du benoetigst dazu eine WLAN-Verbindung zu "
+#~ "einem anderen Freifunk-Router. Du kannst auf der Freifunk-Karte "
+#~ "nachschauen, wer in deiner Naehe ist, und sie kontaktieren, damit ihr die "
+#~ "Verbindung optimal ausrichten koennt."
+#~ msgstr ""
+#~ "Erweitere das Freifunk-Netz. Du benötigst dazu eine WLAN-Verbindung zu "
+#~ "einem anderen Freifunk-Router. Du kannst auf der Freifunk-Karte "
+#~ "nachschauen, wer in deiner Nähe ist, und sie kontaktieren, damit ihr die "
+#~ "Verbindung optimal ausrichten könnt."
+
+#~ msgid ""
+#~ "Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im "
+#~ "Freifunk-Hauptmenu unter <em>Services</em> ansehen, sobald dein Router "
+#~ "neugestartet hat."
+#~ msgstr ""
+#~ "Es gibt auch Services im Freifunk-Netz. Ein Liste kannst du dir im "
+#~ "Freifunk-Hauptmenü unter <em>Services</em> ansehen, sobald dein Router "
+#~ "neu gestartet hat."
+
+#~ msgid ""
+#~ "Herzlichen Glueckwunsch! <br/>Du hast deinen Router erfolgreich mit der "
+#~ "Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim "
+#~ "Einrichten deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
+#~ "Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
+#~ ">Aendere hier zunaechst dein Password. Bitte waehle ein sicheres "
+#~ "Passwort, da der Router nach aussen sichtbar ist. Spaeter findest du "
+#~ "diese Option im Bereich <em>System &gt; Administration.</em>"
+#~ msgstr ""
+#~ "Herzlichen Glückwunsch! <br/>Du hast deinen Router erfolgreich mit der "
+#~ "Freifunk-Firmware ausgestattet. Dieser Assistent hilft dir beim "
+#~ "Einrichten deines Routers. Wenn du keine Hilfe brauchst, kannst du in der "
+#~ "Administrationsoberfläche die Einstellungen auch alleine vornehmen. <br/"
+#~ ">Ändere hier zunächst dein Password. Bitte wähle ein sicheres Passwort, "
+#~ "da der Router nach außen sichtbar ist. Später findest du diese Option im "
+#~ "Bereich <em>System &gt; Administration.</em>"
+
+#~ msgid ""
+#~ "Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
+#~ "berlin.freifunk.net bekommen hast. Ueber diese Adresse(n) verbindet sich "
+#~ "dein Router mit anderen Freifunk-Routern in deiner Naehe. Spaeter kannst "
+#~ "du dir die Einstellungen unter <em>Network &gt; Interfaces und Network "
+#~ "&gt; Wireless</em> anschauen."
+#~ msgstr ""
+#~ "Im Folgenden werden die IPs eingetragen, die du vom Wizard unter config."
+#~ "berlin.freifunk.net bekommen hast. Über diese Adresse(n) verbindet sich "
+#~ "dein Router mit anderen Freifunk-Routern in deiner Nähe. Später kannst du "
+#~ "dir die Einstellungen unter <em>Netzwerk &gt; Interfaces und Netzwerk "
+#~ "&gt; Drahtlos</em> anschauen."
+
+#~ msgid ""
+#~ "Im Folgenden wird dein Schluessel zum Tunnel/VPN gebraucht. Du entpackst "
+#~ "die Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und "
+#~ "deinen Schlüssel hoch."
+#~ msgstr ""
+#~ "Im Folgenden wird dein Schlüssel zum Tunnel/VPN gebraucht. Du entpackst "
+#~ "die Datei, die dir zugeschickt wurde, und lädst hier dein Zertifikat und "
+#~ "deinen Schlüssel hoch."
+
+#~ msgid "Schluessel loeschen und erneut hochladen"
+#~ msgstr "Schlüssel löschen und erneut hochladen"
+
+#~ msgid ""
+#~ "Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
+#~ "freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu "
+#~ "anderen Freifunk-Routern sinnvoll."
+#~ msgstr ""
+#~ "Unterstütze die Community, indem du dein Internet im Freifunk-Netzwerk "
+#~ "freigibst. Diese Option ist sowohl mit als auch ohne Verbindung zu "
+#~ "anderen Freifunk-Routern sinnvoll."
+
+#~ msgid ""
+#~ "Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, "
+#~ "CPU-Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in "
+#~ "der Oberflaeche des Routers angezeigt sowie an monitor.berlin.freifunk."
+#~ "net geschickt. Es werden keine Statistiken erhoben, wenn du den Haken "
+#~ "nicht setzt. Du kannst die Statistiken spaeter ueber Administration &gt; "
+#~ "Statistics &gt; Collectd einschalten. Auf Routern mit nur 4MB ROM steht "
+#~ "das Monitoring nicht zur Verfuegung. Auf Routern mit nur 32MB RAM werden "
+#~ "die Daten nur auf monitor.berlin.freifunk.net dargestellt, nicht lokal in "
+#~ "der Router-Oberflaeche."
+#~ msgstr ""
+#~ "Wenn Du hier den Haken setzt, werden statistische Daten (RAM-Auslastung, "
+#~ "CPU-Auslastung, Bandbreitennutzung etc.) dieses Routers erhoben und in "
+#~ "der Oberfläche des Routers angezeigt sowie an monitor.berlin.freifunk.net "
+#~ "geschickt. Es werden keine Statistiken erhoben, wenn du den Haken nicht "
+#~ "setzt. Du kannst die Statistiken später über Administration &gt; "
+#~ "Statistiken &gt; Collectd einschalten. Auf Routern mit nur 4MB ROM steht "
+#~ "das Anzeigen von Statistiken nicht zur Verfügung. Auf Routern mit nur "
+#~ "32MB RAM werden die Daten nur auf monitor.berlin.freifunk.net "
+#~ "dargestellt, nicht lokal in der Router-Oberfläche."
+
+#~ msgid ""
+#~ "Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
+#~ "Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
+#~ "Karte angezeigt. So koennen dich andere Freifunkerinnen finden und dich "
+#~ "ansprechen, falls sie Ihren Router mit deinem verbinden moechten. <br/"
+#~ ">Falls du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
+#~ "ueberspringen oder einzelne Felder leerlassen. <br/>Den (eindeutigen) "
+#~ "Namen dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst "
+#~ "diese Daten auch später noch ändern, indem du nur diese Seite des "
+#~ "Assistenten benutzt."
+#~ msgstr ""
+#~ "Wenn du möchtest, kannst du hier deine Kontaktdaten eingeben. Die "
+#~ "Kontaktdaten werden auf der Infoseite des Routers sowie auf der Freifunk-"
+#~ "Karte angezeigt. So können dich andere Freifunkerinnen finden und dich "
+#~ "ansprechen, falls sie Ihren Router mit deinem verbinden möchten. <br/"
+#~ ">Falls du hier nichts angeben möchtest, kannst du den Punkt auch einfach "
+#~ "überspringen oder einzelne Felder leer lassen. <br/>Den (eindeutigen) "
+#~ "Namen dieses Freifunk-Knotens musst du allerdings setzen. <br/>Du kannst "
+#~ "diese Daten auch später noch ändern, indem du nur diese Seite des "
+#~ "Assistenten benutzt."
 
 #~ msgid ""
 #~ "The wireless interfaces which are built into the router can mesh with "
