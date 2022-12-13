@@ -49,6 +49,23 @@ tm_start() {
     procd_close_instance
 }
 
+wait_for_babeld()
+{
+	ubus -t 60 wait_for babeld 2>/dev/null
+}
+
+wait_for_olsrd()
+{
+	ubus -t 60 wait_for olsrd 2>/dev/null
+}
+
+boot()
+{
+    wait_for_babeld
+    wait_for_olsrd
+    start "$@"
+}
+
 start_service() {
     config_load tunnelmanager
     config_foreach tm_start tunnelmanager
