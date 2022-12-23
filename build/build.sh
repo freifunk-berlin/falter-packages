@@ -47,6 +47,7 @@ unbuf="stdbuf --output=0 --error=0"
   mkdir -p ./tmp/feed
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
+  ln -sfT "$(pwd)/luci_upstream" ./tmp/feed/luci-upstream
   cp "$sdkdir/feeds.conf.default" "$sdkdir/feeds.conf"
   echo "src-link falter $(pwd)/tmp/feed" >> "$sdkdir/feeds.conf"
 
