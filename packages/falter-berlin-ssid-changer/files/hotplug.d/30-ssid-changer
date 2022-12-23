@@ -8,14 +8,33 @@
 . /lib/functions.sh
 . /lib/lib_ssid-changer.sh
 
+# don't run ssid_changer, if the wizard wasn't run yet.
+if [ ! -f /etc/config/ffwizard ]; then
+    log "ffwizard didn't run yet. Cancelling scripts run."
+    exit 0
+fi
+
+# if ssid_changer wasn't configured by wizard, add it to ffwizard-file
+if ! grep ssid_changer /etc/config/ffwizard; then
+    log "No ssid-changer config found. Writing one to /etc/config/ffwizard."
+    uci_add ffwizard ssid_changer ssid_changer
+    uci_set ffwizard ssid_changer enabled 1
+    uci_commit
+fi
+
 # exit early, if ssid-changer is disabled or interface doesn't matter for wifi
 ENABLED=$(uci_get ffwizard ssid_changer enabled)
 if [ $? = 1 ]; then ENABLED=1; fi # default to enbaled, if value not set
-if [ $ENABLED = 0 ]; then
+if [ "$ENABLED" = 0 ]; then
     exit 0
 fi
-if [ "$INTERFACE" != "ffuplink" ] || !(echo "$INTERFACE" | grep -Eq 'tnl_.*'); then
+if [ "$INTERFACE" != "ffuplink" ] && ! (echo "$INTERFACE" | grep -Eq 'tnl_.*'); then
     exit 0
+fi
+
+# delay execution for up to 280 seconds, to evenly distribute the pings
+if [ "$DELAY" ]; then
+    sleep $(( $( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi ) % 280))
 fi
 
 # check, if we are online

@@ -1,14 +1,14 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-ssid-changer
-PKG_VERSION:=1
+PKG_VERSION:=2
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/falter-berlin-ssid-changer
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
-  TITLE:=Freifunk Berlin ssid changer
+  TITLE:=Freifunk Berlin SSID Changer
   URL:=http://github.com/Freifunk-Spalter/packages
   PKGARCH:=all
   EXTRA_DEPENDS:=pingcheck
@@ -32,6 +32,8 @@ define Package/falter-berlin-ssid-changer/install
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
 	$(CP) ./files/hotplug.d/* $(1)/etc/hotplug.d/net
 	$(CP) ./files/lib $(1)/lib
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(CP) ./files/post-inst.sh $(1)/etc/uci-defaults/90_ssidchanger-post-inst.sh
 endef
 
 $(eval $(call BuildPackage,falter-berlin-ssid-changer))
