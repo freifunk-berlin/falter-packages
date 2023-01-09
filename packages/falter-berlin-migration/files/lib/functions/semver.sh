@@ -27,16 +27,19 @@
 # of the authors and should not be interpreted as representing official policies,
 # either expressed or implied, of the FreeBSD Project.
 
+# Modified for recent best practicies on shells
+# 2023, by Freifunk Berlin
+
 semverParseInto() {
     local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)'
     #MAJOR
-    eval $2=`echo $1 | sed -e "s#$RE#\1#"`
+    eval $2="$(echo "$1" | sed -e "s#$RE#\1#")"
     #MINOR
-    eval $3=`echo $1 | sed -e "s#$RE#\2#"`
+    eval $3="$(echo "$1" | sed -e "s#$RE#\2#")"
     #MINOR
-    eval $4=`echo $1 | sed -e "s#$RE#\3#"`
+    eval $4="$(echo "$1" | sed -e "s#$RE#\3#")"
     #SPECIAL
-    eval $5=`echo $1 | sed -e "s#$RE#\4#"`
+    eval $5="$(echo "$1" | sed -e "s#$RE#\4#")"
 }
 
 semverEQ() {
@@ -50,8 +53,8 @@ semverEQ() {
     local PATCH_B=0
     local SPECIAL_B=0
 
-    semverParseInto $1 MAJOR_A MINOR_A PATCH_A SPECIAL_A
-    semverParseInto $2 MAJOR_B MINOR_B PATCH_B SPECIAL_B
+    semverParseInto "$1" MAJOR_A MINOR_A PATCH_A SPECIAL_A
+    semverParseInto "$2" MAJOR_B MINOR_B PATCH_B SPECIAL_B
 
     if [ $MAJOR_A -ne $MAJOR_B ]; then
         return 1
@@ -65,10 +68,9 @@ semverEQ() {
         return 1
     fi
 
-    if [[ "_$SPECIAL_A" != "_$SPECIAL_B" ]]; then
+    if [ "_$SPECIAL_A" != "_$SPECIAL_B" ]; then
         return 1
     fi
-
 
     return 0
 
@@ -85,28 +87,28 @@ semverLT() {
     local PATCH_B=0
     local SPECIAL_B=0
 
-    semverParseInto $1 MAJOR_A MINOR_A PATCH_A SPECIAL_A
-    semverParseInto $2 MAJOR_B MINOR_B PATCH_B SPECIAL_B
+    semverParseInto "$1" MAJOR_A MINOR_A PATCH_A SPECIAL_A
+    semverParseInto "$2" MAJOR_B MINOR_B PATCH_B SPECIAL_B
 
     if [ $MAJOR_A -lt $MAJOR_B ]; then
         return 0
     fi
 
-    if [[ $MAJOR_A -le $MAJOR_B  && $MINOR_A -lt $MINOR_B ]]; then
+    if [ $MAJOR_A -le $MAJOR_B ] && [ $MINOR_A -lt $MINOR_B ]; then
         return 0
     fi
 
-    if [[ $MAJOR_A -le $MAJOR_B  && $MINOR_A -le $MINOR_B && $PATCH_A -lt $PATCH_B ]]; then
+    if [ $MAJOR_A -le $MAJOR_B ] && [ $MINOR_A -le $MINOR_B ]  && [ $PATCH_A -lt $PATCH_B ]; then
         return 0
     fi
 
-    if [[ "_$SPECIAL_A"  == "_" ]] && [[ "_$SPECIAL_B"  == "_" ]] ; then
+    if [ "_$SPECIAL_A" = "_" ] && [ "_$SPECIAL_B" = "_" ]; then
         return 1
     fi
-    if [[ "_$SPECIAL_A"  == "_" ]] && [[ "_$SPECIAL_B"  != "_" ]] ; then
+    if [ "_$SPECIAL_A" = "_" ] && [ "_$SPECIAL_B" != "_" ]; then
         return 1
     fi
-    if [[ "_$SPECIAL_A"  != "_" ]] && [[ "_$SPECIAL_B"  == "_" ]] ; then
+    if [ "_$SPECIAL_A" != "_" ] && [ "_$SPECIAL_B" = "_" ]; then
         return 0
     fi
 
@@ -119,10 +121,10 @@ semverLT() {
 }
 
 semverGT() {
-    semverEQ $1 $2
+    semverEQ "$1" "$2"
     local EQ=$?
 
-    semverLT $1 $2
+    semverLT "$1" "$2"
     local LT=$?
 
     if [ $EQ -ne 0 ] && [ $LT -ne 0 ]; then
@@ -132,26 +134,26 @@ semverGT() {
     fi
 }
 
-if [ "___semver.sh" == "___`basename $0`" ]; then
+if [ "___semver.sh" = "___$(basename "$0")" ]; then
 
-MAJOR=0
-MINOR=0
-PATCH=0
-SPECIAL=""
+    MAJOR=0
+    MINOR=0
+    PATCH=0
+    SPECIAL=""
 
-semverParseInto $1 MAJOR MINOR PATCH SPECIAL
-echo "$1 -> M: $MAJOR m:$MINOR p:$PATCH s:$SPECIAL"
+    semverParseInto "$1" MAJOR MINOR PATCH SPECIAL
+    echo "$1 -> M: $MAJOR m:$MINOR p:$PATCH s:$SPECIAL"
 
-semverParseInto $2 MAJOR MINOR PATCH SPECIAL
-echo "$2 -> M: $MAJOR m:$MINOR p:$PATCH s:$SPECIAL"
+    semverParseInto "$2" MAJOR MINOR PATCH SPECIAL
+    echo "$2 -> M: $MAJOR m:$MINOR p:$PATCH s:$SPECIAL"
 
-semverEQ $1 $2
-echo "$1 == $2 -> $?."
+    semverEQ "$1" "$2"
+    echo "$1 = $2 -> $?."
 
-semverLT $1 $2
-echo "$1 < $2 -> $?."
+    semverLT "$1" "$2"
+    echo "$1 < $2 -> $?."
 
-semverGT $1 $2
-echo "$1 > $2 -> $?."
+    semverGT "$1" "$2"
+    echo "$1 > $2 -> $?."
 
 fi
