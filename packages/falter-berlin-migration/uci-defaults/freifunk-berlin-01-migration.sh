@@ -5,13 +5,13 @@ source /lib/functions/semver.sh
 source /etc/openwrt_release
 source /lib/functions/guard.sh
 
-if [ -f /etc/freifunk_release ]; then 
+if [ -f /etc/freifunk_release ]; then
   source /etc/freifunk_release
   DISTRIB_ID="Freifunk Berlin"
   DISTRIB_RELEASE=$FREIFUNK_RELEASE
 fi
 
-# possible cases: 
+# possible cases:
 # 1) firstboot with kathleen --> uci system.version not defined
 # 2) upgrade from kathleen --> uci system.version defined
 # 3) upgrade from non kathleen / legacy --> no uci system.version
@@ -327,7 +327,7 @@ r1_0_0_change_to_ffuplink() {
   remove_routingpolicy() {
     local config=$1
     case "$config" in
-      olsr_*_ffvpn_ipv4*) 
+      olsr_*_ffvpn_ipv4*)
         log "  network.$config"
         uci delete network.$config
         ;;
@@ -656,7 +656,7 @@ r1_1_1_rssiled() {
     local ifname=''
     config_get mode $config mode
     config_get ifname $config ifname
-    [ $mode != "adhoc" ] && [ $mode != "mesh"] && return
+    [ $mode != "adhoc" ] && [ $mode != "mesh" ] && return
 
     local rssidev=${ifname%%-*}
     local result=$(uci -q get system.rssid_${rssidev}.dev)
@@ -681,12 +681,12 @@ r1_1_2_dnsmasq_ignore_wan() {
   local notinterfaces=$(uci -q get dhcp.@dnsmasq[0].notinterface)
   local found=0
   for interface in ${notinterfaces}; do
-    if [ "X${interface}X" == "XwanX" ]; then
+    if [ "X${interface}X" = "XwanX" ]; then
       found=1
     fi
   done
 
-  if [ "X${found}X" == "X0X"]; then
+  if [ "X${found}X" = "X0X" ]; then
     log "adjust dnsmasq to ignore wan iface in log"
     uci add_list dhcp.@dnsmasq[0].notinterface='wan'
     uci commit dhcp
@@ -744,7 +744,7 @@ r1_2_0_fw_zones() {
   }
 
   reset_cb
-  config_load firewall 
+  config_load firewall
   config_foreach handle_zone zone
 
   uci commit firewall
@@ -817,7 +817,7 @@ r1_2_0_network() {
     uci -q delete network.wan6.ifname
   fi
 
-  # change ffuplink from ifname to device (may or may not be a 
+  # change ffuplink from ifname to device (may or may not be a
   # tunneldigger interface).
   dev=$(uci -q get network.ffuplink.ifname)
   if [ $? -eq 0 ]; then
@@ -1014,6 +1014,13 @@ r1_2_2_https_interface() {
   service uhttpd reload
 }
 
+r1_2_3_update_dns() {
+  log "updating dns servers in network-config"
+  uci set network.loopback.dns='46.182.19.48 80.67.169.40 194.150.168.168 9.9.9.10 149.112.112.10 2001:910:800::12 2a02:2970:1002::18 2620:fe::10 2620:fe::fe:10'
+  uci commit network
+  service network restart
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1130,6 +1137,12 @@ migrate () {
 
   if semverLT ${OLD_VERSION} "1.2.2"; then
     r1_2_2_https_interface
+  fi
+
+  if semverLT ${OLD_VERSION} "1.2.3"; then
+    r1_2_1_dynbanner
+    r1_2_2_https_interface
+    r1_2_3_update_dns
   fi
 
   # overwrite version with the new version
