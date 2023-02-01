@@ -1,5 +1,6 @@
 #!/bin/sh
 test -f /etc/crontabs/root || touch /etc/crontabs/root
 SEED="$( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read line; then echo 0x${line#* }; fi )"
-MIN="$(( $SEED % 59 ))"
-crontab -l | grep -q "owm.sh" || crontab -l | { cat; echo "$MIN * * * *	test -e /usr/sbin/owm.sh && /usr/sbin/owm.sh"; } | crontab -
+MIN1="$(( $SEED % 29 ))"
+MIN2="$(( $MIN1 + 30 ))"
+crontab -l | grep -q "owm.sh" || crontab -l | { cat; echo "$MIN1,$MIN2 * * * * test -e /usr/sbin/owm.sh && /usr/sbin/owm.sh"; } | crontab -
