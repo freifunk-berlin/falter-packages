@@ -1,0 +1,3 @@
+[submodule "external_feeds/freifunk/openwrt-packages"]
+	path = external_feeds/freifunk/openwrt-packages
+	url = https://github.com/freifunk/openwrt-packages.git
