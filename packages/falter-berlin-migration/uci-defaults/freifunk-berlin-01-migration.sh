@@ -1021,6 +1021,17 @@ r1_2_3_update_dns() {
   service network restart
 }
 
+r1_2_3_update_owm_cron() {
+  log "make OWM cron run twice per hour"
+  test -f /etc/crontabs/root || touch /etc/crontabs/root
+  OWM="/usr/sbin/owm.sh"
+  SEED="$( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi )"
+  MIN1="$((SEED % 29))"
+  MIN2="$((MIN1 + 30))"
+  (crontab -l | grep -v "$OWM"; echo "$MIN1,$MIN2 * * * * test -e $OWM && $OWM") | crontab -
+  /etc/init.d/cron restart
+}
+
 migrate () {
   log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1143,6 +1154,7 @@ migrate () {
     r1_2_1_dynbanner
     r1_2_2_https_interface
     r1_2_3_update_dns
+    r1_2_3_update_owm_cron
   fi
 
   # overwrite version with the new version
