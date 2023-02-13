@@ -30,6 +30,8 @@ jobs:
             ./packages/falter-berlin-network-defaults/hotplug.d/iface/60-ffuplink_policyrouting
             ./packages/falter-berlin-network-defaults/lib/functions/freifunk-berlin-network.sh
             ./packages/falter-berlin-network-defaults/uci-defaults/freifunk-berlin-correct-nsm2-txpower
+            ./packages/falter-berlin-service-registrar/files/register-services.sh
+            ./packages/falter-berlin-service-registrar/files/ffserviced.sh
             ./packages/falter-berlin-ssid-changer/files/lib/lib_ssid-changer.sh
             ./packages/falter-berlin-ssid-changer/files/post-inst.sh
             ./packages/falter-berlin-system-defaults/uci-defaults/freifunk-berlin-system-defaults
