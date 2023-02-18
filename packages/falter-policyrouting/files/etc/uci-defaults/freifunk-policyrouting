@@ -1,7 +1,10 @@
 #!/bin/sh
 
 . /lib/functions/guard.sh
-guard "freifunk-policyrouting"
+
+# guard will stop the script, if option was set already and will set it otherwise
+guard "freifunk_policyrouting"
+
 
 uci batch <<-EOF
         add ucitrack freifunk-policyrouting
