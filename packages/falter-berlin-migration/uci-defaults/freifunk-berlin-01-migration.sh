@@ -1174,6 +1174,8 @@ migrate() {
     if semverLT "${OLD_VERSION}" "1.2.3"; then
         # run rssid-migration again, as there was a typo in an variable
         r1_1_1_rssiled
+        # fix https://github.com/freifunk-berlin/falter-packages/issues/350
+        r1_2_0_ucitrack
         r1_2_1_dynbanner
         r1_2_2_https_interface
         r1_2_3_update_dns
