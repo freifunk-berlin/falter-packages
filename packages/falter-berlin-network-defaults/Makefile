@@ -9,7 +9,7 @@ define Package/falter-berlin-network-defaults
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin network default configuration
-  URL:=http://github.com/Freifunk-Spalter/packages
+  URL:=https://github.com/freifunk-berlin/falter-packages
   EXTRA_DEPENDS:=falter-berlin-lib-guard, pingcheck
   PKGARCH:=all
 endef
