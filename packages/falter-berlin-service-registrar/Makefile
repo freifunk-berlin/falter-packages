@@ -11,7 +11,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/falter-berlin-service-registrar/default
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
-  URL:=http://github.com/Freifunk-Spalter/packages
+  URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
   EXTRA_DEPENDS:=olsrd, olsrd-mod-nameservice, uhttpd, uci
 endef

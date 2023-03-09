@@ -18,7 +18,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/falter-berlin-bbbdigger/default
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
-  URL:=http://github.com/Freifunk-Spalter/packages
+  URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
 endef
 

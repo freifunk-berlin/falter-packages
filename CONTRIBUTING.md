@@ -35,8 +35,8 @@ You can add the signed-off-by line automatically via `git commit -s`.
 ## Any contributions you make will be under the GPLv3 Software License
 In short, when you submit code changes, your submissions are understood to be under the same [GPLv3 License](http://www.gnu.org/licenses/gpl-3.0.html) that covers the project. Feel free to contact the maintainers if that's a concern.
 
-## Report bugs using Github's [issues](https://github.com/Freifunk-Spalter/packages/issues)
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/Freifunk-Spalter/packages/issues/new); it's that easy!
+## Report bugs using Github's [issues](https://github.com/freifunk-berlin/falter-packages/issues)
+We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/freifunk-berlin/falter-packages/issues/new); it's that easy!
 
 ## Write bug reports with detail, background, and sample code
 A good bug report helps the maintainers a lot to understand you problem and fix it faster.
