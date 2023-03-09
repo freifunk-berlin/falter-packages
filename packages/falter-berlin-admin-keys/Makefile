@@ -9,7 +9,7 @@ define Package/falter-berlin-admin-keys
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin Administrator SSH Keys
-  URL:=http://github.com/Freifunk-Spalter/packages
+  URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
 endef
 

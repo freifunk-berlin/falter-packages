@@ -9,7 +9,7 @@ define Package/falter-berlin-ssid-changer
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin SSID Changer
-  URL:=http://github.com/Freifunk-Spalter/packages
+  URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
   EXTRA_DEPENDS:=pingcheck
 endef
