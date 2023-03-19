@@ -3,6 +3,9 @@
 # Just looks for changes in the config-file and applies them with a
 # one-time-run.
 
+# shellcheck disable=SC2034
+# shellcheck disable=SC2102
+
 USE_PROCD=1
 
 service_triggers() {
@@ -10,7 +13,7 @@ service_triggers() {
 }
 
 start_service() {
-    procd_open_instance [ffserviced]
+    procd_open_instance
     procd_set_param command /usr/bin/register-services
 
     procd_set_param stdout 1
