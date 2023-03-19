@@ -6,6 +6,7 @@
 # services in OLSR. It is licensed under GNU General Public License v3.0 or later
 # Copyright (C) 2022   Martin Hübner
 
+# shellcheck disable=SC2181
 # shellcheck source=/dev/null
 . /lib/functions.sh
 
