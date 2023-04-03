@@ -2,7 +2,8 @@
 
 # TODO: generate feeds.conf with revision info
 
-# podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout master && build/build.sh master x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
+# To run this in a rootless podman container:
+#   podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc argp-standalone musl-fts-dev musl-obstack-dev musl-libintl abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout master && build/build.sh master x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
 
 set -ex
 set -o pipefail
