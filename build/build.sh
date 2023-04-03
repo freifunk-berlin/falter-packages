@@ -5,23 +5,47 @@
 # To run this in a rootless podman container:
 #   podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc argp-standalone musl-fts-dev musl-obstack-dev musl-libintl abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout master && build/build.sh master x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
 
-set -ex
-set -o pipefail
-
 function usage() {
-  echo "usage: build/build.sh <branch> <arch> <destination>" >&2
+  local br="$1"
+  echo "usage: build/build.sh <branch> <arch> [<destination>]"
+  echo
+  if [ -n "$br" ]; then
+    echo "branch name:"
+    echo "  $br"
+    echo
+    echo "arch names:"
+    for a in $(cat "build/targets-$br.txt" | grep -v '#' | grep . | cut -d' ' -f1); do
+      echo -n "  $a"
+    done
+    echo
+  else
+    echo "branch names:"
+    echo "  master  openwrt-22.03  openwrt-21.02"
+    echo
+    echo "arch names:"
+    echo "  run build/build.sh with a branch name to see available arch names"
+  fi
+  echo
+  echo "destination:"
+  echo "  path to a writable directory where the 'falter' feed directory will end up."
+  echo "  default: ./out/<branch>/<arch>"
+  echo
   exit 1
 }
+
+[ -n "$1" ] && branch="$1" || usage >&2
+[ -n "$2" ] && arch="$2" || usage "$branch" >&2
+[ -n "$3" ] && dest="$3" || dest="./out/$branch/$arch"
+
+set -o pipefail
+set -e
+set -x
 
 dlmirror="https://downloads.openwrt.org"
 #dlmirror="file:///mnt/mirror/downloads.openwrt.org"
 
-[ -n "$1" ] && branch="$1" || usage
-[ -n "$2" ] && arch="$2" || usage
-[ -n "$3" ] && dest="$3" || usage
-
+mkdir -p "$dest/falter"
 destdir=$(realpath "$dest")
-mkdir -p "$destdir/falter"
 
 sdkdir="./tmp/$branch/$arch"
 
