@@ -1,0 +1,2 @@
+# preserve the data of ffwizard3 on a sysupgrade
+/etc/ffwizard3.json
