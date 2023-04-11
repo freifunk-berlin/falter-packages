@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# . /lib/functions/guard.sh
+# guard "ffwizard3"
+
+# check for translation-script
+if ! which uci2ffwizard; then
+    exit 1
+fi
+
+# check, if there is the needed information already set
+if [ ! -f /etc/config/ffwizard ]; then
+    exit 1
+fi
+
+# create a ffwizard3-file, if there is none already
+if [ ! -f /etc/ffwizard3.json ]; then
+    uci2ffwizard > /etc/ffwizard3.json
+    exit 0
+fi
