@@ -1036,6 +1036,8 @@ r1_2_3_update_dns() {
     log "updating dns servers in network-config"
     uci set network.loopback.dns='46.182.19.48 80.67.169.40 194.150.168.168 9.9.9.10 149.112.112.10 2001:910:800::12 2a02:2970:1002::18 2620:fe::10 2620:fe::fe:10'
     uci commit network
+    log "updating dns-servers in freifunk-file"
+    uci set freifunk.interface.dns='8.8.8.8 141.1.1.1'
     service network restart
 }
 
