@@ -1038,6 +1038,7 @@ r1_2_3_update_dns() {
     uci commit network
     log "updating dns-servers in freifunk-file"
     uci set freifunk.interface.dns='8.8.8.8 141.1.1.1'
+    uci commit freifunk
     service network restart
 }
 
