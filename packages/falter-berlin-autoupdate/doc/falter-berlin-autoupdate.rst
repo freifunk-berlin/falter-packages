@@ -22,7 +22,7 @@ Hinweise
 - Es kann passieren, dass sich die Konfigurations-Dateien von Paketen in unterschiedlichen OpenWrt-Versionen ändern. Da die Firmware-Entwickler nicht alle Konfigurationen testen können, kann es passieren, dass Inkompatibilitäten in Spezialfällen nicht behandelt werden. Wir empfehlen daher, immer ein funktionierendes Backup der Routereinstellungen aufzubewahren.
 - Nach einem Update sind nur die Basis-Pakete installiert, welche im Image sowieso vorhanden sind. Pakete, welche durch den Nutzer nachinstalliert wurden, müssen nach einem Update wieder selbst nachinstalliert werden.
 
-Für Contributer: Ein Release signieren
+Für Contributors: Ein Release signieren
 --------------------------------------
 
 Die Linkliste wird mit dem OpenWrt-Tool ``usign`` signiert. Die Installation und Schlüsselgenerierung für ``usign`` wird im `OpenWrt-Wiki <https://openwrt.org/docs/guide-user/security/keygen?s[]=usign&s[]=guide#generate_usign_key_pair>`_ beschrieben. Statt aus dem Quelltext zu kompilieren, kannst du unter Debian-basierten Systemen auch das Paket ``signify-openbsd`` nutzen.
@@ -35,3 +35,16 @@ Um ein Autoupdate im Netz anzustoßen, müssen (standardmäßig) mindestens 3 Sc
 2. Signatur erzeugen mit: ``./usign -S -m autoupdate.json -s geheimer_Schluessel.sec``. Die Signatur ist die Datei ``autoupdate.json.sig``
 3. Die Signatur-Datei unter ``https://firmware.berlin.freifunk.net/stable/autoupdate.json.$NUM.sig`` hochladen. ``$NUM`` ist eine fortlaufende Nummer, beginnend ab 1. Wenn du keinen Zugang zum selector-Server hast, schicke die Signatur-Datei bitte an einen Maintainer.
 4. Sich zurücklehnen und freuen, dass mehr aktuelle Firmware im Netz läuft.
+
+Für Maintainer: Ein Autoupdate vorbereiten
+------------------------------------------
+
+1. Release bauen (siehe Doku für Releases)
+2. Release mit ``./fetch_release.sh`` in den `Firmwareselector <https://selector.berlin.freifunk.net>`_ übertragen. Es muss noch nicht ins Dropdownmenü eingetragen werden, aber die JSON-Dateien für die einzelnen Router müssen vorhanden und zugreifbar sein.
+3. ``autoupdate.json`` mit dem script ``/usr/local/src/generate_autoupdate_json.py`` erzeugen und unter ``/usr/local/src/www/htdocs/buildbot/stable`` ablegen.
+4. Contributors informieren, dass autoupdate.json nun signiert werden kann
+5. Signaturen in entsprechender Nummerierung (siehe oben) in das gleiche Verzeichnis legen.
+
+Es ist sinnvoll, nicht alle Signaturen auf einmal hochzuladen. In der Vergangenheit haben wir zuerst zwei Signaturen hochgeladen. Kontrollierbare Test-Router, welche auf zwei Zertifikate eingestellt waren, haben dann ein Update gemacht. Wenn dort alles funktioniert, können die weiteren Zertifikate hochgeladen werden, sodass der Rest des Netzes folgt.
+
+Für augenblickliche Test kann der Autoupdater auch mit der Option ``-n`` gestartet werden, um eine bestimmte Anzahl an Zertifikaten zu fordern. Das gleich kann auch in der Kondifurationsdatei unter ``/etc/config/autoupdate`` eingetragen werden.
