@@ -142,6 +142,11 @@ get_download_link_and_hash() {
     # load board-specific json with image-name from selector
     board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
 
+    if [ -z "$board_json" ]; then
+        log "Failed to download board-specific JSON-File from firmware selector. Exiting..."
+        exit 2
+    fi
+
     json_init
     json_load "$board_json"
     json_for_each_item "iter_images" "images"
