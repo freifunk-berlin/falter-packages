@@ -54,6 +54,7 @@ unbuf="stdbuf --output=0 --error=0"
 (
   # pick the right URL
   dldir="snapshots"
+  [ "$branch" == "openwrt-23.05" ] && dldir="releases/23.05-SNAPSHOT"
   [ "$branch" == "openwrt-22.03" ] && dldir="releases/22.03-SNAPSHOT"
   [ "$branch" == "openwrt-21.02" ] && dldir="releases/21.02-SNAPSHOT"
 
