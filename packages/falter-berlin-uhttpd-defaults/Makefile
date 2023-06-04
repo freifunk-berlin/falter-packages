@@ -10,7 +10,7 @@ define Package/falter-berlin-uhttpd-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin uhttpd default configuration
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=uhttpd, falter-berlin-lib-guard
+  EXTRA_DEPENDS:=uhttpd
   PKGARCH:=all
 endef
 

@@ -11,7 +11,7 @@ define Package/falter-berlin-statistics-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin statistics default configuration
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=olsrd-mod-txtinfo, falter-berlin-lib-guard
+  EXTRA_DEPENDS:=olsrd-mod-txtinfo
   PKGARCH:=all
 endef
 

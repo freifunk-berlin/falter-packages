@@ -10,7 +10,7 @@ define Package/falter-berlin-dhcp-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin dhcp default configuration
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=dnsmasq, falter-berlin-lib-guard
+  EXTRA_DEPENDS:=dnsmasq
   PKGARCH:=all
 endef
 

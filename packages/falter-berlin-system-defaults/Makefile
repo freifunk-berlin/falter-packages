@@ -11,7 +11,6 @@ define Package/falter-berlin-system-defaults
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin system default configuration
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=falter-berlin-lib-guard
   PKGARCH:=all
 endef
 
