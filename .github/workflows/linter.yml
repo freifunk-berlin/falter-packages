@@ -58,3 +58,4 @@ jobs:
           # Change to 'master' if your main branch differs
           DEFAULT_BRANCH: master
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILTER_REGEX_EXCLUDE: ".*/usr/bin/hna\\.lua$"

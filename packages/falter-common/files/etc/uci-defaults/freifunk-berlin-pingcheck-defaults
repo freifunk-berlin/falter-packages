@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+
 . /lib/functions.sh
 
 # remove the sta interface, leaving only wan
@@ -12,4 +14,3 @@ uci set pingcheck.@default\[0\].host=livecheck.berlin.freifunk.net
 uci set pingcheck.@default\[0\].timeout=60
 
 uci commit pingcheck
-

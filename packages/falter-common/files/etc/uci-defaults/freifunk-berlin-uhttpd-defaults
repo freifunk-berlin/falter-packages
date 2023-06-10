@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+
 . /lib/functions/guard.sh
 guard "uhttpd"
 

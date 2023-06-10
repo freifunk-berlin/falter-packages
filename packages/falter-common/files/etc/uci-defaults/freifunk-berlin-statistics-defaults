@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+# shellcheck disable=SC1083
+
 . /lib/functions/guard.sh
 guard "luci_statistics"
 
@@ -8,7 +11,7 @@ uci import luci_statistics <<EOF
 EOF
 
 # mod_ping and collectd_rrdtool use a lot of RAM, disable on 32MB routers
-if [ "$(cat /proc/meminfo |grep MemTotal:|awk {'print $2'})" -gt "65536" ]; then
+if [ "$(grep MemTotal: < /proc/meminfo | awk {'print $2'})" -gt "65536" ]; then
   HAVE_PLENTY_RAM=1
 else
   HAVE_PLENTY_RAM=0
@@ -74,8 +77,8 @@ uci set luci_statistics.collectd_uptime=statistics
 uci set luci_statistics.collectd_uptime.enable=1
 
 # network - push data to monitor server
-NETWORK="$(uci add luci_statistics collectd_network_server)" 
-uci set luci_statistics.$NETWORK.host=monitor.berlin.freifunk.net
+NETWORK="$(uci add luci_statistics collectd_network_server)"
+uci set "luci_statistics.$NETWORK.host=monitor.berlin.freifunk.net"
 uci set luci_statistics.collectd_network=statistics
 uci set luci_statistics.collectd_network.enable=1
 
