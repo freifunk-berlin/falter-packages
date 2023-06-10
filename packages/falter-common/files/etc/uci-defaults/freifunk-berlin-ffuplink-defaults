@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+
+
 . /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 guard "ffberlin_uplink"
@@ -17,4 +20,3 @@ uci commit ffberlin-uplink
 create_ffuplink
 uci set network.ffuplink.disabled=1
 uci commit network.ffuplink
-

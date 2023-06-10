@@ -5,6 +5,9 @@
 ## the first wizard run
 #
 
+# shellcheck disable=SC1091
+# shellcheck disable=SC3043
+
 . /lib/functions.sh
 . /lib/config/uci.sh
 . /lib/functions/system.sh

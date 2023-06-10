@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+
 . /lib/functions/guard.sh
 guard "dhcp"
 
@@ -11,7 +13,7 @@ uci set dhcp.@dnsmasq[0].quietdhcp=1
 uci add_list dhcp.@dnsmasq[0].notinterface='wan'
 
 # on IPv6-islands we also should give a default-route to the clients,
-# so they can also reach IPv6-neighbours. 
+# so they can also reach IPv6-neighbours.
 uci set dhcp.lan.ra_default=1
 
 # add dns entry frei.funk
@@ -23,7 +25,7 @@ uci set dhcp.frei_funk.ip=192.168.42.1
 router_ula=$(uci get network.globals.ula_prefix | sed -e 's/\/48/1/')
 uci set dhcp.frei_funk_ipv6=domain
 uci set dhcp.frei_funk_ipv6.name=frei.funk
-uci set dhcp.frei_funk_ipv6.ip=$router_ula
+uci set dhcp.frei_funk_ipv6.ip="$router_ula"
 
 # don't send default-route to clients to prevent them sending pakets
 # to us, that we can't forward now

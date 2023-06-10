@@ -1,6 +1,6 @@
 #!/usr/bin/lua
 
---[[] 
+--[[]
 	Both functions, fetch_jsoninfo() and fetch_hna() are copied from
 	/usr/lib/lua/luci/controller/olsr.lua.
 
