@@ -1,8 +1,25 @@
 #!/bin/sh /etc/rc.common
 
-START=15
-. $IPKG_INSTROOT/lib/functions/network.sh
-. $IPKG_INSTROOT/lib/functions.sh
+# shellcheck shell=dash
+
+# START var belongs to openwrt initscripts and get read by initd
+# shellcheck disable=SC2034
+# vars get assigned by config_get function...
+# shellcheck disable=SC2154
+# that one is intended exactly the way it is.
+# shellcheck disable=SC2140
+# seems to work in ash, but it only replaces the first '-' with one '_'. Other occurences remain...
+# shellcheck disable=SC3060
+# Not sure how to transform the following expressions
+# shellcheck disable=SC2143
+# shellcheck disable=SC2027
+
+START=
+
+# shellcheck source=/dev/null
+. "$IPKG_INSTROOT/lib/functions/network.sh"
+# shellcheck source=/dev/null
+. "$IPKG_INSTROOT/lib/functions.sh"
 
 proto="4"
 #[ -f /proc/net/ipv6_route ] && proto="4 6"
@@ -17,10 +34,10 @@ config_get zones pr zones
 
 olsrd_rmtables() {
 	for cfg in $cfgs; do
-		# Remove custom routing tables from olsrd 
-		if [ "`uci -q get $cfg.@olsrd[0].RtTable`" == "111" ] || [ "`uci -q get $cfg.@olsrd[0].RtTableDefault`" == "112" ]; then
-			uci delete $cfg.@olsrd[0].RtTable
-			uci delete $cfg.@olsrd[0].RtTableDefault
+		# Remove custom routing tables from olsrd
+		if [ "$(uci -q get "$cfg".@olsrd[0].RtTable)" = "111" ] || [ "$(uci -q get "$cfg".@olsrd[0].RtTableDefault)" = "112" ]; then
+			uci delete "$cfg".@olsrd[0].RtTable
+			uci delete "$cfg".@olsrd[0].RtTableDefault
 			uci commit
 		fi
 	done
@@ -28,24 +45,24 @@ olsrd_rmtables() {
 
 olsrd_intalltables() {
 	for cfg in $cfgs; do
-		if [ ! "`uci -q get $cfg.@olsrd[0].RtTable`" == "111" ] || [ ! "`uci -q get $cfg.@olsrd[0].RtTableDefault`" == "112" ]; then
-			uci set $cfg.@olsrd[0].RtTable='111'
-			uci set $cfg.@olsrd[0].RtTableDefault='112'
-			uci commit $cfg
-			/etc/init.d/$cfg restart 2&> /dev/null
+		if [ ! "$(uci -q get "$cfg".@olsrd[0].RtTable)" = "111" ] || [ ! "$(uci -q get "$cfg".@olsrd[0].RtTableDefault)" = "112" ]; then
+			uci set "$cfg".@olsrd[0].RtTable='111'
+			uci set "$cfg".@olsrd[0].RtTableDefault='112'
+			uci commit "$cfg"
+			/etc/init.d/"$cfg" restart > /dev/null 2>&1
 		fi
 	done
 }
 
 rt_tables() {
 	tables="/etc/iproute2/rt_tables"
-	if [ -z "`grep "110" $tables`" ]; then
+	if [ -z "$(grep "110" $tables)" ]; then
 		echo "110 localnets" >> $tables
 	fi
-	if [ -z "`grep "111" $tables`" ]; then
+	if [ -z "$(grep "111" $tables)" ]; then
 		echo "111 olsr" >> $tables
 	fi
-	if [ -z "`grep "112" $tables`" ]; then
+	if [ -z "$(grep "112" $tables)" ]; then
 		echo "112 olsr-default" >> $tables
 	fi
 
@@ -60,15 +77,15 @@ handle_disable_dyngw() {
 			config_get RtTable "$cfg" RtTable
 			if [ -z "$RtTable" ] || [ "$RtTable" = "254" ]; then
 				config_set "$cfg" ignore '1'
-				uci set $olsrd_cfg.$cfg.ignore="1"
-				uci commit $olsrd_cfg
+				uci set "$olsrd_cfg"."$cfg".ignore="1"
+				uci commit "$olsrd_cfg"
 				logger -s -t policyrouting -p info "dyngw_plain plugin disabled."
 			fi
 		;;
 		olsrd_dyn_gw.so*)
 			logger -s -t policyrouting -p info "$cfg"
-			uci set $olsrd_cfg.$cfg.ignore="1"
-				uci commit $olsrd_cfg
+			uci set "$olsrd_cfg"."$cfg".ignore="1"
+				uci commit "$olsrd_cfg"
 			logger -s -t policyrouting -p info "dyngw plugin disabled."
 		;;
 	esac
@@ -76,16 +93,16 @@ handle_disable_dyngw() {
 
 disable_dyngw() {
 	for olsrd_cfg in $cfgs; do
-		config_load $olsrd_cfg
-		config_foreach handle_disable_dyngw LoadPlugin $olsrd_cfg
+		config_load "$olsrd_cfg"
+		config_foreach handle_disable_dyngw LoadPlugin "$olsrd_cfg"
 	done
 }
 
 restart_services() {
 	logger -s -t policyrouting -p info "Restarting services"
-	/etc/init.d/network restart 2&> /dev/null
+	/etc/init.d/network restart > /dev/null 2>&1
 	for cfg in $cfgs; do
-		/etc/init.d/$cfg restart 2&> /dev/null
+		/etc/init.d/"$cfg" restart > /dev/null 2>&1
 	done
 }
 
@@ -100,13 +117,14 @@ boot() {
 }
 
 add_lookup_rule() {
+	# seems to work in ash, but it only replaces the first '-' with one '_'. Other occurences remain...
 	name=${1/-/_}
 	lookup=$2
 	prio=$3
 	in=$4
 	name=$name"_"${in:-allif}"_"
 
-	if [ -z "$name" -o -z "$lookup" -o -z "$prio" ]; then
+	if [ -z "$name" ] || [ -z "$lookup" ] || [ -z "$prio" ]; then
 		logger -s -t policyrouting "Missing parameters for add_rule!"
 	else
 		for p in $proto; do
@@ -115,7 +133,7 @@ add_lookup_rule() {
 			else
 				rule="rule"
 			fi
-			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
+			if [ "$(uci -q get network."${name}"ipv${p})" != "$rule" ] ; then
 				uci batch <<- EOF
 					set network.${name}ipv${p}="$rule"
 					set network.${name}ipv${p}.lookup="$lookup"
@@ -129,13 +147,14 @@ add_lookup_rule() {
 }
 
 add_action_rule() {
+	# seems to work in ash, but it only replaces the first '-' with one '_'. Other occurences remain...
 	name=${1/-/_}
 	action=$2
 	prio=$3
 	in=$4
 	name=$name"_"${in:-allif}"_"
 
-	if [ -z "$name" -o -z "$action" -o -z "$prio" ]; then
+	if [ -z "$name" ] || [ -z "$action" ] || [ -z "$prio" ]; then
 		logger -s -t policyrouting "Missing parameters for add_action!"
 	else
 		for p in $proto; do
@@ -144,7 +163,7 @@ add_action_rule() {
 			else
 				rule="rule"
 			fi
-			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
+			if [ "$(uci -q get network."${name}"ipv${p})" != "$rule" ] ; then
 				uci batch <<- EOF
 					set network.${name}ipv${p}="$rule"
 					set network.${name}ipv${p}.action="$action"
@@ -159,17 +178,18 @@ add_action_rule() {
 
 
 del_rule() {
+	# seems to work in ash, but it only replaces the first '-' with one '_'. Other occurences remain...
 	name=${1/-/_}
 	in=$2
 	name=$name"_"${in:-allif}"_"
 	for p in $proto; do
-		uci -q delete network.${name}ipv${p}
+		uci -q delete network."${name}"ipv${p}
 	done
 	uci commit network
 }
 
 start() {
-	if [ $enable = "1" ]; then
+	if [ "$enable" = "1" ]; then
 		logger -s -t policyrouting "Starting policy routing."
 		rt_tables
 		olsrd_intalltables
@@ -183,7 +203,7 @@ start() {
 		fi
 		networks=""
 		for z in $zones; do
-			network_zone="$(uci -q get firewall.zone_${z}.network)"
+			network_zone="$(uci -q get firewall.zone_"${z}".network)"
 			if [ -z "$network_zone" ]; then
 				network_zone="$z"
 			fi
@@ -194,11 +214,11 @@ start() {
 		for n in $networks; do
 			# only add route for tunnel if smart gateway is enabled
 			if [ "$sgw" = "yes" ]; then
-				add_lookup_rule olsr-tunnel olsr-tunnel 19999 $n
+				add_lookup_rule olsr-tunnel olsr-tunnel 19999 "$n"
 			fi
-			add_lookup_rule olsr-default olsr-default 20000 $n
+			add_lookup_rule olsr-default olsr-default 20000 "$n"
 			if [ "$strict" != 0 ]; then
-				add_action_rule olsr-default_unreachable unreachable 20001 $n
+				add_action_rule olsr-default_unreachable unreachable 20001 "$n"
 			fi
 		done
 	fi
@@ -216,7 +236,7 @@ stop() {
 	del_rule localnets
 	networks=""
 	for z in $zones; do
-		network_zone="$(uci -q get firewall.zone_${z}.network)"
+		network_zone="$(uci -q get firewall.zone_"${z}".network)"
 		if [ -z "$network_zone" ]; then
 			network_zone="$z"
 		fi
@@ -226,11 +246,11 @@ stop() {
 	sgw=$(uci -q get olsrd.@olsrd[0].SmartGateway)
 	for n in $networks; do
 		if [ "$sgw" = "yes" ]; then
-			del_rule olsr-tunnel $n
+			del_rule olsr-tunnel "$n"
 		fi
-		del_rule olsr-default $n
+		del_rule olsr-default "$n"
 		if [ "$strict" != 0 ]; then
-			del_rule olsr-default_unreachable $n
+			del_rule olsr-default_unreachable "$n"
 		fi
 	done
 	restart_services

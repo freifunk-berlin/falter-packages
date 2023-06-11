@@ -4,15 +4,19 @@
 # see https://github.com/freifunk-berlin/firmware/issues/381
 #
 
-[ ! $(command -v iwinfo) ] && exit 0
+# shellcheck shell=dash
+# shellcheck disable=SC2181
+
+[ ! "$(command -v iwinfo)" ] && exit 0
 iwinfo|grep -q 'NanoStation M2\|NanoStation Loco M2' || exit 0
 
+# shellcheck source=/dev/null
 . /lib/functions/guard.sh
 guard "NSm2_txpower"
 
 set_default_txpower() {
  echo "setting txpower value to $1 dBm"
- uci set wireless.radio0.txpower=$1
+ uci set wireless.radio0.txpower="$1"
  uci commit wireless
 }
 
@@ -20,13 +24,13 @@ MAX_TX_2G=20
 # get "TX offset" of 1st interface, if this is unknown set it to 0dB
 # then only return the numerical value
 ANT_GAIN=$(iwinfo |grep -m 1 "TX power offset:" |sed -e "s/unknown/0 dB/" |tr -dc '0-9')
-NEW_TX=$(echo $(($MAX_TX_2G - $ANT_GAIN)))
+NEW_TX=$((MAX_TX_2G - ANT_GAIN))
 
 CURR_TX=$(uci -q get wireless.radio0.txpower)
 # check if txpower is defined in config
 if [ $? -ne 0 ]; then
   echo -n "txpower not defined - "
   set_default_txpower $NEW_TX
-elif [ $CURR_TX -gt $NEW_TX ]; then
+elif [ "$CURR_TX" -gt $NEW_TX ]; then
   set_default_txpower $NEW_TX
 fi
