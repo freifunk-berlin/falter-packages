@@ -12,7 +12,6 @@ define Package/falter-berlin-migration
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin configuration migration script
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=falter-berlin-lib-guard
   PKGARCH:=all
 endef
 
