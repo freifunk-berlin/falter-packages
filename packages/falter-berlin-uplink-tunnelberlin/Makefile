@@ -12,7 +12,7 @@ define Package/falter-berlin-uplink-tunnelberlin
 	CATEGORY:=falter-berlin
 	TITLE:=Freifunk Berlin Networktunnel files
 	URL:=http://github.com/freifunk-berlin/packages_berlin
-	EXTRA_DEPENDS:=falter-berlin-lib-guard, falter-berlin-tunneldigger, falter-berlin-network-defaults
+	EXTRA_DEPENDS:=falter-berlin-tunneldigger
 	PROVIDES:=falter-berlin-uplink
 	PKGARCH:=all
 endef
