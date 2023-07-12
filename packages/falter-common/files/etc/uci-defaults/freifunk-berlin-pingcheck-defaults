@@ -4,6 +4,9 @@
 
 . /lib/functions.sh
 
+. /lib/functions/guard.sh
+guard "pingcheck"
+
 # remove the sta interface, leaving only wan
 uci del pingcheck.@interface\[1\]
 

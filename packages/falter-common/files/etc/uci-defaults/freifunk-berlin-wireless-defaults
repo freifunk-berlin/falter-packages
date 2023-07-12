@@ -12,6 +12,9 @@
 . /lib/config/uci.sh
 . /lib/functions/system.sh
 
+. /lib/functions/guard.sh
+guard "wireless"
+
 mac_addr=$(get_mac_label | cut -c 10-)
 
 if [ -z "$mac_addr" ]; then
