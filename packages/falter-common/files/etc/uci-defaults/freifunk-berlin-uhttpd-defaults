@@ -11,6 +11,12 @@ guard "uhttpd"
 uci set uhttpd.px5g.commonname="Freifunk Berlin - $(dd if=/dev/urandom bs=4 count=1 | hexdump -e '1/1 "%02x"')"
 # do force redirect to https for encrypted web interface
 uci set uhttpd.main.redirect_https=1
+
+# Disable filtering requests from RFC1918 IP addresses.
+# This is a DNS rebinding countermeasure that we don't want,
+# since we use the 10.0.0.0/8 space for OLSR meshing.
+uci set uhttpd.main.rfc1918_filter=0
+
 uci commit
 
 service uhttpd reload
