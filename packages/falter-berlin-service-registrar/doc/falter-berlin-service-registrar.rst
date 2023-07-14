@@ -6,7 +6,7 @@ Der Service-Registrar ist eine App, die die Einrichtung von Diensten im Berliner
 Gebrauchsanweisung
 ------------------
 
-Der Service-Registrar kann sowohl von der Kommandozeile, als auch vom Webinterface genutzt werden. Die Konzepte sind dabei sehr ähnlich, nur die Bedienung ist anders.
+Der Service-Registrar kann sowohl von der Kommandozeile als auch vom Webinterface genutzt werden. Die Konzepte sind dabei sehr ähnlich, nur die Bedienung ist anders.
 
 Er generiert die Einstellungen ausschließlich aus seinen eigenen Dateien. Dienste, die z.B. von Hand im OLSR-Daemon eingetragen wurden, werden entfernt, sofern sie nicht beim Service-Registrar eingetragen sind.
 
@@ -27,15 +27,15 @@ Beide Varianten haben den gleichen Funktionsumfang und unterscheiden sich aussch
 LuCI-App (Webinterface)
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Der Service-Registrar befindet sich in der Admin-Oberfläche unter *Freifunk* -> *Freifunkdienste registrieren*. In der App können entweder Webseiten oder Allgemeine Dienste angelegt werden.
+Der Service-Registrar befindet sich in der Admin-Oberfläche unter *Freifunk* -> *Freifunkdienste registrieren*. In der App können entweder Webseiten oder allgemeine Dienste angelegt werden.
 
 Webseiten sind Dienste, bei denen der Freifunk-Router selbst eine (statische) Webseite ausliefert. Es wird also nicht nur entsprechend OLSR konfiguriert, sondern auch der Webserver auf dem Freifunkrouter so eingestellt, dass er die Webseite ausliefert.
 
-Allgemeine Dienste sind etwas anders. Sie eignen für Dienste, die auf einem anderen Gerät im lokalen Freifunknetzwerk laufen. Wenn man z.B. eine Webcam bereitstellen möchte, oder irgendeine andere Art von Server hat, eignet sich diese Art von Diensten am besten dafür.
+Allgemeine Dienste sind etwas anders. Sie eignen sich für Dienste, die auf einem anderen Gerät im lokalen Freifunknetzwerk laufen. Wenn man z.B. eine Webcam bereitstellen möchte oder irgendeine andere Art von Server hat, eignet sich diese Art von Diensten am besten dafür.
 
 Am besten sollte die IP-Adresse des entsprechenden Gerätes dann auf statisch gestellt werden (unter *Status* -> *Übersicht* und dann im Abschnitt *Aktive DHCP-Leases* auf den Knopf *Auf statisch setzen* drücken).
 
-Die benötigten Felder sind sind eigentlich relativ selbsterklärend. Nachdem die Änderungen mit dem Knopf *Speichern & Anwenden* abgespeichert wurden, beginnt der Freifunkrouter mit der Einrichtung.
+Die benötigten Felder sind eigentlich relativ selbsterklärend. Nachdem die Änderungen mit dem Knopf *Speichern & Anwenden* abgespeichert wurden, beginnt der Freifunkrouter mit der Einrichtung.
 
 Bis der Service im kompletten Freifunknetz verfügbar ist, können bis zu 5 Minuten vergehen.
 
@@ -45,7 +45,7 @@ Kommandozeile
 
 Um einen Dienst über die Kommandozeile einzutragen, muss zuerst die Konfigurationsdatei unter ``/etc/config/ffservices`` angepasst werden und anschließend das Skript ``register-services`` ausgeführt werden.
 
-Je nachdem, ob man eine Webseite oder einen Allgemeinen Dienst eintragen möchte, gibt es zwei unterschiedliche Typen von UCI-Sections. Einmal den Typen ``website`` und einmal den Typen ``service``. Beide Typen unterscheiden sich geringfügig in ihren Feldern:
+Je nachdem, ob man eine Webseite oder einen allgemeinen Dienst eintragen möchte, gibt es zwei unterschiedliche Typen von UCI-Sections. Einmal den Typen ``website`` und einmal den Typen ``service``. Beide Typen unterscheiden sich geringfügig in ihren Feldern:
 
 ..
     config website "testsite"
@@ -65,7 +65,7 @@ Je nachdem, ob man eine Webseite oder einen Allgemeinen Dienst eintragen möchte
             option ip_addr      "10.36.0.34"
             option disabled     0
 
-Besondere Vorsicht braucht es bei dem Feld ``description``: Dort sollten keine Sonderzeichen, wie z.B. Punkte``.``, Kommata``,``, Dollarzeichen ``$``, Umlaute usw. verwendet werden.
+Besondere Vorsicht braucht es bei dem Feld ``description``: Dort sollten keine Sonderzeichen, wie z.B. Punkte ``.``, Kommata ``,``, Dollarzeichen ``$``, Umlaute usw. verwendet werden.
 
 Die IP-Adresse im Feld ``ip_addr`` muss aus dem Host-Network des eigenen Routers stammen ("DHCP-Adressen" aus der IP-Email).
 
