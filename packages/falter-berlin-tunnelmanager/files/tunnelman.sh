@@ -210,6 +210,9 @@ manage() {
                 fi
             else
                 log "No servers available..."
+                log "Backing down for 500 + 60 = 610 seconds so keys could time out on servers..."
+                sleep 550 &
+                wait $!
                 break
             fi
         done
