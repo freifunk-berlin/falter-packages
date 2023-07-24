@@ -1,5 +1,7 @@
 #! /bin/sh
 
+# shellcheck disable=SC3043
+
 # except than noted, this script is not posix-compliant in one way: we use "local"
 # variables definition. As nearly all shells out there implement local, this should
 # work anyway. This is a little reminder to you, if you use some rare shell without
@@ -98,7 +100,8 @@ get_age() {
 
 teardown() {
     local interface="$1"
-    local endpoint="$(wg show $interface endpoints | awk -F '\t|:' '{print $2}')"
+    local endpoint
+    endpoint="$(wg show "$interface" endpoints | awk -F '\t|:' '{print $2}')"
 
     sh "$OPT_DOWN_SCRIPT" "$interface"
     ip link delete "$interface"
@@ -110,11 +113,13 @@ teardown() {
 wg_get_usage() {
     local server="$1"
     # ToDo: PASSWORDS!!!!11!!111!!
-    clients=$(timeout 60 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    # ToDo: Fix Shellcheck
+    clients=$(timeout 60 ip netns exec "$OPT_NAMESPACE_NAME" wg-client-installer get_usage --endpoint "$server" --user wginstaller --password wginstaller)
+    # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then
         return 1
     fi
-    echo "$(echo "$clients" | cut -d' ' -f2)"
+    echo "$clients" | cut -d' ' -f2
 }
 
 get_least_used_tunnelserver() {
@@ -132,10 +137,11 @@ get_least_used_tunnelserver() {
 
     for i in $tunnel_endpoints; do
         current=$(wg_get_usage "$i")
+	# shellcheck disable=SC2181
         if [ $? -ne 0 ]; then
             log "Error while querying tunnelserver $i for utilization"
 
-        elif [ $current -le $usercount ]; then
+        elif [ "$current" -le "$usercount" ]; then
             best=$i
             usercount=$current
         fi
@@ -160,8 +166,8 @@ new_tunnel() {
     local ip="$1"
     local nsname="$2"
     local mtu="$3"
-
-    local interface="$(timeout 5 ip netns exec $OPT_NAMESPACE_NAME wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file $gw_pub --mtu $mtu)"
+    local interface
+    interface="$(timeout 5 ip netns exec "$OPT_NAMESPACE_NAME" wg-client-installer register --lookup-default-namespace --endpoint "$ip" --user wginstaller --password wginstaller --wg-key-file "$gw_pub" --mtu "$mtu")"
 
     if [ -z "$interface" ]; then
         log "Failed to register a new tunnel."
@@ -192,7 +198,7 @@ manage() {
     # Check for stale tunnels and tear em down
     while true; do
         for interface in $interfaces; do
-            if [ $(get_age "$interface") -ge $OPT_TUNNEL_TIMEOUT ]; then
+            if [ "$(get_age "$interface")" -ge "$OPT_TUNNEL_TIMEOUT" ]; then
                 log "Tunnel to $interface timed out."
                 teardown "$interface"
             fi
@@ -200,9 +206,9 @@ manage() {
 
         tmp_tunnel_endpoints="$tunnel_endpoints"
 
-        while [ $(echo $connections | wc -w) -lt $connection_count ]; do
+        while [ "$(echo "$connections" | wc -w)" -lt "$connection_count" ]; do
             ep=$(get_least_used_tunnelserver "$tmp_tunnel_endpoints")
-            if [ ! -z "$ep" ]; then
+            if [ -n "$ep" ]; then
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
                 if ! new_tunnel "$ep" "$nsname" "$mtu"; then
                     # remove ep from tunnel
