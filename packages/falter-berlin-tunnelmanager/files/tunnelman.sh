@@ -47,6 +47,12 @@ cleanup() {
     log "Closing"
     exit
 }
+remove_entry_from_list() {
+    local remove="$1"
+    local list="$2"
+    list=$(echo "$list" | sed "s/$remove//; s/^[ ]*//g; s/[ ]*$//g; s/  / /")
+    echo "$list"
+}
 setup_namespace() {
     local namespace_name="$1"
     local uplink_interface="$2"
@@ -106,8 +112,8 @@ teardown() {
     sh "$OPT_DOWN_SCRIPT" "$interface"
     ip link delete "$interface"
 
-    interfaces=$(echo "$interfaces" | sed "s/ $interface//")
-    connections=$(echo "$connections" | sed "s/ $endpoint//")
+    interfaces=$(remove_entry_from_list "$interface" "$interfaces")
+    connections=$(remove_entry_from_list "$endpoint" "$connections")
 }
 
 wg_get_usage() {
@@ -128,7 +134,7 @@ get_least_used_tunnelserver() {
     # Dont check tunnelserver we already have a connection with
     for i in $(wg show all endpoints | awk -F '\t|:' '{print $3}'); do
         # remove ip from connections:
-        tunnel_endpoints=$(echo "$tunnel_endpoints" | sed "s/$i//")
+        tunnel_endpoints=$(remove_entry_from_list "$i" "$tunnel_endpoints")
     done
 
     # Select next best tunnelserver
@@ -137,7 +143,7 @@ get_least_used_tunnelserver() {
 
     for i in $tunnel_endpoints; do
         current=$(wg_get_usage "$i")
-	# shellcheck disable=SC2181
+        # shellcheck disable=SC2181
         if [ $? -ne 0 ]; then
             log "Error while querying tunnelserver $i for utilization"
 
@@ -212,7 +218,7 @@ manage() {
                 log "Server handling least clients is: $ep. Trying to create tunnel..."
                 if ! new_tunnel "$ep" "$nsname" "$mtu"; then
                     # remove ep from tunnel
-                    tmp_tunnel_endpoints=$(echo "$tmp_tunnel_endpoints" | sed "s/$ep//")
+                    tmp_tunnel_endpoints=$(remove_entry_from_list "$ep" "$tmp_tunnel_endpoints")
                 fi
             else
                 log "No servers available..."
@@ -285,9 +291,9 @@ log "starting tunnelmanager with
     Uplink-IP............: $OPT_UPLINK_IP
     Uplink-GW............: $OPT_UPLINK_GW
     MTU..................: $OPT_MTU
-    Namespace............: $OPT_NAMESPACE_NAME 
-    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS 
-    Tunnel-Count.........: $OPT_TUNNEL_COUNT 
+    Namespace............: $OPT_NAMESPACE_NAME
+    Tunnel-Endpoints.....: $OPT_TUNNEL_ENDPOINTS
+    Tunnel-Count.........: $OPT_TUNNEL_COUNT
     Tunnel-Timeout.......: $OPT_TUNNEL_TIMEOUT
     Work-Interval........: $OPT_INTERVAL
     Up_Script............: $OPT_UP_SCRIPT
