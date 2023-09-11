@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# shellcheck disable=SC2155
+# shellcheck disable=SC2181
+# shellcheck disable=SC3010
+# shellcheck disable=SC3020
+# shellcheck disable=SC3043
+
 interface="$1"
 
 # can be controlled using tunnelmanagers "-A" parameter
@@ -7,7 +13,7 @@ extra_args="$2"
 
 prefix=$(echo "$extra_args" | cut -d ' ' -f1)
 
-argc=$(echo $extra_args | wc -w)
+argc=$(echo "$extra_args" | wc -w)
 if [ "$argc" -gt "2" ]; then
     metric=$(echo "$extra_args" | cut -d ' ' -f2)
     lqm=$(echo "$extra_args" | cut -d ' ' -f3)
@@ -16,7 +22,7 @@ fi
 get_ips_from_prefix() {
     local prefix="$1"
     local amount="$(owipcalc "$prefix" howmany 32)"
-    local command="owipcalc "$prefix" network print"
+    local command="owipcalc $prefix network print"
     for i in $(seq 2 "$amount"); do
         command="$command next 32 print add 1"
     done
@@ -40,7 +46,7 @@ cleanup_olsr_wg_config() {
         fi
 
         # skip non wireguard interfaces
-        slicedint=$(echo $int_name | cut -c1-3)
+        slicedint=$(echo "$int_name" | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
             continue
@@ -76,7 +82,7 @@ cleanup_babel_wg_config() {
         fi
 
         # skip non wireguard interfaces
-        slicedint=$(echo $int_name | cut -c1-3)
+        slicedint=$(echo "$int_name" | cut -c1-3)
         if [ "${slicedint}" != "wg_" ]; then
             i=$((i + 1))
             continue
@@ -104,10 +110,10 @@ get_ips_from_prefix "$prefix"
 # unconditionally wipe all configured ips from available ips.
 available_ips="$_ret_prefixes"
 for i in $(get_configured_ips); do
-    available_ips="$(echo $available_ips | sed "s/\b$i\b//")"
+    available_ips="$(echo "$available_ips" | sed "s/\b$i\b//")"
 done
 
-next_ip="$(echo $available_ips | awk '{print $1}')"
+next_ip="$(echo "$available_ips" | awk '{print $1}')"
 
 # Configure IPs
 ip address add "$next_ip/32" dev "$interface"
@@ -129,7 +135,7 @@ UCIREF="$(uci add olsrd Interface)"
 uci set "olsrd.$UCIREF.ignore=0"
 uci set "olsrd.$UCIREF.interface=$interface"
 uci set "olsrd.$UCIREF.Mode=ether"
-if [[ ! -z "$lqm" ]]; then
+if [[ -n "$lqm" ]]; then
     uci set "olsrd.$UCIREF.LinkQualityMult=default $lqm"
 fi
 uci commit olsrd
@@ -158,7 +164,7 @@ uci set "babeld.$UCIREF.ifname=$interface"
 uci set "babeld.$UCIREF.split_horizon=true"
 uci commit babeld
 
-if [[ ! -z "$metric" ]]; then
+if [[ -n "$metric" ]]; then
     uci revert babeld
     UCIREF="$(uci add babeld filter)"
     uci set "babeld.$UCIREF.type=in"
