@@ -140,12 +140,15 @@ if [ $? -eq 1 ]; then
     # no olsr running start
     /etc/init.d/olsrd start
 else
+    /etc/init.d/olsrd reload
     # instead of reloading add interface via ipc to make it seamless
-    if [[ ! -z "$lqm" ]]; then
-        ubus call olsrd add_interface '{"ifname":'\""$interface"\"',"lqm":'\""$lqm"\"'}'
-    else
-        ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
-    fi
+    # note: we tried this, however it does not work reliably, therefore we are back to
+    # reloading olsrd instead. we leave the ipc code so it could be improved
+    # if [[ ! -z "$lqm" ]]; then
+    #     ubus call olsrd add_interface '{"ifname":'\""$interface"\"',"lqm":'\""$lqm"\"'}'
+    # else
+    #     ubus call olsrd add_interface '{"ifname":'\""$interface"\"'}'
+    # fi
 fi
 
 # Configure babeld
@@ -171,9 +174,12 @@ ubus list | grep -qF babeld
 if [ $? -eq 1 ]; then
     /etc/init.d/babeld start
 else
+    /etc/init.d/babeld reload
     # instead of reloading add interface via ipc to make it seamless
-    ubus call babeld add_interface '{"ifname":'\""$interface"\"'}'
-    if [[ ! -z "$metric" ]]; then
-        ubus call babeld add_filter '{"ifname":'\""$interface"\"',"type":0,"metric":'$metric'}'
-    fi
+    # note: we tried this, however it does not work reliably, therefore we are back to
+    # reloading babeld instead. we leave the ipc code so it could be improved
+    # ubus call babeld add_interface '{"ifname":'\""$interface"\"'}'
+    # if [[ ! -z "$metric" ]]; then
+    #     ubus call babeld add_filter '{"ifname":'\""$interface"\"',"type":0,"metric":'$metric'}'
+    # fi
 fi
