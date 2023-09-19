@@ -42,8 +42,21 @@ set -o pipefail
 set -e
 set -x
 
+# Mirror base URL for SDK download.
+# We search in $dlmirror/releases/$version-SNAPSHOT/targets/sha256sum.
 dlmirror="https://downloads.openwrt.org"
-#dlmirror="file:///mnt/mirror/downloads.openwrt.org"
+# dlmirror="file:///mnt/mirror/downloads.openwrt.org"
+# dlmirror="http://192.168.1.1/downloads.openwrt.org"
+
+# Mirror URL for source tarball downloads.
+srcmirror="https://sources.openwrt.org;https://firmware.berlin.freifunk.net/sources"
+# srcmirror="file:///mnt/mirror/sources.openwrt.org;file:///mnt/mirror/firmware.berlin.freifunk.net/sources"
+# srcmirror="http://192.168.1.1/sources.openwrt.org;http://192.168.1.1/firmware.berlin.freifunk.net/sources"
+
+# Mirror URL for Git repositories in feeds.conf
+gitmirror="https://git.openwrt.org"
+# gitmirror="file:///mnt/mirror/git.openwrt.org"
+# gitmirror="http://192.168.1.1/git.openwrt.org"
 
 mkdir -p "$dest/falter"
 destdir=$(realpath "$dest")
@@ -75,6 +88,12 @@ unbuf="stdbuf --output=0 --error=0"
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
   cp "$sdkdir/feeds.conf.default" "$sdkdir/feeds.conf"
+  if [ "$gitmirror" != "https://git.openwrt.org" ]; then
+    sed -i "s|https://git.openwrt.org/openwrt|$gitmirror|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/feed|$gitmirror|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/project|$gitmirror|g" "$sdkdir/feeds.conf"
+    sed -i 's|src-git |src-git-full |g' "$sdkdir/feeds.conf"
+  fi
   echo "src-link falter $(pwd)/tmp/feed" >> "$sdkdir/feeds.conf"
 
   cd "$sdkdir"
@@ -84,6 +103,7 @@ unbuf="stdbuf --output=0 --error=0"
   make defconfig
   ./scripts/feeds update -a
   ./scripts/feeds install -a -p falter
+  export DOWNLOAD_MIRROR="$srcmirror"
   for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}'); do
     make -j8 V=s "package/$p/compile"
   done
