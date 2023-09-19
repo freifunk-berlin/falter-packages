@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # TODO: generate feeds.conf with revision info
+# TODO: use $dlmirror for repositories.conf as well
 
 # To run this in a rootless podman container:
 #   podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc argp-standalone musl-fts-dev musl-obstack-dev musl-libintl abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout master && build/build.sh master x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
@@ -53,21 +54,21 @@ sdkdir="./tmp/$branch/$arch"
 unbuf="stdbuf --output=0 --error=0"
 (
   # pick the right URL
-  dldir="snapshots"
-  [ "$branch" == "openwrt-23.05" ] && dldir="releases/23.05-SNAPSHOT"
-  [ "$branch" == "openwrt-22.03" ] && dldir="releases/22.03-SNAPSHOT"
-  [ "$branch" == "openwrt-21.02" ] && dldir="releases/21.02-SNAPSHOT"
+  dlurl="$dlmirror/snapshots/targets"
+  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02-SNAPSHOT/targets"
 
   # determine the sdk tarball's filename
   target=$(cat "./build/targets-$branch.txt" | grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2)
-  sdk=$(wget -q -O - "$dlmirror/$dldir/targets/$target/sha256sums" | cut -d '*' -f 2 | grep -i openwrt-sdk-)
+  sdkfile=$(wget -q -O - "$dlurl/$target/sha256sums" | cut -d '*' -f 2 | grep -i openwrt-sdk-)
 
   # download and extract sdk tarball
   mkdir -p "./tmp/dl/$branch"
-  wget --progress=dot:giga -O "./tmp/dl/$branch/$sdk" "$dlmirror/$dldir/targets/$target/$sdk"
+  wget --progress=dot:giga -O "./tmp/dl/$branch/$sdkfile" "$dlurl/$target/$sdkfile"
   rm -rf "$sdkdir"
   mkdir -p "$sdkdir"
-  tar -x -C "$sdkdir" --strip-components=1 -f "./tmp/dl/$branch/$sdk"
+  tar -x -C "$sdkdir" --strip-components=1 -f "./tmp/dl/$branch/$sdkfile"
 
   # configure our feed, with an indirection via /tmp/feed so sdk doesn't recurse our feed
   mkdir -p ./tmp/feed
