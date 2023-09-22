@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# shellcheck disable=SC2015
+
 # TODO: generate feeds.conf with revision info
 # TODO: use $dlmirror for repositories.conf as well
 
@@ -8,6 +10,8 @@
 
 function usage() {
   local br="$1"
+  local arch=""
+
   echo "usage: build/build.sh <branch> <arch> [<destination>]"
   echo
   if [ -n "$br" ]; then
@@ -15,8 +19,9 @@ function usage() {
     echo "  $br"
     echo
     echo "arch names:"
-    for a in $(cat "build/targets-$br.txt" | grep -v '#' | grep . | cut -d' ' -f1); do
-      echo -n "  $a"
+    (grep -v '#' | grep . | cut -d' ' -f1) < "build/targets-$br.txt" | while IFS= read -r arch
+    do
+      echo -n "  $arch"
     done
     echo
   else
@@ -34,6 +39,7 @@ function usage() {
   exit 1
 }
 
+# shell check SC2015: If-then-else work here, as a assignment can not fail.
 [ -n "$1" ] && branch="$1" || usage >&2
 [ -n "$2" ] && arch="$2" || usage "$branch" >&2
 [ -n "$3" ] && dest="$3" || dest="./out/$branch/$arch"
@@ -72,7 +78,7 @@ unbuf="stdbuf --output=0 --error=0"
   [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02-SNAPSHOT/targets"
 
   # determine the sdk tarball's filename
-  target=$(cat "./build/targets-$branch.txt" | grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2)
+  target=$( (grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2) < "./build/targets-$branch.txt")
   sdkfile=$(wget -q -O - "$dlurl/$target/sha256sums" | cut -d '*' -f 2 | grep -i openwrt-sdk-)
 
   # download and extract sdk tarball
