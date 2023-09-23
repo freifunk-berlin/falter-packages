@@ -1,0 +1,59 @@
+#!/bin/sh
+
+if [ ! -f /etc/config/tunspace ]; then
+  cat <<EOT > /etc/config/tunspace
+package 'tunspace'
+
+config tunspace "tunspace"
+  option uplink_netns "uplink"
+  option uplink_ifname "br-wan"
+  option maintenance_interval 15
+  option debug 0
+
+config wg-server
+  option name "ak36"
+  option url "https://77.87.51.11/ubus"
+  option check_cert 0
+  option disabled 0
+
+config wg-server
+  option name "l105"
+  option url "https://77.87.49.8/ubus"
+  option check_cert 0
+  option disabled 0
+
+config wg-server
+  option name "ohlauer"
+  option url "https://176.74.57.19/ubus"
+  option check_cert 0
+  option disabled 0
+
+config wg-server
+  option name "saarbruecker"
+  option url "https://176.74.57.43/ubus"
+  option check_cert 0
+  option disabled 0
+
+config wg-server
+  option name "strom"
+  option url "https://77.87.51.131/ubus"
+  option check_cert 0
+  option disabled 0
+
+config wg-interface
+  option ifname "ts_wg0"
+  option ipv6 "fe80::2/64"
+  option ipv4 "10.31.174.138/32"
+  option mtu 1280
+  option port 51820
+  option keyfile "/etc/tunspace/ts_wg0.key"
+  option disabled 0
+
+EOT
+fi
+
+if [ ! -f /usr/share/tunspace/udhcpc.script ]; then
+  mkdir -p /usr/share/tunspace
+  cp /usr/share/udhcpc/default.script /usr/share/tunspace/udhcpc.script
+  sed -i -e 's/ip -4 addr flush/#ip -4 addr flush/g' /usr/share/tunspace/udhcpc.script
+fi
