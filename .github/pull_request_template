@@ -1,5 +1,18 @@
-Maintainer: me / @\<github-user> (find it by checking history of the package Makefile)
-Compile tested: (put here arch, model, OpenWrt version)
-Run tested: (put here arch, model, OpenWrt version, tests done)
+# Pull Request Vorlage / Template
 
-Description:
+Bitte die nicht-benutzte Sprachversion entfernen.
+Please remove the Language version of this template, which you don't use.
+
+------------ schnipp /snip ------------
+
+Kompiliert Ja/Nein: (Bitte gib Prozessorarchitektur, Modell und Falter/OpenWrtversion an)
+Läuft live Ja/Nein: (Bitte gib Prozessorarchitektur, Modell und Falter/OpenWrtversion an und wie du deine Änderungen getestet hast)
+
+Beschreibung deiner Änderungen:
+
+----------
+
+Compile tested: (put here arch, model, Falter (_OpenWrt_) version)
+Run tested: (put here arch, model, Falter (_OpenWrt_) version, tests done)
+
+Description of your changes:
