@@ -99,7 +99,7 @@ olsr4_links() {
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	if ! echo "$olsrInterface" | grep -q '.*wg_.*'; then
+	if ! echo "$olsrInterface" | grep -q -E '.*(wg|ts)_.*'; then
 		olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
 	fi
 }
@@ -113,7 +113,7 @@ olsr6_links() {
 	json_get_var olsrInterface olsrInterface
 	json_get_var ifName ifName
 	json_select ..
-	if ! echo "$olsrInterface" | grep -q '.*wg_.*'; then
+	if ! echo "$olsrInterface" | grep -q -E '.*(wg|ts)_.*'; then
 		olsr6links="$olsr6links$localIP $remoteIP $remotehost $linkQuality $ifName;"
 	fi
 }
