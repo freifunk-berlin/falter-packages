@@ -87,6 +87,9 @@ function rtnl_request(cmd, flags, msg) {
 
 function wg_request(cmd, flags, msg) {
   let reply = wg.request(cmd, flags, msg);
+  if (length(msg.privateKey) > 0) {
+    msg.privateKey = "REDACTED";
+  }
   debug(sprintf("wireguard: cmd=%J flags=%J msg=%J error=%J reply=%s", cmd, flags, msg, err, type(reply)));
   return reply;
 }
