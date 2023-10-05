@@ -15,8 +15,10 @@ define Package/tunspace
 	TITLE:=TunSpace
 	URL:=https://github.com/freifunk-berlin/falter-packages
 	PKGARCH:=all
-	DEPENDS:=+uclient-fetch +kmod-macvlan +kmod-wireguard +ucode-mod-wireguard
-	DEPENDS+= +ucode-mod-uloop +ucode-mod-rtnl +ucode-mod-fs +ucode-mod-math
+	EXTRA_DEPENDS:= \
+		ucode, ucode-mod-wireguard, ucode-mod-rtnl, \
+		ucode-mod-uloop, ucode-mod-fs, ucode-mod-math, \
+		kmod-macvlan, uclient-fetch
 endef
 
 define Package/tunspace/conffiles
