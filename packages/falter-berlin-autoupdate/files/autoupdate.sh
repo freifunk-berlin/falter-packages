@@ -44,9 +44,11 @@ configuration file.
 Optional arguments:
     -h: show this help text
     -i: ignore certs
-            Don't prove the images origin by checking the certificates
+            Don't prove the images origin by checking the certificates.
     -m INT: minimum certs
-            flash image, if it was signed by minimum amount of certs
+            flash image, if it was signed by minimum amount of certs.
+    -N: update now
+            overrides the uptime check and performs update now.
     -n: new installation
             flash the image and wipe configuration. So you will start
             with a new wizard-run.
@@ -87,7 +89,7 @@ MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-downlo
 #########################
 #  Commandline parsing
 
-while getopts him:ntf option; do
+while getopts him:Nntf option; do
     case $option in
     h)
         print_help
@@ -95,6 +97,7 @@ while getopts him:ntf option; do
         ;;
     i) OPT_IGNORE_CERTS=1 ;;
     m) MIN_CERTS=$OPTARG ;;
+    N) OPT_NOW=1 ;;
     n) OPT_N=1 ;;
     t) OPT_TESTRUN=1 ;;
     f) OPT_FORCE=1 ;;
@@ -131,7 +134,7 @@ fi
 
 UPTIME=$(cut -d'.' -f1 </proc/uptime)
 # only update, if router runs for at least two hours (so the update probably won't get disrupted)
-if [ -z "$OPT_FORCE" ] && [ "$UPTIME" -lt 7200 ]; then
+if [ -z "$OPT_FORCE" ] && [ "$UPTIME" -lt 7200 ] && [ -z "$OPT_NOW" ]; then
     log "Router didn't run for two hours. It might be just plugged in for testing. Aborting..."
     exit 2
 fi
