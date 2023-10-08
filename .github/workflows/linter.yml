@@ -55,6 +55,8 @@ jobs:
         uses: github/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false
+          # Disable JavaScript Standard Linter as it has problems with the syntax of Javascript LuCI-Apps
+          VALIDATE_JAVASCRIPT_STANDARD: false
           # Change to 'master' if your main branch differs
           DEFAULT_BRANCH: master
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
