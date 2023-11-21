@@ -26,7 +26,7 @@ function usage() {
     echo
   else
     echo "branch names:"
-    echo "  master  openwrt-22.03  openwrt-21.02"
+    echo "  master  openwrt-23.05  openwrt-22.03"
     echo
     echo "arch names:"
     echo "  run build/build.sh with a branch name to see available arch names"
