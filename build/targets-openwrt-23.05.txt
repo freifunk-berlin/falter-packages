@@ -19,7 +19,7 @@ arm_xscale kirkwood/generic
 i386_pentium-mmx x86/legacy x86/geode
 i386_pentium4 x86/generic
 mips64_octeonplus octeon/generic
-mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xway lantiq/xway_legacy malta/be realtek/rtl839x realtek/rtl930x realtek/rtl931x
+mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xrx200 lantiq/xway lantiq/xway_legacy malta/be realtek/rtl839x realtek/rtl930x realtek/rtl931x
 mips_4kec realtek/rtl838x
 mips_mips32 bcm63xx/generic bcm63xx/smp bmips/bcm6318 bmips/bcm6328 bmips/bcm6358 bmips/bcm6362 bmips/bcm6368 bmips/bcm63268 lantiq/ase
 mipsel_24kc ramips/mt7620 ramips/mt7621 ramips/mt76x8 ramips/rt288x ramips/rt305x
