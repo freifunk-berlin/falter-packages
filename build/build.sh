@@ -26,7 +26,7 @@ function usage() {
     echo
   else
     echo "branch names:"
-    echo "  master  openwrt-22.03  openwrt-21.02"
+    echo "  master  openwrt-23.05  openwrt-22.03"
     echo
     echo "arch names:"
     echo "  run build/build.sh with a branch name to see available arch names"
@@ -74,6 +74,7 @@ unbuf="stdbuf --output=0 --error=0"
 (
   # pick the right URL
   dlurl="$dlmirror/snapshots/targets"
+  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05-SNAPSHOT/targets"
   [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03-SNAPSHOT/targets"
   [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02-SNAPSHOT/targets"
 
