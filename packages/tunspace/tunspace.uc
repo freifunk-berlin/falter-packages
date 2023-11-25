@@ -11,6 +11,11 @@
 // - [x] test multiple ifaces
 // - [x] bug: possible multiple use of servers
 // - [x] better logging
+// - [ ] disable strom temporarily
+// - [ ] nftables rules for mss clamping
+// - [ ] retry dhcp on boot
+// - [ ] less logging
+// - [ ] omit dhcp if lease isn't old, allows for more frequent maintenance intervals
 // - [ ] implement check_cert option
 // - [ ] implement disabled option
 // - [ ] warn if ipv6 RA is disabled
