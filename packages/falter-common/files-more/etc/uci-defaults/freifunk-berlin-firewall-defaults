@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck disable=SC1091
+# shellcheck disable=SC2140
+
 . /lib/functions/guard.sh
 guard "firewall"
 
@@ -8,66 +11,66 @@ uci import firewall <<EOF
 EOF
 
 SECTION="$(uci add firewall defaults)"
-uci set firewall.$SECTION.synflood_protect=1
-uci set firewall.$SECTION.input=ACCEPT
-uci set firewall.$SECTION.output=ACCEPT
-uci set firewall.$SECTION.forward=REJECT
-uci set firewall.$SECTION.drop_invalid=0
+uci set firewall."$SECTION".synflood_protect=1
+uci set firewall."$SECTION".input=ACCEPT
+uci set firewall."$SECTION".output=ACCEPT
+uci set firewall."$SECTION".forward=REJECT
+uci set firewall."$SECTION".drop_invalid=0
 
 ZONE="$(uci add firewall zone)"
-uci set firewall.$ZONE.name=wan
-uci set firewall.$ZONE.masq=1
-uci add_list firewall.$ZONE.network=wan
-uci set firewall.$ZONE.forward=REJECT
-uci set firewall.$ZONE.output=ACCEPT
-uci set firewall.$ZONE.local_restrict=1
-uci set firewall.$ZONE.input=ACCEPT
+uci set firewall."$ZONE".name=wan
+uci set firewall."$ZONE".masq=1
+uci add_list firewall."$ZONE".network=wan
+uci set firewall."$ZONE".forward=REJECT
+uci set firewall."$ZONE".output=ACCEPT
+uci set firewall."$ZONE".local_restrict=1
+uci set firewall."$ZONE".input=ACCEPT
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.name=Allow-DHCP-Renew
-uci set firewall.$RULE.src=wan
-uci set firewall.$RULE.proto=udp
-uci set firewall.$RULE.dest_port=68
-uci set firewall.$RULE.target=ACCEPT
-uci set firewall.$RULE.family=ipv4
+uci set firewall."$RULE".name=Allow-DHCP-Renew
+uci set firewall."$RULE".src=wan
+uci set firewall."$RULE".proto=udp
+uci set firewall."$RULE".dest_port=68
+uci set firewall."$RULE".target=ACCEPT
+uci set firewall."$RULE".family=ipv4
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.name=Allow-Ping
-uci set firewall.$RULE.src=wan
-uci set firewall.$RULE.proto=icmp
-uci set firewall.$RULE.icmp_type=echo-request
-uci set firewall.$RULE.family=ipv4
-uci set firewall.$RULE.target=ACCEPT
+uci set firewall."$RULE".name=Allow-Ping
+uci set firewall."$RULE".src=wan
+uci set firewall."$RULE".proto=icmp
+uci set firewall."$RULE".icmp_type=echo-request
+uci set firewall."$RULE".family=ipv4
+uci set firewall."$RULE".target=ACCEPT
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.name=Allow-DHCPv6
-uci set firewall.$RULE.src=wan
-uci set firewall.$RULE.proto=udp
-uci set firewall.$RULE.src_ip=fe80::/10
-uci set firewall.$RULE.src_port=547
-uci set firewall.$RULE.dest_ip=fe80::/10
-uci set firewall.$RULE.dest_port=546
-uci set firewall.$RULE.family=ipv6
-uci set firewall.$RULE.target=ACCEPT
+uci set firewall."$RULE".name=Allow-DHCPv6
+uci set firewall."$RULE".src=wan
+uci set firewall."$RULE".proto=udp
+uci set firewall."$RULE".src_ip=fe80::/10
+uci set firewall."$RULE".src_port=547
+uci set firewall."$RULE".dest_ip=fe80::/10
+uci set firewall."$RULE".dest_port=546
+uci set firewall."$RULE".family=ipv6
+uci set firewall."$RULE".target=ACCEPT
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.name=Allow-ICMPv6-Input
-uci set firewall.$RULE.src=wan
-uci set firewall.$RULE.proto=icmp
-uci set firewall.$RULE.icmp_type="echo-request echo-reply destination-unreachable packet-too-big time-exceeded bad-header unknown-header-type router-solicitation neighbour-solicitation router-advertisement neighbour-advertisement"
-uci set firewall.$RULE.limit=1000/sec
-uci set firewall.$RULE.family=ipv6
-uci set firewall.$RULE.target=ACCEPT
+uci set firewall."$RULE".name=Allow-ICMPv6-Input
+uci set firewall."$RULE".src=wan
+uci set firewall."$RULE".proto=icmp
+uci set firewall."$RULE".icmp_type="echo-request echo-reply destination-unreachable packet-too-big time-exceeded bad-header unknown-header-type router-solicitation neighbour-solicitation router-advertisement neighbour-advertisement"
+uci set firewall."$RULE".limit=1000/sec
+uci set firewall."$RULE".family=ipv6
+uci set firewall."$RULE".target=ACCEPT
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.name=Allow-ICMPv6-Forward
-uci set firewall.$RULE.src=wan
-uci set firewall.$RULE.dest=*
-uci set firewall.$RULE.proto=icmp
-uci set firewall.$RULE.icmp_type="echo-request echo-reply destination-unreachable packet-too-big time-exceeded bad-header unknown-header-type"
-uci set firewall.$RULE.limit=1000/sec
-uci set firewall.$RULE.family=ipv6
-uci set firewall.$RULE.target=ACCEPT
+uci set firewall."$RULE".name=Allow-ICMPv6-Forward
+uci set firewall."$RULE".src=wan
+uci set firewall."$RULE".dest=*
+uci set firewall."$RULE".proto=icmp
+uci set firewall."$RULE".icmp_type="echo-request echo-reply destination-unreachable packet-too-big time-exceeded bad-header unknown-header-type"
+uci set firewall."$RULE".limit=1000/sec
+uci set firewall."$RULE".family=ipv6
+uci set firewall."$RULE".target=ACCEPT
 
 uci commit firewall
 
@@ -90,39 +93,39 @@ uci add_list firewall.zone_ffuplink.network=ffuplink
 uci set firewall.zone_ffuplink.masq=1
 
 FORWARDING="$(uci add firewall forwarding)"
-uci set firewall.$FORWARDING.dest=freifunk
-uci set firewall.$FORWARDING.src=freifunk
+uci set firewall."$FORWARDING".dest=freifunk
+uci set firewall."$FORWARDING".src=freifunk
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.proto=icmp
-uci set firewall.$RULE.target=ACCEPT
-uci set firewall.$RULE.src=freifunk
+uci set firewall."$RULE".proto=icmp
+uci set firewall."$RULE".target=ACCEPT
+uci set firewall."$RULE".src=freifunk
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.dest_port=80
-uci set firewall.$RULE.proto=tcp
-uci set firewall.$RULE.target=ACCEPT
-uci set firewall.$RULE.src=freifunk
+uci set firewall."$RULE".dest_port=80
+uci set firewall."$RULE".proto=tcp
+uci set firewall."$RULE".target=ACCEPT
+uci set firewall."$RULE".src=freifunk
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.dest_port=443
-uci set firewall.$RULE.proto=tcp
-uci set firewall.$RULE.target=ACCEPT
-uci set firewall.$RULE.src=freifunk
+uci set firewall."$RULE".dest_port=443
+uci set firewall."$RULE".proto=tcp
+uci set firewall."$RULE".target=ACCEPT
+uci set firewall."$RULE".src=freifunk
 
 RULE="$(uci add firewall rule)"
-uci set firewall.$RULE.dest_port=22
-uci set firewall.$RULE.proto=tcp
-uci set firewall.$RULE.target=ACCEPT
-uci set firewall.$RULE.src=freifunk
+uci set firewall."$RULE".dest_port=22
+uci set firewall."$RULE".proto=tcp
+uci set firewall."$RULE".target=ACCEPT
+uci set firewall."$RULE".src=freifunk
 
 FORWARDING="$(uci add firewall forwarding)"
-uci set firewall.$FORWARDING.dest=wan
-uci set firewall.$FORWARDING.src=freifunk
+uci set firewall."$FORWARDING".dest=wan
+uci set firewall."$FORWARDING".src=freifunk
 
 FORWARDING="$(uci add firewall forwarding)"
-uci set firewall.$FORWARDING.dest=freifunk
-uci set firewall.$FORWARDING.src=wan
+uci set firewall."$FORWARDING".dest=freifunk
+uci set firewall."$FORWARDING".src=wan
 
 uci set firewall.fwd_ff_ffuplink=forwarding
 uci set firewall.fwd_ff_ffuplink.src=freifunk
