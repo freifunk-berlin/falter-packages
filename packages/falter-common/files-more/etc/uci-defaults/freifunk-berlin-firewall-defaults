@@ -69,9 +69,6 @@ uci set firewall.$RULE.limit=1000/sec
 uci set firewall.$RULE.family=ipv6
 uci set firewall.$RULE.target=ACCEPT
 
-INCLUDE="$(uci add firewall include)"
-uci set firewall.$INCLUDE.path=/etc/firewall.user
-
 uci commit firewall
 
 # add named freifunk zone section
