@@ -20,9 +20,7 @@ create_ffuplink() {
 	uci commit network.ffuplink
 
 	guard_delete notunnel
-	guard_delete tunnelberlin_openvpn
 	guard_delete tunnelberlin_tunneldigger
-	guard_delete vpn03_openvpn
 }
 
 generate_random_mac_hex() {

@@ -127,8 +127,6 @@ function commit()
   uci:commit("qos")
 
   sys.init.enable("olsrd")
-  -- openvpn gets started by wan hotplug script
-  sys.init.disable("openvpn")
 
   if (sharenet == "1") then
     sys.init.enable("qos")
