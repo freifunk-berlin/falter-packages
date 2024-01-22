@@ -353,10 +353,6 @@ msgstr "Beachte"
 msgid "OLSR"
 msgstr "OLSR"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:57
-msgid "OLSR2"
-msgstr "OLSR2"
-
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:26
 msgid "Operator"
 msgstr "Betreiber"

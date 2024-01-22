@@ -76,20 +76,6 @@ handle_contact() {
 #                    #
 ######################
 
-# Draft for OLSRv2-Links currently not used
-olsr2_links() {
-	json_select "$2"
-	json_get_var localIP link_bindto
-	json_get_var remoteIP neighbor_originator
-	remotehost="$(nslookup "$remoteIP" | grep name | sed -e 's/.*name = \(.*\)/\1/' -e 's/\..*//')"".olsr"
-	# Maybe add some stuff here.
-	json_get_var linkQuality domain_metric_out_raw
-	#json_get_var linkQuality domain_metric_in_raw
-	json_get_var ifName "if"
-	json_select ..
-	olsr2links="$olsr2links$localIP $remoteIP $remotehost $linkQuality $ifName;"
-}
-
 olsr4_links() {
 	json_select "$2"
 	json_get_var localIP localIP
@@ -122,12 +108,6 @@ fi
 
 
 # collect data on OLSR-links
-json_load "$(printf "/nhdpinfo" json link | nc ::1 2009 2>/dev/null)" 2>/dev/null
-olsr2links=""
-if json_is_a link array;then
-	json_for_each_item olsr2_links link
-fi
-json_cleanup
 json_load "$( printf "/links" | nc 127.0.0.1 9090 2>/dev/null)" 2>/dev/null
 #json_get_var timeSinceStartup timeSinceStartup
 olsr4links=""
@@ -264,17 +244,6 @@ json_close_object
 json_add_array links
 	IFSORIG="$IFS"
 	IFS=';'
-	for i in ${olsr2links} ; do
-		IFS="$IFSORIG"
-		set -- $i
-		json_add_object
-		json_add_string sourceAddr6 "$1"
-		json_add_string destAddr6 "$2"
-		json_add_string id "$3"
-		json_add_double quality "$4"
-		json_close_object
-		IFS=';'
-	done
 	for i in ${olsr4links} ; do
 		IFS="$IFSORIG"
 		set -- $i
