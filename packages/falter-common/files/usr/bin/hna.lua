@@ -17,20 +17,14 @@ function fetch_jsoninfo(otable)
 	local json = require "luci.json"
 	local IpVersion = uci:get_first("olsrd", "olsrd","IpVersion")
 	local jsonreq4 = ""
-	local jsonreq6 = ""
 	local v4_port = uci:get("olsrd", "olsrd_jsoninfo", "port") or 9090
-	local v6_port = uci:get("olsrd6", "olsrd_jsoninfo", "port") or 9090
 
 	jsonreq4 = utl.exec("(echo /" .. otable .. " | nc 127.0.0.1 " .. v4_port .. ") 2>/dev/null")
-	jsonreq6 = utl.exec("(echo /" .. otable .. " | nc ::1 " .. v6_port .. ") 2>/dev/null")
 	local jsondata4 = {}
-	local jsondata6 = {}
 	local data4 = {}
-	local data6 = {}
 	local has_v4 = False
-	local has_v6 = False
 
-	if jsonreq4 == '' and jsonreq6 == '' then
+	if jsonreq4 == '' then
 		luci.template.render("status-olsr/error_olsr")
 		return nil, 0, 0, true
 	end
@@ -49,24 +43,12 @@ function fetch_jsoninfo(otable)
 		end
 
 	end
-	if jsonreq6 ~= "" then
-		has_v6 = 1
-		jsondata6 = json.decode(jsonreq6)
-		if otable == 'status' then
-			data6 = jsondata6 or {}
-		else
-			data6 = jsondata6[otable] or {}
-		end
-		for k, v in ipairs(data6) do
-			data6[k]['proto'] = '6'
-		end
-	end
 
 	for k, v in ipairs(data6) do
 		table.insert(data4, v)
 	end
 
-	return data4, has_v4, has_v6, false
+	return data4, has_v4, false, false
 end
 
 

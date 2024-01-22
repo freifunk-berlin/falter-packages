@@ -159,12 +159,6 @@ function main.write(self, section, value)
       olsrifbase.ignore = "0"
       uci:section("olsrd", "Interface", nil, olsrifbase)
 
-      --OLSR6 CONFIG device
-      local olsrifbase6 = {}
-      olsrifbase6.interface = calcnif(device)
-      olsrifbase6.ignore = "0"
-      uci:section("olsrd6", "Interface", nil, olsrifbase6)
-
       --FIREWALL CONFIG device
       tools.firewall_zone_add_interface("freifunk", calcnif(device))
 
@@ -240,7 +234,6 @@ function main.write(self, section, value)
 
       uci:save("firewall")
       uci:save("olsrd")
-      uci:save("olsrd6")
       uci:save("system")
       uci:save("wireless")
       uci:save("network")
@@ -330,7 +323,6 @@ function main.write(self, section, value)
 
   uci:save("dhcp")
   uci:save("olsrd")
-  uci:save("olsrd6")
   uci:save("network")
   uci:save("ffwizard")
 end

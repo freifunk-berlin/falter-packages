@@ -5,9 +5,7 @@ START=15
 . $IPKG_INSTROOT/lib/functions.sh
 
 proto="4"
-#[ -f /proc/net/ipv6_route ] && proto="4 6"
 [ -f /etc/config/olsrd ] && cfgs="olsrd"
-[ -f /etc/config/olsrd6 ] && cfgs="$cfgs olsrd6"
 
 config_load freifunk-policyrouting
 config_get enable pr enable
@@ -110,11 +108,7 @@ add_lookup_rule() {
 		logger -s -t policyrouting "Missing parameters for add_rule!"
 	else
 		for p in $proto; do
-			if [ "$p" = "6" ]; then
-				rule="rule6"
-			else
-				rule="rule"
-			fi
+			rule="rule"
 			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
 				uci batch <<- EOF
 					set network.${name}ipv${p}="$rule"
@@ -139,11 +133,7 @@ add_action_rule() {
 		logger -s -t policyrouting "Missing parameters for add_action!"
 	else
 		for p in $proto; do
-			if [ "$p" = "6" ]; then
-				rule="rule6"
-			else
-				rule="rule"
-			fi
+			rule="rule"
 			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
 				uci batch <<- EOF
 					set network.${name}ipv${p}="$rule"
