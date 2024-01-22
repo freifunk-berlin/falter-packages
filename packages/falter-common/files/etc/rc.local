@@ -1,0 +1,11 @@
+#!/bin/sh /etc/rc.common
+
+# shellcheck disable=SC2034
+
+[ -d /etc/rc.local.d ] && {
+  for file in /etc/rc.local.d/*; do
+    test -f "$file" && . "$file"
+  done
+}
+
+exit 0;
