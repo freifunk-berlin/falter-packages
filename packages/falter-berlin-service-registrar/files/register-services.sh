@@ -40,8 +40,6 @@ get_olsrd_nsplugin_index() {
 
     if [ "$ipversion" = 4 ]; then
         uci show olsrd | grep nameservice | sed -e 's|.*\(\d\).*|\1|g'
-    elif [ "$ipversion" = 6 ]; then
-        uci show olsrd6 | grep nameservice | sed -e 's|.*\(\d\).*|\1|g'
     else
         log "cannot find olsrd-conf for IP version $ipversion."
     fi

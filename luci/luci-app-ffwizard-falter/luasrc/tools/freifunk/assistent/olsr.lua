@@ -13,11 +13,7 @@ function prepareOLSR()
 	uci:delete_all("olsrd", "Interface")
 	uci:delete_all("olsrd", "Hna4")
 
-	uci:delete_all("olsrd6", "Interface")
-	uci:delete_all("olsrd6", "Hna6")
-
 	uci:save("olsrd")
-	uci:save("olsrd6")
 end
 
 
@@ -27,28 +23,11 @@ function configureOLSR()
 	local olsrbase = tools.getMergedConfig(mergeList, "defaults", "olsrd")
 	tools.mergeInto("olsrd", "olsrd", olsrbase)
 
-	-- olsr 6
-	local olsr6base = tools.getMergedConfig(mergeList, "defaults", "olsrd6")
-	tools.mergeInto("olsrd6", "olsrd", olsr6base)
-
-	-- set HNA for olsr6
-	local ula_prefix = uci:get("network","globals","ula_prefix")
-	if ula_prefix then
-		ula_prefix = ip.IPv6(ula_prefix)
-		if ula_prefix:is6() then
-			uci:section("olsrd6", "Hna6", nil, {
-				prefix = ula_prefix:prefix(),
-				netaddr = ula_prefix:network():string()
-			})
-		end
-	end
-
   -- olsr 4 interface defaults
   local olsrifbase = tools.getMergedConfig(mergeList, "defaults", "olsr_interface")
   tools.mergeInto("olsrd", "InterfaceDefaults", olsrifbase)
 
   uci:save("olsrd")
-  uci:save("olsrd6")
 end
 
 
@@ -58,7 +37,6 @@ function configureOLSRPlugins()
 	updatePluginInConfig("olsrd", "olsrd_dyn_gw", "PingCmd", "ping -c 1 -q -I ffuplink %s")
 	updatePluginInConfig("olsrd", "olsrd_dyn_gw", "PingInterval", "30")
 	uci:save("olsrd")
-	uci:save("olsrd6")
 end
 
 
@@ -74,5 +52,4 @@ end
 
 function updatePlugin(pluginName, key, value)
 	updatePluginInConfig("olsrd", pluginName, key, value)
-	updatePluginInConfig("olsrd6", pluginName, key, value)
 end

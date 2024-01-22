@@ -118,7 +118,6 @@ function commit()
 
   uci:commit("dhcp")
   uci:commit("olsrd")
-  uci:commit("olsrd6")
   uci:commit("firewall")
   uci:commit("system")
   uci:commit("ffwizard")
@@ -128,7 +127,6 @@ function commit()
   uci:commit("qos")
 
   sys.init.enable("olsrd")
-  sys.init.enable("olsrd6")
   -- openvpn gets started by wan hotplug script
   sys.init.disable("openvpn")
 
@@ -156,7 +154,6 @@ end
 function reset()
   uci:revert("dhcp")
   uci:revert("olsrd")
-  uci:revert("olsrd6")
   uci:revert("firewall")
   uci:revert("system")
   uci:revert("freifunk")

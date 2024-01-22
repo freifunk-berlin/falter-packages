@@ -79,69 +79,6 @@ uci set olsrd.procd.respawn_retry=0
 
 uci commit olsrd
 
-
-##########
-# OLSRD6 #
-##########
-
-# reset olsrd6 config
-uci import olsrd6 <<EOF
-EOF
-
-# add txtinfo plugin - needed for collectd-mod-olsrd
-PLUGIN="$(uci add olsrd6 LoadPlugin)"
-uci set olsrd6.$PLUGIN.accept=0::
-uci set olsrd6.$PLUGIN.library=olsrd_txtinfo
-uci set olsrd6.$PLUGIN.port=2006
-uci set olsrd6.$PLUGIN.ipv6only=true
-
-# add nameservice plugin
-PLUGIN="$(uci add olsrd6 LoadPlugin)"
-uci set olsrd6.$PLUGIN.library=olsrd_nameservice
-uci set olsrd6.$PLUGIN.suffix=.olsr
-uci set olsrd6.$PLUGIN.hosts_file=/tmp/hosts/olsr.ipv6
-uci set olsrd6.$PLUGIN.latlon_file=/var/run/latlon.js.ipv6
-uci set olsrd6.$PLUGIN.services_file=/var/etc/services.olsr.ipv6
-
-# add jsoninfo plugin
-PLUGIN="$(uci add olsrd6 LoadPlugin)"
-uci set olsrd6.$PLUGIN.accept=0::
-uci set olsrd6.$PLUGIN.library=olsrd_jsoninfo
-uci set olsrd6.$PLUGIN.ignore=0
-uci set olsrd6.$PLUGIN.ipv6only=true
-
-# set olsrd defaults
-OLSRD="$(uci add olsrd6 olsrd)"
-uci set olsrd6.$OLSRD.IpVersion=6
-uci set olsrd6.$OLSRD.FIBMetric=flat
-uci set olsrd6.$OLSRD.AllowNoInt=yes
-uci set olsrd6.$OLSRD.TcRedundancy=2
-uci set olsrd6.$OLSRD.LinkQualityAlgorithm=etx_ffeth
-uci set olsrd6.$OLSRD.Pollrate=0.025
-uci set olsrd6.$OLSRD.RtTable=111
-uci set olsrd6.$OLSRD.RtTableDefault=112
-uci set olsrd6.$OLSRD.RtTablePriority=1000
-uci set olsrd6.$OLSRD.RtTableDefaultOlsrPriority=20000
-
-# set InterfaceDefaults parameters
-INTERFACES="$(uci add olsrd6 InterfaceDefaults)"
-uci set olsrd6.$INTERFACES.MidValidityTime=500.0
-uci set olsrd6.$INTERFACES.TcInterval=2.0
-uci set olsrd6.$INTERFACES.HnaValidityTime=125.0
-uci set olsrd6.$INTERFACES.HelloValidityTime=125.0
-uci set olsrd6.$INTERFACES.TcValidityTime=500.0
-uci set olsrd6.$INTERFACES.MidInterval=25.0
-uci set olsrd6.$INTERFACES.HelloInterval=3.0
-uci set olsrd6.$INTERFACES.HnaInterval=10.0
-
-# set procd parameters
-uci set olsrd6.procd=procd
-uci set olsrd6.procd.respawn_threshold=3600
-uci set olsrd6.procd.respawn_timeout=15
-uci set olsrd6.procd.respawn_retry=0
-
-uci commit olsrd6
-
 # add routing tables
 tables="/etc/iproute2/rt_tables"
 test -d /etc/iproute2/ || mkdir -p /etc/iproute2/
