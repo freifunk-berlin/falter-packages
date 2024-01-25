@@ -13,7 +13,7 @@ define Package/falter-berlin-uplink-notunnel
 	CATEGORY:=falter-berlin
 	TITLE:=Freifunk Berlin no tunnel files
 	URL:=http://github.com/freifunk-berlin/packages_berlin
-	EXTRA_DEPENDS:=kmod-veth, pingcheck
+	EXTRA_DEPENDS:=kmod-veth
 	PROVIDES:=falter-berlin-uplink
 	PKGARCH:=all
 endef
@@ -26,10 +26,6 @@ endef
 define Package/falter-berlin-uplink-notunnel/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(CP) ./uci-defaults/* $(1)/etc/uci-defaults
-	$(INSTALL_DIR) $(1)/etc/pingcheck/online.d
-	$(CP) ./files/etc/pingcheck/online.d/* $(1)/etc/pingcheck/online.d
-	$(INSTALL_DIR) $(1)/etc/pingcheck/offline.d
-	$(CP) ./files/etc/pingcheck/offline.d/* $(1)/etc/pingcheck/offline.d
 endef
 
 $(eval $(call BuildPackage,falter-berlin-uplink-notunnel))
