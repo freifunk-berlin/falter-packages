@@ -70,7 +70,7 @@ define Package/falter-more/description
 endef
 
 define Package/falter-more/install
-	$(CP) ./files/* $(1)/
+	$(CP) ./files-more/* $(1)/
 endef
 
 
