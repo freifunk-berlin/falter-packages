@@ -77,7 +77,7 @@ endef
 define Package/falter-standard
 	$(call Package/falter-standard/template)
 	TITLE:=Falter Standard firmware (tunnel uplink)
-	EXTRA_DEPENDS:=falter-more, falter-berlin-uplink-tunnelberlin, wpad-mini
+	EXTRA_DEPENDS:=falter-more, falter-berlin-uplink-tunnelberlin
 endef
 
 define Package/falter-standard/description
