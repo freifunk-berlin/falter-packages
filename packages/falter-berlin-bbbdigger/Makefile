@@ -42,13 +42,7 @@ define Build/Compile
 endef
 
 define Package/falter-berlin-bbbdigger/install
-	$(INSTALL_DIR) $(1)/tmp
-	$(INSTALL_BIN) ./files/postinst.sh $(1)/tmp/falter-berlin-bbbdigger_postinst.sh
-endef
-
-define Package/falter-berlin-bbbdigger/postinst
-#!/bin/sh
-$${IPKG_INSTROOT}/tmp/falter-berlin-bbbdigger_postinst.sh
+  $(CP) ./files/* $(1)/
 endef
 
 $(eval $(call BuildPackage,falter-berlin-bbbdigger))
