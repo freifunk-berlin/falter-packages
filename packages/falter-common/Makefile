@@ -57,7 +57,7 @@ endef
 
 define Package/falter-more
 	$(call Package/falter-standard/template)
-	TITLE:=Falter more files
+	TITLE:=Falter more packages
 	EXTRA_DEPENDS:=falter-common, falter-profiles, luci-app-ffwizard-falter, falter-berlin-migration, falter-berlin-tunneldigger, falter-policyrouting, falter-berlin-ssid-changer, falter-berlin-bbbdigger,
 	EXTRA_DEPENDS+= qos-scripts, firewall4, luci-app-firewall, luci-i18n-firewall-de,
 	EXTRA_DEPENDS+= falter-berlin-autoupdate, falter-berlin-autoupdate-keys, luci-app-falter-autoupdate, luci-i18n-falter-autoupdate-de,
@@ -66,11 +66,11 @@ define Package/falter-more
 endef
 
 define Package/falter-more/description
-	Additional configs and scripts that enable participation in Falter-based Freifunk networks.
+	Additional packages that enable participation in Falter-based Freifunk networks.
 endef
 
 define Package/falter-more/install
-	$(CP) ./files-more/* $(1)/
+	true
 endef
 
 
