@@ -8,7 +8,7 @@ if ! which uci2ffwizard; then
     exit 1
 fi
 
-# check, if there is the needed information already set
+# retry on next boot if the wizard hasn't been completed yet
 if [ ! -f /etc/config/ffwizard ]; then
     exit 1
 fi
