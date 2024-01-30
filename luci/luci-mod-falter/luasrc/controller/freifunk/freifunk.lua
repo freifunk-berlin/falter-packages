@@ -42,8 +42,6 @@ function index()
 	page.setuser  = false
 	page.setgroup = false
 
-	entry({"freifunk", "status", "zeroes"}, call("zeroes"), "Testdownload")
-
 	if nixio.fs.access("/usr/sbin/luci-splash") then
 		assign({"freifunk", "status", "splash"}, {"splash", "publicstatus"}, _("Splash"), 40)
 	end
@@ -114,19 +112,4 @@ function index()
 	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
 	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
 	entry({"admin", "freifunk", "profile_error"}, template("freifunk/profile_error"))
-end
-
-function zeroes()
-	local string = require "string"
-	local http = require "luci.http"
-	local zeroes = string.rep(string.char(0), 8192)
-	local cnt = 0
-	local lim = 1024 * 1024 * 1024
-	
-	http.prepare_content("application/x-many-zeroes")
-
-	while cnt < lim do
-		http.write(zeroes)
-		cnt = cnt + #zeroes
-	end
 end
