@@ -10,7 +10,6 @@ function index()
 	-- Frontend
 	page          = node()
 	page.lock     = true
-	page.target   = alias("freifunk")
 	page.subindex = true
 	page.index    = false
 
@@ -66,7 +65,6 @@ function index()
 
 	-- backend
 	assign({"mini", "freifunk"}, {"admin", "freifunk"}, _("Freifunk"), 5)
-	entry({"admin", "freifunk"}, alias("admin", "freifunk", "index"), _("Freifunk"), 5)
 
 	page        = node("admin", "freifunk")
 	page.target = template("freifunk/adminindex")
