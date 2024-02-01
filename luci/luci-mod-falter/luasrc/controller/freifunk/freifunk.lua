@@ -4,7 +4,6 @@
 module("luci.controller.freifunk.freifunk", package.seeall)
 
 function index()
-	local uci = require "luci.model.uci".cursor()
 	local page
 
 	-- Frontend
