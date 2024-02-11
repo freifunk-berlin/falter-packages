@@ -64,6 +64,22 @@ gitmirror="https://git.openwrt.org"
 # gitmirror="file:///mnt/mirror/git.openwrt.org"
 # gitmirror="http://192.168.1.1/git.openwrt.org"
 
+function cache_feed() {
+  local name="$1"
+  local url="$2"
+  if [[ ! -d "tmp/feeds/$name" ]] ; then
+    git clone --mirror "$url" "tmp/feeds/$name"
+  else
+    (cd "tmp/feeds/$name" ; git fetch --all)
+  fi
+}
+mkdir -p tmp/feeds
+cache_feed base https://git.openwrt.org/openwrt/openwrt.git
+cache_feed packages https://git.openwrt.org/feed/packages.git
+cache_feed luci https://git.openwrt.org/project/luci.git
+cache_feed routing https://git.openwrt.org/feed/routing.git
+cache_feed telephony https://git.openwrt.org/feed/telephony.git
+
 mkdir -p "$dest/falter"
 destdir=$(realpath "$dest")
 
@@ -84,23 +100,24 @@ unbuf="stdbuf --output=0 --error=0"
 
   # download and extract sdk tarball
   mkdir -p "./tmp/dl/$branch"
-  wget --progress=dot:giga -O "./tmp/dl/$branch/$sdkfile" "$dlurl/$target/$sdkfile"
+  ( cd "./tmp/dl/$branch/" ; wget -N --progress=dot:giga "$dlurl/$target/$sdkfile")
   rm -rf "$sdkdir"
   mkdir -p "$sdkdir"
   tar -x -C "$sdkdir" --strip-components=1 -f "./tmp/dl/$branch/$sdkfile"
 
-  # configure our feed, with an indirection via /tmp/feed so sdk doesn't recurse our feed
-  mkdir -p ./tmp/feed
-  ln -sfT "$(pwd)/packages" ./tmp/feed/packages
-  ln -sfT "$(pwd)/luci" ./tmp/feed/luci
-  cp "$sdkdir/feeds.conf.default" "$sdkdir/feeds.conf"
-  if [ "$gitmirror" != "https://git.openwrt.org" ]; then
-    sed -i "s|https://git.openwrt.org/openwrt|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i "s|https://git.openwrt.org/feed|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i "s|https://git.openwrt.org/project|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i 's|src-git |src-git-full |g' "$sdkdir/feeds.conf"
-  fi
-  echo "src-link falter $(pwd)/tmp/feed" >> "$sdkdir/feeds.conf"
+  # use the local cached feed repos
+  echo "src-git base file:///$(pwd)/tmp/feeds/base" >> "$sdkdir/feeds.conf"
+  echo "src-git packages file:///$(pwd)/tmp/feeds/packages" >> "$sdkdir/feeds.conf"
+  echo "src-git luci file:///$(pwd)/tmp/feeds/luci" >> "$sdkdir/feeds.conf"
+  echo "src-git routing file:///$(pwd)/tmp/feeds/routing" >> "$sdkdir/feeds.conf"
+  echo "src-git telephony file:///$(pwd)/tmp/feeds/telephony" >> "$sdkdir/feeds.conf"
+
+  # configure our own feed
+  # with an indirection via a symlink so the sdk doesn't recurse our feed
+  mkdir -p ./tmp/feeds/falter
+  ln -sfT "$(pwd)/packages" ./tmp/feeds/falter/packages
+  ln -sfT "$(pwd)/luci" ./tmp/feeds/falter/luci
+  echo "src-link falter $(pwd)/tmp/feeds/falter" >> "$sdkdir/feeds.conf"
 
   cd "$sdkdir"
 
