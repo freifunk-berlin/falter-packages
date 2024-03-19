@@ -393,8 +393,8 @@ function uplink_maintenance(nsid, netns, ifname) {
       // shell_command("ip -n "+netns+" link set "+ifname+" up");
       // shell_command("ip -n "+netns+" link set "+ifname+" name "+netnsifname);
 
-      // or create a macvlan bridge:
-      shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode bridge");
+      // or create a macvlan passthru:
+      shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode passthru");
       shell_command("ip link set dev "+netnsifname+" netns "+netns);
       shell_command("ip -n "+netns+" link set up "+netnsifname+"");
 
