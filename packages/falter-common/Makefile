@@ -32,19 +32,20 @@ define Package/falter-common
 	$(call Package/falter-standard/template)
 	TITLE:=Falter common files
 	EXTRA_DEPENDS:=uci, libuci-lua, lua, ip, ethtool, iwinfo, libiwinfo-lua,
-	EXTRA_DEPENDS+= uhttpd, uhttpd-mod-ubus, luci, luci-ssl, luci-app-opkg, luci-i18n-base-de, luci-i18n-opkg-de, luci-proto-ppp, luci-theme-bootstrap,
+	EXTRA_DEPENDS+= uhttpd, uhttpd-mod-ubus, luci, luci-app-opkg, luci-i18n-base-de, luci-i18n-opkg-de, luci-proto-ppp, luci-theme-bootstrap,
 	EXTRA_DEPENDS+= luci-mod-falter, luci-i18n-falter-de, luci-app-falter-owm, luci-app-falter-owm-ant, luci-app-falter-owm-cmd, luci-app-falter-owm-gui,
-	EXTRA_DEPENDS+= olsrd, olsrd-mod-arprefresh, olsrd-mod-dyn-gw, olsrd-mod-jsoninfo, olsrd-mod-txtinfo, olsrd-mod-nameservice, olsrd-mod-watchdog, kmod-ipip, luci-app-olsr, luci-app-olsr-services, luci-i18n-olsr-de,
+	EXTRA_DEPENDS+= olsrd, olsrd-utils, olsrd-mod-arprefresh, olsrd-mod-dyn-gw, olsrd-mod-jsoninfo, olsrd-mod-txtinfo, olsrd-mod-nameservice, olsrd-mod-watchdog, kmod-ipip, luci-app-olsr, luci-app-olsr-services, luci-i18n-olsr-de,
 	EXTRA_DEPENDS+= vnstat, luci-app-statistics, luci-i18n-statistics-de, collectd, collectd-mod-dhcpleases, collectd-mod-interface, collectd-mod-iwinfo, collectd-mod-network, collectd-mod-olsrd, collectd-mod-rrdtool, collectd-mod-ping, collectd-mod-uptime, collectd-mod-memory,
 	EXTRA_DEPENDS+= tcpdump-mini, mtr, iperf3, tmux
 endef
 
 define Package/falter-common/description
-	Common configs and scripts that enable participation in Falter-based Freifunk networks.
+	Common configs and scripts that are shared by Falter and BBB-Configs.
 endef
 
 define Package/falter-common/conffiles
 /etc/config/freifunk
+/etc/config/ffwizard
 endef
 
 FALTER_REVISION:=$(shell git -C $(TOPDIR)/feeds/falter describe --exact-match --tags 2> /dev/null || git -C $(TOPDIR)/feeds/falter rev-parse --short HEAD)
@@ -77,7 +78,7 @@ endef
 define Package/falter-standard
 	$(call Package/falter-standard/template)
 	TITLE:=Falter Standard firmware (tunnel uplink)
-	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-tunnelberlin
+	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-tunnelberlin, luci-ssl
 endef
 
 define Package/falter-standard/description
@@ -92,7 +93,7 @@ endef
 define Package/falter-notunnel
 	$(call Package/falter-standard/template)
 	TITLE:=Falter No-Tunnel firmware (direct uplink)
-	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-notunnel
+	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-notunnel, luci-ssl
 endef
 
 define Package/falter-notunnel/description
@@ -107,7 +108,7 @@ endef
 define Package/falter-backbone
 	$(call Package/falter-standard/template)
 	TITLE:=Falter Backbone firmware (mesh only)
-	EXTRA_DEPENDS:=falter-defaults, falter-common, falter-berlin-tunneldigger
+	EXTRA_DEPENDS:=falter-defaults, falter-common, falter-berlin-tunneldigger, luci-ssl
 endef
 
 define Package/falter-backbone/description
