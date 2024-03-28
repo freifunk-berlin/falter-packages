@@ -77,7 +77,7 @@ endef
 define Package/falter-standard
 	$(call Package/falter-standard/template)
 	TITLE:=Falter Standard firmware (tunnel uplink)
-	EXTRA_DEPENDS:=falter-more, falter-berlin-uplink-tunnelberlin
+	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-tunnelberlin
 endef
 
 define Package/falter-standard/description
@@ -92,7 +92,7 @@ endef
 define Package/falter-notunnel
 	$(call Package/falter-standard/template)
 	TITLE:=Falter No-Tunnel firmware (direct uplink)
-	EXTRA_DEPENDS:=falter-more, falter-berlin-uplink-notunnel
+	EXTRA_DEPENDS:=falter-defaults, falter-more, falter-berlin-uplink-notunnel
 endef
 
 define Package/falter-notunnel/description
@@ -107,7 +107,7 @@ endef
 define Package/falter-backbone
 	$(call Package/falter-standard/template)
 	TITLE:=Falter Backbone firmware (mesh only)
-	EXTRA_DEPENDS:=falter-common, falter-berlin-tunneldigger
+	EXTRA_DEPENDS:=falter-defaults, falter-common, falter-berlin-tunneldigger
 endef
 
 define Package/falter-backbone/description
