@@ -15,7 +15,6 @@ define Package/falter-profiles
   CATEGORY:=LuCI
   SUBMENU:=9. Freifunk
   TITLE:=Falter profiles
-  EXTRA_DEPENDS:=falter-common
   PKGARCH:=all
 endef
 
