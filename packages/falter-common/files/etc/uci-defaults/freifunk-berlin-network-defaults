@@ -31,7 +31,7 @@ if [ "X${WANDEV}X" = "XX" ]; then
   # create a wan6 interface, even if it can't do anything
   uci set network.wan6=interface
   uci set network.wan6.device="br-wan"
-  uci set network.wan6.proto="dhcp6"
+  uci set network.wan6.proto="dhcpv6"
 
 elif [ $BRIDGECHECK = "0" ]; then
   # The wan device is a bridge (ex DSA with multiple physical ports)
