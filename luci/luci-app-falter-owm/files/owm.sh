@@ -188,8 +188,9 @@ com_splash_prefix=$(uci_get freifunk community splash_prefix)
 
 json_init
 json_add_object freifunk
-
+{
 	json_add_object contact
+	{
 		if [ -n "$name" ]; then json_add_string name "$name"; fi
 		# contact list superseeds the use of mail option
 		if [ -n "$contacts" ]; then
@@ -201,9 +202,11 @@ json_add_object freifunk
 		if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
 		if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi # was array of homepages
 		if [ -n "$note" ]; then json_add_string note "$note"; fi
+	}
 	json_close_object
 
 	json_add_object community
+	{
 		json_add_string ssid "$ssid"
 		json_add_string mesh_network "$mesh_network"
 		json_add_string owm_api "$uci_owm_api"
@@ -214,7 +217,9 @@ json_add_object freifunk
 		json_add_string ssid_scheme "$com_ssid_scheme"
 		json_add_string splash_network "$com_splash_network"
 		json_add_int splash_prefix $com_splash_prefix
+	}
 	json_close_object
+}
 json_close_object
 
 # script infos
@@ -223,39 +228,53 @@ json_add_string script "owm.sh"
 json_add_double api_rev $OWM_API_VER
 
 json_add_object system
+{
 	json_add_array sysinfo
+	{
 		json_add_string "" "system is deprecated"
 		json_add_string "" "$model"
+	}
 	json_close_array
 	json_add_array uptime
+	{
 		json_add_int "" $uptime
+	}
 	json_close_array
 	json_add_array loadavg
+	{
 		json_add_double "" $load5
+	}
 	json_close_array
+}
 json_close_object
 
 # OLSR-Config
 # That string gets substituted by the olsrd-config-string afterwards
 json_add_object olsr
+{
 	json_add_string ipv4Config '$OLSRCONFIG'
+}
 json_close_object
 
 json_add_array links
+{
 	IFSORIG="$IFS"
 	IFS=';'
 	for i in ${olsr4links} ; do
 		IFS="$IFSORIG"
 		set -- $i
 		json_add_object
-		json_add_string sourceAddr4 "$1"
-		json_add_string destAddr4 "$2"
-		json_add_string id "$3"
-		json_add_double quality "$4"
+		{
+			json_add_string sourceAddr4 "$1"
+			json_add_string destAddr4 "$2"
+			json_add_string id "$3"
+			json_add_double quality "$4"
+		}
 		json_close_object
 		IFS=';'
 	done
 	IFS="$IFSORIG"
+}
 json_close_array
 
 # General node info
@@ -267,10 +286,12 @@ json_add_string hostname "$hostname"
 json_add_int updateInterval 3600
 json_add_string hardware "$system"
 json_add_object firmware
+{
 	json_add_string name "$distribution $version"
 	json_add_string revision "$revision"
 	json_add_string kernelVersion "$kernelVersion"
 	json_add_string kernelBuildDate "$buildDate"
+}
 json_close_object
 
 json_close_object
