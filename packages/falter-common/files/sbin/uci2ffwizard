@@ -85,63 +85,78 @@ json_get_var hostname hostname
 #############################
 
 json_init
-
+{
     json_add_string "created" "$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")"
     json_add_string "version" "1.0"
 
     json_add_array contact
+    {
         json_add_object
+        {
             if [ -n "$nick" ]; then json_add_string nickname "$nick"; fi
             if [ -n "$name" ]; then json_add_string realname "$name"; fi
             if [ -n "$mail" ]; then json_add_string email "$mail"; fi
             if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi
             if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
             json_add_string url "$url"
+        }
         json_close_object
+    }
     json_close_array
 
     json_add_object node
+    {
         json_add_string name "$hostname"
         json_add_string community "$com_name"
 
         json_add_object location
+        {
             json_add_double latitude $latitude
             json_add_double longitude $longitude
             json_add_string description "$loc_description"
+        }
         json_close_object
 
         json_add_object internet
+        {
             json_add_boolean share $share
             json_add_string uplink-tunnel "$is_tunneldigger"
             json_add_string mesh-tunnel "$has_bbbdigger"
             json_add_int download $download
             json_add_int upload $upload
+        }
         json_close_object
 
         json_add_boolean monitoring $monitoring
 
         json_add_object autoupdate
+        {
             json_add_boolean enabled $autoupdate_enabled
             json_add_string branch "stable"
+        }
         json_close_object
 
-
         json_add_object ips
+        {
             json_add_array mesh
+            {
                 if [ -n "$mesh1" ]; then json_add_string "" "$mesh1/32"; fi
                 if [ -n "$mesh2" ]; then json_add_string "" "$mesh2/32"; fi
+            }
             json_close_array
             json_add_string dhcp "$dhcp"
             json_add_string ipv6 ""
+        }
         json_close_object
+    }
     json_close_object
 
     json_add_array sshkeys
-
+    {
         while IFS= read -r line; do
             json_add_string "" "$line"
         done < /etc/dropbear/authorized_keys
-
+    }
     json_close_array
-
+}
 json_dump
