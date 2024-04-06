@@ -45,7 +45,6 @@ NET_STATE=$?
 
 ONLINE_SSIDS=$(get_interfaces)
 CHK_SSID=$(echo "$ONLINE_SSIDS" | cut -d' ' -f 1) # makes checking easier
-CHANGE=0
 
 if [ $NET_STATE = 0 ]; then # router online: switch to online, if not present already
     # abort if SSID is "online" already
@@ -64,7 +63,6 @@ if [ $NET_STATE = 0 ]; then # router online: switch to online, if not present al
         for ONLINE_SSID in $ONLINE_SSIDS; do
             log "Internet was reached. Change SSID back to online..."
             sed -i "s~^ssid=$OFFLINE_SSID~ssid=$ONLINE_SSID~" "$HOSTAPD"
-            CHANGE=1
         done
     done
 else # router offline: adjust ssid accordingly, if needed

@@ -1,5 +1,8 @@
 #!/bin/sh /etc/rc.common
 
+# shellcheck disable=SC2044
+# shellcheck disable=SC2068
+
 . $IPKG_INSTROOT/lib/functions/network.sh
 
 # Comment out the START declaration to prevent the init file from
@@ -23,7 +26,8 @@ tunnel_is_up() {
 
 interface_disabled() {
         local iface=$1
-        local disabled=$(uci -q get network.${iface}.disabled)
+        local disabled
+        disabled="$(uci -q get network.${iface}.disabled)"
         [ -z $disabled ] && disabled=0
         echo "${disabled}"
 }
@@ -33,13 +37,16 @@ srv_lookup() {
         local i
         local srvlist=""
         for i in $srv; do
-                local lookup=$(nslookup -q=SRV $i | grep $i | cut -d "=" -f 2)
+                local lookup
+                lookup="$(nslookup -q=SRV $i | grep $i | cut -d "=" -f 2)"
                 local OLDIFS=$IFS
                 IFS=$'\n'
                 local j
                 for j in $lookup; do
-                        local host=$(echo $j | cut -d ' ' -f 5)
-                        local port=$(echo $j | cut -d ' ' -f 4)
+                        local host
+                        local port
+                        host="$(echo $j | cut -d ' ' -f 5)"
+                        port="$(echo $j | cut -d ' ' -f 4)"
                         append srvlist "${host}:${port}"
                 done
                 IFS=$OLDIFS
@@ -53,14 +60,14 @@ missing() {
 }
 
 handle_td() {
-        local cfg=$1; shift
+        local cfg="$1"; shift
         # determine if we should start only this instance
-        local sections=$@
-        local argn=$#
+        local sections=("$@")
+        local argn="$#"
         local skip=0
         if [ $argn -ne 0 ]; then
                 skip=1
-                for section in $sections; do
+                for section in "${sections[@]}"; do
                         if [ "$cfg" == "$section" ]; then
                                 skip=0
                                 break
@@ -79,7 +86,6 @@ handle_td() {
         local group
         local limit_bw_down
         local hook_script
-        local bind_interface
         local broker_selection
 
         config_get_bool enabled "$cfg" enabled 1
@@ -90,15 +96,14 @@ handle_td() {
         config_get group "$cfg" group
         config_get limit_bw_down "$cfg" limit_bw_down
         config_get hook_script "$cfg" hook_script
-        config_get bind_interface "$cfg" bind_interface
         config_get broker_selection "$cfg" broker_selection
 
         let tunnel_id++
 			
         [ $enabled -eq 0 ] && return
-        [ $(interface_disabled ${interface}) == "1" ] && \
+        [ "$(interface_disabled ${interface})" == "1" ] && \
                 echo "Not starting tunneldigger \"${cfg}\", interface ${interface} disabled" && return
-        [ $(tunnel_is_up ${interface}) == "1" ] && \
+        [ "$(tunnel_is_up ${interface})" == "1" ] && \
                 echo "Not starting tunneldigger \"${cfg}\", already started" && return
 
         local broker_opts=""
@@ -156,7 +161,7 @@ start() {
 # to stop all tunneldigger sections.  With arguements, only the listed tunneldigger
 # sections are stopped
 stop() {
-        local sections=$@
+        local sections=("$@")
         local argn=$#
         for PIDFILE in `find ${PIDPATH}/ -name "tunneldigger\.*\.pid"`; do
                 PID="$(cat ${PIDFILE})"
@@ -165,8 +170,9 @@ stop() {
                 local skip=0
                 if [ $argn -ne 0 ]; then
                         skip=1
-                        for section in $sections; do
-                                local section_iface=$(uci get tunneldigger.${section}.interface)
+                        for section in "${sections[@]}"; do
+                                local section_iface
+                                section_iface="$(uci get tunneldigger.${section}.interface)"
                                 if [ $IFACE = $section_iface ]; then
                                         skip=0
                                         break
@@ -182,7 +188,7 @@ stop() {
                         echo "  waiting for tunneldigger to stop"
                         sleep 1
                 done
-                $(rm -f ${PIDFILE})
+                rm -f ${PIDFILE}
                 echo "  tunneldigger stopped"
         done
 }

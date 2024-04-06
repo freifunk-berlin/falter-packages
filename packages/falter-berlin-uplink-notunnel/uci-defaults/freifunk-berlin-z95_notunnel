@@ -2,7 +2,7 @@
 
 THIS_UPLINKNAME="notunnel"
 
-. /lib/functions/freifunk-berlin-network.sh 
+. /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 . /lib/functions.sh
 
@@ -48,21 +48,22 @@ uci set network.ffuplink_dev.macaddr=$macaddr
 uci commit network.ffuplink_dev
 
 # add ffuplink_dev to the br-wan bridge if not there
-devname=$(uci get network.wan.device)
 handle_wan_device() {
   local config=$1
   local name=""
-  local ports=""
-  local wandev=$(uci -q get network.wan.device)
+  local _ports=""
+  local wandev
+
+  wandev="$(uci -q get network.wan.device)"
   if [ -z $wandev ]; then
-    return
+      return
   fi
 
   config_get name $config name
   if [ "X${name}X" == "Xbr-wanX" ]; then
-    config_get ports $config ports
-    list_contains ports ffuplink_wan || uci add_list network.${config}.ports="ffuplink_wan"
-    uci commit network.${config}
+      config_get _ports $config _ports
+      list_contains _ports ffuplink_wan || uci add_list network.${config}.ports="ffuplink_wan"
+      uci commit network.${config}
   fi
 }
 
@@ -71,6 +72,6 @@ config_load network
 config_foreach handle_wan_device device
 
 uci set network.ffuplink.proto=dhcp
-uci set network.ffuplink.hostname=freifunk-$(echo $macaddr|tr -d :)-uplink
+uci set network.ffuplink.hostname="freifunk-$(echo $macaddr|tr -d :)-uplink"
 uci commit network.ffuplink
 
