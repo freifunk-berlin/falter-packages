@@ -2,7 +2,7 @@
 
 THIS_UPLINKNAME="tunnelberlin_tunneldigger"
 
-. /lib/functions/freifunk-berlin-network.sh 
+. /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 . /lib/functions/system.sh
 
@@ -48,7 +48,7 @@ uci commit network.ffuplink
 UUID=$(uci -q get tunneldigger.ffuplink.uuid)
 if [ $? -eq 1 ]; then
   UUID=$macaddr
-  for byte in 7 8 9 10; do
+  for _byte in 7 8 9 10; do
     UUID=$UUID`dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"'`
   done
 fi

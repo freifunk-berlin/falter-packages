@@ -9,9 +9,11 @@
 proto="4"
 #[ -f /proc/net/ipv6_route ] && proto="4 6"
 
+enable=""
+zones=""
+strict=""
 config_load freifunk-policyrouting
 config_get enable pr enable
-config_get fallback pr fallback
 config_get strict pr strict
 config_get zones pr zones
 
@@ -25,9 +27,9 @@ if [ "$ACTION" = "ifup" ] && [ "$enable" = "1" ]; then
 		#network_get_subnet6 net6 $INTERFACE
 	;;esac
 
-	if [ "$net" != "" -a -n "${DEVICE}" ]; then
-		eval $(/bin/ipcalc.sh $net)
-		if [ "$PREFIX" != "0" -a "$NETWORK" != "127.0.0.0" ]; then
+	if [ "$net" != "" ] && [ -n "${DEVICE}" ]; then
+		eval "$(/bin/ipcalc.sh $net)"
+		if [ "$PREFIX" != "0" ] && [ "$NETWORK" != "127.0.0.0" ]; then
 			if [ ! "$(ip route show table localnets |grep "$NETWORK/$PREFIX dev")" ]; then
 				cmd="ip route add $NETWORK/$PREFIX dev ${DEVICE} table localnets"
 				$cmd
@@ -51,7 +53,7 @@ if [ "$ACTION" = "ifup" ] && [ "$enable" = "1" ]; then
 
 		if [ -n "$net6" ]; then
 			cmd="ip -6 route add $net6 dev ${DEVICE} table localnets"
-			$cmd 2>&1 > /dev/null
+			$cmd >/dev/null 2>&1
 			if [ "$?" = 0 ]; then
 				logger -s -t policyrouting "Add route: $cmd (IPv6)"
 			fi

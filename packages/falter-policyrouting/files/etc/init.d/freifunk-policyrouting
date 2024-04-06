@@ -1,5 +1,7 @@
 #!/bin/sh /etc/rc.common
 
+# shellcheck disable=SC2034
+
 START=15
 . $IPKG_INSTROOT/lib/functions/network.sh
 . $IPKG_INSTROOT/lib/functions.sh
@@ -7,227 +9,231 @@ START=15
 proto="4"
 [ -f /etc/config/olsrd ] && cfgs="olsrd"
 
+enable=""
+zones=""
+fallback=""
+strict=""
 config_load freifunk-policyrouting
 config_get enable pr enable
+config_get strict pr strict
 config_get fallback pr fallback
 config_get zones pr zones
 
-
 olsrd_rmtables() {
-	for cfg in $cfgs; do
-		# Remove custom routing tables from olsrd 
-		if [ "`uci -q get $cfg.@olsrd[0].RtTable`" == "111" ] || [ "`uci -q get $cfg.@olsrd[0].RtTableDefault`" == "112" ]; then
-			uci delete $cfg.@olsrd[0].RtTable
-			uci delete $cfg.@olsrd[0].RtTableDefault
-			uci commit
-		fi
-	done
+    for cfg in $cfgs; do
+        # Remove custom routing tables from olsrd
+        if [ "$(uci -q get $cfg.@olsrd[0].RtTable)" == "111" ] || [ "$(uci -q get $cfg.@olsrd[0].RtTableDefault)" == "112" ]; then
+            uci delete $cfg.@olsrd[0].RtTable
+            uci delete $cfg.@olsrd[0].RtTableDefault
+            uci commit
+        fi
+    done
 }
 
 olsrd_intalltables() {
-	for cfg in $cfgs; do
-		if [ ! "`uci -q get $cfg.@olsrd[0].RtTable`" == "111" ] || [ ! "`uci -q get $cfg.@olsrd[0].RtTableDefault`" == "112" ]; then
-			uci set $cfg.@olsrd[0].RtTable='111'
-			uci set $cfg.@olsrd[0].RtTableDefault='112'
-			uci commit $cfg
-			/etc/init.d/$cfg restart 2&> /dev/null
-		fi
-	done
+    for cfg in $cfgs; do
+        if [ ! "$(uci -q get $cfg.@olsrd[0].RtTable)" == "111" ] || [ ! "$(uci -q get $cfg.@olsrd[0].RtTableDefault)" == "112" ]; then
+            uci set $cfg.@olsrd[0].RtTable='111'
+            uci set $cfg.@olsrd[0].RtTableDefault='112'
+            uci commit $cfg
+            /etc/init.d/$cfg restart 2 &>/dev/null
+        fi
+    done
 }
 
 rt_tables() {
-	tables="/etc/iproute2/rt_tables"
-	if [ -z "`grep "110" $tables`" ]; then
-		echo "110 localnets" >> $tables
-	fi
-	if [ -z "`grep "111" $tables`" ]; then
-		echo "111 olsr" >> $tables
-	fi
-	if [ -z "`grep "112" $tables`" ]; then
-		echo "112 olsr-default" >> $tables
-	fi
+    tables="/etc/iproute2/rt_tables"
+    if [ -z "$(grep "110" $tables)" ]; then
+        echo "110 localnets" >>$tables
+    fi
+    if [ -z "$(grep "111" $tables)" ]; then
+        echo "111 olsr" >>$tables
+    fi
+    if [ -z "$(grep "112" $tables)" ]; then
+        echo "112 olsr-default" >>$tables
+    fi
 
 }
 
 handle_disable_dyngw() {
-	local cfg="$1"
-	local olsrd_cfg="$2"
-	config_get library "$cfg" library
-	case "$library" in
-		olsrd_dyn_gw_plain*)
-			config_get RtTable "$cfg" RtTable
-			if [ -z "$RtTable" ] || [ "$RtTable" = "254" ]; then
-				config_set "$cfg" ignore '1'
-				uci set $olsrd_cfg.$cfg.ignore="1"
-				uci commit $olsrd_cfg
-				logger -s -t policyrouting -p info "dyngw_plain plugin disabled."
-			fi
-		;;
-		olsrd_dyn_gw.so*)
-			logger -s -t policyrouting -p info "$cfg"
-			uci set $olsrd_cfg.$cfg.ignore="1"
-				uci commit $olsrd_cfg
-			logger -s -t policyrouting -p info "dyngw plugin disabled."
-		;;
-	esac
+    local cfg="$1"
+    local olsrd_cfg="$2"
+    local library
+    config_get library "$cfg" library
+    case "$library" in
+        olsrd_dyn_gw_plain*)
+            config_get RtTable "$cfg" RtTable
+            if [ -z "$RtTable" ] || [ "$RtTable" = "254" ]; then
+                config_set "$cfg" ignore '1'
+                uci set $olsrd_cfg.$cfg.ignore="1"
+                uci commit $olsrd_cfg
+                logger -s -t policyrouting -p info "dyngw_plain plugin disabled."
+            fi
+            ;;
+        olsrd_dyn_gw.so*)
+            logger -s -t policyrouting -p info "$cfg"
+            uci set $olsrd_cfg.$cfg.ignore="1"
+            uci commit $olsrd_cfg
+            logger -s -t policyrouting -p info "dyngw plugin disabled."
+            ;;
+    esac
 }
 
 disable_dyngw() {
-	for olsrd_cfg in $cfgs; do
-		config_load $olsrd_cfg
-		config_foreach handle_disable_dyngw LoadPlugin $olsrd_cfg
-	done
+    for olsrd_cfg in $cfgs; do
+        config_load $olsrd_cfg
+        config_foreach handle_disable_dyngw LoadPlugin $olsrd_cfg
+    done
 }
 
 restart_services() {
-	logger -s -t policyrouting -p info "Restarting services"
-	/etc/init.d/network restart 2&> /dev/null
-	for cfg in $cfgs; do
-		/etc/init.d/$cfg restart 2&> /dev/null
-	done
+    logger -s -t policyrouting -p info "Restarting services"
+    /etc/init.d/network restart 2 &>/dev/null
+    for cfg in $cfgs; do
+        /etc/init.d/$cfg restart 2 &>/dev/null
+    done
 }
 
 boot() {
-	if [ "$enable" = "1" ]; then
-		[ -d /var/state ] || mkdir -p /var/state
-		touch /var/state/freifunk-policyrouting
-		start noservicerestart
-	else
-		olsrd_rmtables
-	fi
+    if [ "$enable" = "1" ]; then
+        [ -d /var/state ] || mkdir -p /var/state
+        touch /var/state/freifunk-policyrouting
+        start noservicerestart
+    else
+        olsrd_rmtables
+    fi
 }
 
 add_lookup_rule() {
-	name=${1/-/_}
-	lookup=$2
-	prio=$3
-	in=$4
-	name=$name"_"${in:-allif}"_"
+    name=${1/-/_}
+    lookup=$2
+    prio=$3
+    in=$4
+    name="${name}_${in:-allif}_"
 
-	if [ -z "$name" -o -z "$lookup" -o -z "$prio" ]; then
-		logger -s -t policyrouting "Missing parameters for add_rule!"
-	else
-		for p in $proto; do
-			rule="rule"
-			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
-				uci batch <<- EOF
+    if [ -z "$name" ] || [ -z "$lookup" ] || [ -z "$prio" ]; then
+        logger -s -t policyrouting "Missing parameters for add_rule!"
+    else
+        for p in $proto; do
+            rule="rule"
+            if [ "$(uci -q get "network.${name}ipv${p}")" != "$rule" ]; then
+                uci batch <<-EOF
 					set network.${name}ipv${p}="$rule"
 					set network.${name}ipv${p}.lookup="$lookup"
 					set network.${name}ipv${p}.priority="$prio"
 					set network.${name}ipv${p}.in="$in"
 				EOF
-				uci commit network
-			fi
-		done
-	fi
+                uci commit network
+            fi
+        done
+    fi
 }
 
 add_action_rule() {
-	name=${1/-/_}
-	action=$2
-	prio=$3
-	in=$4
-	name=$name"_"${in:-allif}"_"
+    name=${1/-/_}
+    action=$2
+    prio=$3
+    in=$4
+    name="${name}_${in:-allif}_"
 
-	if [ -z "$name" -o -z "$action" -o -z "$prio" ]; then
-		logger -s -t policyrouting "Missing parameters for add_action!"
-	else
-		for p in $proto; do
-			rule="rule"
-			if [ "$(uci -q get network.${name}ipv${p})" != "$rule" ] ; then
-				uci batch <<- EOF
+    if [ -z "$name" ] || [ -z "$action" ] || [ -z "$prio" ]; then
+        logger -s -t policyrouting "Missing parameters for add_action!"
+    else
+        for p in $proto; do
+            rule="rule"
+            if [ "$(uci -q get "network.${name}ipv${p}")" != "$rule" ]; then
+                uci batch <<-EOF
 					set network.${name}ipv${p}="$rule"
 					set network.${name}ipv${p}.action="$action"
 					set network.${name}ipv${p}.priority="$prio"
 					set network.${name}ipv${p}.in="$in"
 				EOF
-				uci commit network
-			fi
-		done
-	fi
+                uci commit network
+            fi
+        done
+    fi
 }
 
-
 del_rule() {
-	name=${1/-/_}
-	in=$2
-	name=$name"_"${in:-allif}"_"
-	for p in $proto; do
-		uci -q delete network.${name}ipv${p}
-	done
-	uci commit network
+    name=${1/-/_}
+    in=$2
+    name="${name}_${in:-allif}_"
+    for p in $proto; do
+        uci -q delete "network.${name}ipv${p}"
+    done
+    uci commit network
 }
 
 start() {
-	if [ $enable = "1" ]; then
-		logger -s -t policyrouting "Starting policy routing."
-		rt_tables
-		olsrd_intalltables
-		#disable_dyngw
+    if [ $enable = "1" ]; then
+        logger -s -t policyrouting "Starting policy routing."
+        rt_tables
+        olsrd_intalltables
+        #disable_dyngw
 
-		add_lookup_rule olsr olsr 1000
-		add_lookup_rule localnets localnets 2000
+        add_lookup_rule olsr olsr 1000
+        add_lookup_rule localnets localnets 2000
 
-		if [ "$fallback" = 1 ]; then
-			add_lookup_rule olsr-default olsr-default 100000
-		fi
-		networks=""
-		for z in $zones; do
-			network_zone="$(uci -q get firewall.zone_${z}.network)"
-			if [ -z "$network_zone" ]; then
-				network_zone="$z"
-			fi
-			networks="$networks $network_zone"
-		done
+        if [ "$fallback" = 1 ]; then
+            add_lookup_rule olsr-default olsr-default 100000
+        fi
+        networks=""
+        for z in $zones; do
+            network_zone="$(uci -q get firewall.zone_${z}.network)"
+            if [ -z "$network_zone" ]; then
+                network_zone="$z"
+            fi
+            networks="$networks $network_zone"
+        done
 
-		sgw="$(uci -q get olsrd.@olsrd[0].SmartGateway)"
-		for n in $networks; do
-			# only add route for tunnel if smart gateway is enabled
-			if [ "$sgw" = "yes" ]; then
-				add_lookup_rule olsr-tunnel olsr-tunnel 19999 $n
-			fi
-			add_lookup_rule olsr-default olsr-default 20000 $n
-			if [ "$strict" != 0 ]; then
-				add_action_rule olsr-default_unreachable unreachable 20001 $n
-			fi
-		done
-	fi
-	uci commit network
-	if [ ! "$1" = "noservicerestart" ]; then
-		restart_services
-	fi
+        sgw="$(uci -q get olsrd.@olsrd[0].SmartGateway)"
+        for n in $networks; do
+            # only add route for tunnel if smart gateway is enabled
+            if [ "$sgw" = "yes" ]; then
+                add_lookup_rule olsr-tunnel olsr-tunnel 19999 $n
+            fi
+            add_lookup_rule olsr-default olsr-default 20000 $n
+            if [ "$strict" != 0 ]; then
+                add_action_rule olsr-default_unreachable unreachable 20001 $n
+            fi
+        done
+    fi
+    uci commit network
+    if [ ! "$1" = "noservicerestart" ]; then
+        restart_services
+    fi
 }
 
 stop() {
-	logger -s -t policyrouting "Stopping policy routing"
-	olsrd_rmtables
-	del_rule olsr-default
-	del_rule olsr
-	del_rule localnets
-	networks=""
-	for z in $zones; do
-		network_zone="$(uci -q get firewall.zone_${z}.network)"
-		if [ -z "$network_zone" ]; then
-			network_zone="$z"
-		fi
-		networks="$networks $network_zone"
-	done
+    logger -s -t policyrouting "Stopping policy routing"
+    olsrd_rmtables
+    del_rule olsr-default
+    del_rule olsr
+    del_rule localnets
+    networks=""
+    for z in $zones; do
+        network_zone="$(uci -q get firewall.zone_${z}.network)"
+        if [ -z "$network_zone" ]; then
+            network_zone="$z"
+        fi
+        networks="$networks $network_zone"
+    done
 
-	sgw=$(uci -q get olsrd.@olsrd[0].SmartGateway)
-	for n in $networks; do
-		if [ "$sgw" = "yes" ]; then
-			del_rule olsr-tunnel $n
-		fi
-		del_rule olsr-default $n
-		if [ "$strict" != 0 ]; then
-			del_rule olsr-default_unreachable $n
-		fi
-	done
-	restart_services
-	echo "Hint: To completely disable freifunk-policyrouting set enable=0 in /etc/config/freifunk-policyrouting."
+    sgw=$(uci -q get olsrd.@olsrd[0].SmartGateway)
+    for n in $networks; do
+        if [ "$sgw" = "yes" ]; then
+            del_rule olsr-tunnel $n
+        fi
+        del_rule olsr-default $n
+        if [ "$strict" != 0 ]; then
+            del_rule olsr-default_unreachable $n
+        fi
+    done
+    restart_services
+    echo "Hint: To completely disable freifunk-policyrouting set enable=0 in /etc/config/freifunk-policyrouting."
 }
 
 restart() {
-	logger -s -t policyrouting "Restarting policy routing"
-	start
+    logger -s -t policyrouting "Restarting policy routing"
+    start
 }
