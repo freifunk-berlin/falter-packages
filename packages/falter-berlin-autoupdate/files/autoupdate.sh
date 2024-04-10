@@ -91,21 +91,21 @@ MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-downlo
 
 while getopts him:Nntf option; do
     case $option in
-    h)
-        print_help
-        exit 0
-        ;;
-    i) OPT_IGNORE_CERTS=1 ;;
-    m) MIN_CERTS=$OPTARG ;;
-    N) OPT_NOW=1 ;;
-    n) OPT_N=1 ;;
-    t) OPT_TESTRUN=1 ;;
-    f) OPT_FORCE=1 ;;
-    *)
-        printf "\nUnknown argument! Please use valid arguments only.\n\n"
-        print_help
-        exit 2
-        ;;
+        h)
+            print_help
+            exit 0
+            ;;
+        i) OPT_IGNORE_CERTS=1 ;;
+        m) MIN_CERTS=$OPTARG ;;
+        N) OPT_NOW=1 ;;
+        n) OPT_N=1 ;;
+        t) OPT_TESTRUN=1 ;;
+        f) OPT_FORCE=1 ;;
+        *)
+            printf "\nUnknown argument! Please use valid arguments only.\n\n"
+            print_help
+            exit 2
+            ;;
     esac
 done
 

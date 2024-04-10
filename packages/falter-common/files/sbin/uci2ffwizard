@@ -48,9 +48,9 @@ fi
 uci_load ffwizard
 share="$(uci_get ffwizard settings sharenet)"
 usersBandwidthDown=$(uci_get ffwizard settings usersBandwidthDown)
-download="$(( usersBandwidthDown * 1000 ))"
+download="$((usersBandwidthDown * 1000))"
 usersBandwidthUp=$(uci_get ffwizard settings usersBandwidthUp)
-upload="$(( usersBandwidthUp * 1000 ))"
+upload="$((usersBandwidthUp * 1000))"
 monitoring="$(uci_get ffwizard settings enableStats)"
 mesh1="$(uci_get ffwizard settings meship_radio0)"
 mesh2="$(uci_get ffwizard settings meship_radio1)"
@@ -59,8 +59,7 @@ dhcp="$(uci_get ffwizard settings dhcpmesh)"
 # autoupdate-stuff
 uci_load autoupdate
 # swap value, as we have different properties here.
-autoupdate_enabled="$(( ! $(uci_get autoupdate cfg disabled) ))"
-
+autoupdate_enabled="$((!$(uci_get autoupdate cfg disabled)))"
 
 # tunnel-stuff
 uci_load ffberlin-uplink
@@ -76,7 +75,6 @@ has_bbbdigger="$(uci_get tunneldigger bbbdigger interface)"
 # get hostname
 json_load "$(ubus call system board)"
 json_get_var hostname hostname
-
 
 #############################
 #                           #
@@ -155,7 +153,7 @@ json_init
     {
         while IFS= read -r line; do
             json_add_string "" "$line"
-        done < /etc/dropbear/authorized_keys
+        done </etc/dropbear/authorized_keys
     }
     json_close_array
 }

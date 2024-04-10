@@ -20,8 +20,8 @@
 FFWIZARD3_FILE="$1"
 
 if [ ! -f "$FFWIZARD3_FILE" ]; then
-    echo "ERROR: There is no file $FFWIZARD3_FILE" 1>&2;
-    echo "Closing..." 1>&2;
+    echo "ERROR: There is no file $FFWIZARD3_FILE" 1>&2
+    echo "Closing..." 1>&2
     exit 1
 fi
 
@@ -34,37 +34,37 @@ json_get_var json_created created
 json_get_var json_version version
 
 json_select contact
-    idx=1
-    # iterate over objects inside contact-list
-    # we must write the vars immediately, otherwise they get lost
-    while json_is_a ${idx} object; do
-        json_select $idx
-            json_get_var nick nickname
-            json_get_var name realname
-            json_get_var mail email
-            json_get_var phone phone
-            json_get_var homepage homepage
-            json_get_var url url
+idx=1
+# iterate over objects inside contact-list
+# we must write the vars immediately, otherwise they get lost
+while json_is_a ${idx} object; do
+    json_select $idx
+    json_get_var nick nickname
+    json_get_var name realname
+    json_get_var mail email
+    json_get_var phone phone
+    json_get_var homepage homepage
+    json_get_var url url
 
-            # if there is no contact-section, create one
-            has_contact=$(uci_get freifunk contact)
-            if [ -z "$has_contact" ]; then
-                uci_add freifunk public contact
-            fi
+    # if there is no contact-section, create one
+    has_contact=$(uci_get freifunk contact)
+    if [ -z "$has_contact" ]; then
+        uci_add freifunk public contact
+    fi
 
-            if [ -n "$nick" ]; then uci_set freifunk contact nickname "$nick"; fi
-            if [ -n "$name" ]; then uci_set freifunk contact name "$name"; fi
-            if [ -n "$mail" ]; then uci_set freifunk contact mail "$mail"; fi
-            if [ -n "$phone" ]; then uci_set freifunk contact phone "$phone"; fi
-            if [ -n "$homepage" ]; then uci_set freifunk contact homepage "$homepage"; fi
-            if [ -n "$url" ]; then uci_set freifunk contact mail "$url"; fi
-        json_select ..
-        idx=$(( idx + 1 ))
-    done
-    uci_commit freifunk
+    if [ -n "$nick" ]; then uci_set freifunk contact nickname "$nick"; fi
+    if [ -n "$name" ]; then uci_set freifunk contact name "$name"; fi
+    if [ -n "$mail" ]; then uci_set freifunk contact mail "$mail"; fi
+    if [ -n "$phone" ]; then uci_set freifunk contact phone "$phone"; fi
+    if [ -n "$homepage" ]; then uci_set freifunk contact homepage "$homepage"; fi
+    if [ -n "$url" ]; then uci_set freifunk contact mail "$url"; fi
+    json_select ..
+    idx=$((idx + 1))
+done
+uci_commit freifunk
 
 # json_select node
-    # json_get_var name hostname
-    # json_get_var community community
+# json_get_var name hostname
+# json_get_var community community
 
 # ToDo: add the rest of the fields here.

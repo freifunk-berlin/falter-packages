@@ -12,7 +12,6 @@
 
 # ToDo: Website descriptions must not contain a comma!
 
-
 log() {
     local msg="$1"
     logger -t "ffserviced" -s "$msg"
@@ -223,7 +222,7 @@ if [ ! -f /etc/config/ffservices ]; then
     exit 2
 fi
 
-if [ -z "$(uci show ffservices | sed -e '/^#/d' )" ]; then
+if [ -z "$(uci show ffservices | sed -e '/^#/d')" ]; then
     echo "/etc/config/ffservices seems to contain no configuration."
     exit 2
 fi

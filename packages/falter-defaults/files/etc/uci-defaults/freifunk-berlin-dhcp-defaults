@@ -32,7 +32,7 @@ uci set dhcp.frei_funk_ipv6.ip="$router_ula"
 uci add_list dhcp.lan.dhcp_option='3'
 
 # default DNS, will be overwritten by community profile later on
-uci add_list dhcp.@dnsmasq[0].server='5.9.164.112' # dns3.digitalcourage.de
+uci add_list dhcp.@dnsmasq[0].server='5.9.164.112'  # dns3.digitalcourage.de
 uci add_list dhcp.@dnsmasq[0].server='80.67.169.40' # ns1.fdn.fr
 
 uci commit dhcp

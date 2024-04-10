@@ -15,6 +15,6 @@ fi
 
 # create a ffwizard3-file, if there is none already
 if [ ! -f /etc/ffwizard3.json ]; then
-    uci2ffwizard > /etc/ffwizard3.json
+    uci2ffwizard >/etc/ffwizard3.json
     exit 0
 fi

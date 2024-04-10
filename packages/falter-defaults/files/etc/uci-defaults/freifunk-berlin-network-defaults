@@ -2,7 +2,6 @@
 
 # shellcheck disable=SC1091
 
-
 . /lib/functions/guard.sh
 guard "network"
 
@@ -10,42 +9,42 @@ guard "network"
 uci set network.lan.ipaddr=192.168.42.1
 
 WANDEV=$(uci -q get network.wan.device)
-echo "$WANDEV" | grep ^br- > /dev/null
+echo "$WANDEV" | grep ^br- >/dev/null
 BRIDGECHECK=$?
 
 # setup wan as a bridge
 if [ "X${WANDEV}X" = "XX" ]; then
-  # This device does not have a wan port. Create a wan device without
-  # a physical port.  This makes it easier to change a single
-  # port device from the client network to wan. This is also needed
-  # in the case where the user decides to use the "notunnel" variant
-  NEWDEV=$(uci add network device)
-  uci set "network.$NEWDEV.type=bridge"
-  uci set "network.$NEWDEV.name=br-wan"
+    # This device does not have a wan port. Create a wan device without
+    # a physical port.  This makes it easier to change a single
+    # port device from the client network to wan. This is also needed
+    # in the case where the user decides to use the "notunnel" variant
+    NEWDEV=$(uci add network device)
+    uci set "network.$NEWDEV.type=bridge"
+    uci set "network.$NEWDEV.name=br-wan"
 
-  # create a wan interface, even if it can't do anything
-  uci set network.wan=interface
-  uci set network.wan.device="br-wan"
-  uci set network.wan.proto="dhcp"
+    # create a wan interface, even if it can't do anything
+    uci set network.wan=interface
+    uci set network.wan.device="br-wan"
+    uci set network.wan.proto="dhcp"
 
-  # create a wan6 interface, even if it can't do anything
-  uci set network.wan6=interface
-  uci set network.wan6.device="br-wan"
-  uci set network.wan6.proto="dhcpv6"
+    # create a wan6 interface, even if it can't do anything
+    uci set network.wan6=interface
+    uci set network.wan6.device="br-wan"
+    uci set network.wan6.proto="dhcpv6"
 
 elif [ $BRIDGECHECK = "0" ]; then
-  # The wan device is a bridge (ex DSA with multiple physical ports)
-  # everything should be set up fine in this case
-  : # do nothing
+    # The wan device is a bridge (ex DSA with multiple physical ports)
+    # everything should be set up fine in this case
+    : # do nothing
 else
-  # The wan device is not a bridge.  Change it to a bridge
-  NEWDEV=$(uci add network device)
-  uci set "network.$NEWDEV.type=bridge"
-  uci set "network.$NEWDEV.name=br-wan"
-  uci add_list "network.$NEWDEV.ports=$WANDEV"
+    # The wan device is not a bridge.  Change it to a bridge
+    NEWDEV=$(uci add network device)
+    uci set "network.$NEWDEV.type=bridge"
+    uci set "network.$NEWDEV.name=br-wan"
+    uci add_list "network.$NEWDEV.ports=$WANDEV"
 
-  uci set network.wan.device="br-wan"
-  uci set network.wan6.device="br-wan"
+    uci set network.wan.device="br-wan"
+    uci set network.wan6.device="br-wan"
 fi
 
 # do not use dns servers provided by dhcp - we maintain a static list of

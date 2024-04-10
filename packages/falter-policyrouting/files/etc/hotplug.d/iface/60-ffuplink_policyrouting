@@ -20,35 +20,35 @@ config_get zones pr zones
 [ "$pr_enable" = 1 ] || exit
 
 if [ "$ACTION" = ifup ]; then
-  logger -t ff-userlog "ffuplink interface is up"
-  logger -t ff-userlog "creating ffuplink ip-rules"
-  ifaces=$(uci -q get firewall.zone_freifunk.network)
-  network_get_subnet uplink_net ffuplink
-  if [ -z "$uplink_net" ]; then
-    logger -t ff-userlog "UCI did not return a valid IP-net for ffuplink; querying directly with ip-tool"
-    uplink_net=$(ip -4 -o addr show dev ffuplink|awk '{print $4}')
-  fi
-  if [ -z "$uplink_net" ]; then
-    logger -t ff-userlog "no valid IP-net found for ffuplink; TRAFFIC FOR UPLINK-NETWORK WILL NOT BE BLOCKED"
-  fi
-  eval "$(/bin/ipcalc.sh "$uplink_net")"
-  for iface in $ifaces; do
-    network_get_physdev netdev "$iface"
-    [ ! '0.0.0.0' = "$NETWORK" ] && ip rule add prio 19989 to "$NETWORK/$PREFIX" iif "$netdev" prohibit
-    ip rule add prio 19990 iif "$netdev" lookup ffuplink
-  done
-  logger -t ff-userlog "ffuplink-interface is setup"
+    logger -t ff-userlog "ffuplink interface is up"
+    logger -t ff-userlog "creating ffuplink ip-rules"
+    ifaces=$(uci -q get firewall.zone_freifunk.network)
+    network_get_subnet uplink_net ffuplink
+    if [ -z "$uplink_net" ]; then
+        logger -t ff-userlog "UCI did not return a valid IP-net for ffuplink; querying directly with ip-tool"
+        uplink_net=$(ip -4 -o addr show dev ffuplink | awk '{print $4}')
+    fi
+    if [ -z "$uplink_net" ]; then
+        logger -t ff-userlog "no valid IP-net found for ffuplink; TRAFFIC FOR UPLINK-NETWORK WILL NOT BE BLOCKED"
+    fi
+    eval "$(/bin/ipcalc.sh "$uplink_net")"
+    for iface in $ifaces; do
+        network_get_physdev netdev "$iface"
+        [ ! '0.0.0.0' = "$NETWORK" ] && ip rule add prio 19989 to "$NETWORK/$PREFIX" iif "$netdev" prohibit
+        ip rule add prio 19990 iif "$netdev" lookup ffuplink
+    done
+    logger -t ff-userlog "ffuplink-interface is setup"
 fi
 
 if [ "$ACTION" = ifdown ]; then
-  logger -t ff-userlog "ffuplink interface going down"
-  ip route flush table ffuplink
-  while true; do
-    ip rule show | grep -q "^19990:" || break
-    ip rule del prio 19990
-  done
-  while true; do
-    ip rule show | grep -q "^19989:" || break
-    ip rule del prio 19989
-  done
+    logger -t ff-userlog "ffuplink interface going down"
+    ip route flush table ffuplink
+    while true; do
+        ip rule show | grep -q "^19990:" || break
+        ip rule del prio 19990
+    done
+    while true; do
+        ip rule show | grep -q "^19989:" || break
+        ip rule del prio 19989
+    done
 fi

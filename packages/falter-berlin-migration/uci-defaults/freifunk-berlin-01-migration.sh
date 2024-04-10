@@ -18,7 +18,6 @@
 # exponential-calculations are supported by busybox-ash
 # shellcheck disable=SC3019
 
-
 . /lib/functions.sh
 . /lib/functions/semver.sh
 . /etc/openwrt_release
@@ -164,7 +163,7 @@ update_collectd_memory_leak_hotfix() {
     sed -i '/luci_statistics restart$/d' $CRONTAB
     /etc/init.d/cron restart
 
-    if [ "$(grep MemTotal: < /proc/meminfo | awk \{'print $2'\})" -lt "65536" ]; then
+    if [ "$(grep MemTotal: </proc/meminfo | awk \{'print $2'\})" -lt "65536" ]; then
         uci set luci_statistics.collectd_ping.enable=0
         uci set luci_statistics.collectd_rrdtool.enable=0
     fi
@@ -346,11 +345,11 @@ r1_0_0_change_to_ffuplink() {
     remove_routingpolicy() {
         local config=$1
         case "$config" in
-        olsr_*_ffvpn_ipv4*)
-            log "  network.$config"
-            uci delete "network.$config"
-            ;;
-        *) ;;
+            olsr_*_ffvpn_ipv4*)
+                log "  network.$config"
+                uci delete "network.$config"
+                ;;
+            *) ;;
         esac
     }
 
@@ -385,18 +384,18 @@ r1_0_0_change_to_ffuplink() {
 
 r1_0_0_update_preliminary_glinet_names() {
     case $(uci get system.led_wlan.sysfs) in
-    "gl_ar150:wlan")
-        log "correcting system.led_wlan.sysfs for GLinet AR150"
-        uci set system.led_wlan.sysfs="gl-ar150:wlan"
-        ;;
-    "gl_ar300:wlan")
-        log "correcting system.led_wlan.sysfs for GLinet AR300"
-        uci set system.led_wlan.sysfs="gl-ar300:wlan"
-        ;;
-    "domino:blue:wlan")
-        log "correcting system.led_wlan.sysfs for GLinet Domino"
-        uci set system.led_wlan.sysfs="gl-domino:blue:wlan"
-        ;;
+        "gl_ar150:wlan")
+            log "correcting system.led_wlan.sysfs for GLinet AR150"
+            uci set system.led_wlan.sysfs="gl-ar150:wlan"
+            ;;
+        "gl_ar300:wlan")
+            log "correcting system.led_wlan.sysfs for GLinet AR300"
+            uci set system.led_wlan.sysfs="gl-ar300:wlan"
+            ;;
+        "domino:blue:wlan")
+            log "correcting system.led_wlan.sysfs for GLinet Domino"
+            uci set system.led_wlan.sysfs="gl-domino:blue:wlan"
+            ;;
     esac
 }
 
@@ -431,12 +430,12 @@ r1_0_1_set_uplinktype() {
         uci set ffberlin-uplink.preset.current="no-tunnel"
     else
         case "$(uci -q get openvpn.ffuplink.remote)" in
-        \'vpn03.berlin.freifunk.net*)
-            uci set ffberlin-uplink.preset.current="vpn03_openvpn"
-            ;;
-        \'tunnel-gw.berlin.freifunk.net*)
-            uci set ffberlin-uplink.preset.current="tunnelberlin_openvpn"
-            ;;
+            \'vpn03.berlin.freifunk.net*)
+                uci set ffberlin-uplink.preset.current="vpn03_openvpn"
+                ;;
+            \'tunnel-gw.berlin.freifunk.net*)
+                uci set ffberlin-uplink.preset.current="tunnelberlin_openvpn"
+                ;;
         esac
     fi
     log " type set to $(uci get ffberlin-uplink.preset.current)"
@@ -557,8 +556,8 @@ r1_1_0_firewall_remove_advanced() {
 r1_1_0_statistics_server() {
     log "Setting the statistcs server to \"monitor.berlin.freifunk.net\"."
     local result=$(uci -q get luci_statistics.\@collectd_network_server\[0\].host)
-    [ $? -eq 0 ] && [ "$result" = "77.87.48.12" ] &&
-        uci set luci_statistics.\@collectd_network_server\[0\].host=monitor.berlin.freifunk.net
+    [ $? -eq 0 ] && [ "$result" = "77.87.48.12" ] \
+        && uci set luci_statistics.\@collectd_network_server\[0\].host=monitor.berlin.freifunk.net
 }
 
 r1_1_0_openwrt_19_07_updates() {
@@ -622,7 +621,7 @@ r1_1_0_wifi_iface_names() {
         [ "X${ifname}X" = "XX" ] && ifname="wifinet${count}"
         ifname=$(echo "$ifname" | sed -e 's/-/_/g')
         uci -q rename "wireless.$config=$ifname"
-        count=$(( count + 1))
+        count=$((count + 1))
     }
     config_load wireless
     config_foreach wifi_set_name wifi-iface
@@ -1046,7 +1045,7 @@ r1_2_3_update_owm_cron() {
     log "make OWM cron run twice per hour"
     test -f /etc/crontabs/root || touch /etc/crontabs/root
     OWM="/usr/sbin/owm.sh"
-    SEED="$( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi )"
+    SEED="$(dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi)"
     MIN1="$((SEED % 29))"
     MIN2="$((MIN1 + 30))"
     (

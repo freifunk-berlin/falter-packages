@@ -8,6 +8,6 @@ KEY_FILES=$(find "$SCRIPTPATH" -name "*.pub")
 for KEY_FILE in $KEY_FILES; do
     KEY=$(cat "$KEY_FILE")
     if ! grep -q "$KEY" /etc/dropbear/authorized_keys; then
-        echo "$KEY" >> /etc/dropbear/authorized_keys
+        echo "$KEY" >>/etc/dropbear/authorized_keys
     fi
 done
