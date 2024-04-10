@@ -4,7 +4,7 @@
 # write the freifunk-file on newly installed nodes
 
 if [ ! -f /etc/config/freifunk ]; then
-    cat <<EOT > /etc/config/freifunk
+    cat <<EOT >/etc/config/freifunk
 package 'freifunk'
 
 config 'public' 'contact'

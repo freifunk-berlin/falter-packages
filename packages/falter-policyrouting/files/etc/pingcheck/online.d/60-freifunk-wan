@@ -7,4 +7,3 @@
 logger -t freifunk-pingcheck "WAN connectivity is up, routing all local traffic through WAN"
 ip rule del prio 3000 iif lo lookup olsr-tunnel
 ip rule del prio 3001 iif lo lookup olsr-default
-

@@ -245,40 +245,40 @@ ENDPOINT_COUNT=0
 
 while getopts a:c:g:i:m:n:o:t:T:D:U:A: option; do
     case $option in
-    a) OPT_UPLINK_IP=$OPTARG ;;
-    c) OPT_TUNNEL_COUNT=$OPTARG ;;
-    g) OPT_UPLINK_GW=$OPTARG ;;
-    i) OPT_UPLINK_INTERFACE=$OPTARG ;;
-    m) OPT_MTU=$OPTARG ;;
-    n) OPT_NAMESPACE_NAME=$OPTARG ;;
-    o) OPT_INTERVAL=$OPTARG ;;
-    t) OPT_TUNNEL_TIMEOUT=$OPTARG ;;
-    D) OPT_DOWN_SCRIPT=$OPTARG ;;
-    U) OPT_UP_SCRIPT=$OPTARG ;;
-    A) OPT_UP_SCRIPT_ARGS=$OPTARG ;;
-    T)
-        if [ $ENDPOINT_COUNT = 0 ]; then
-            OPT_TUNNEL_ENDPOINTS=$OPTARG
-            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
-        else
-            OPT_TUNNEL_ENDPOINTS="$OPT_TUNNEL_ENDPOINTS $OPTARG"
-            ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
-        fi
-        ;;
-    *)
-        print_help
-        exit 2
-        ;;
+        a) OPT_UPLINK_IP=$OPTARG ;;
+        c) OPT_TUNNEL_COUNT=$OPTARG ;;
+        g) OPT_UPLINK_GW=$OPTARG ;;
+        i) OPT_UPLINK_INTERFACE=$OPTARG ;;
+        m) OPT_MTU=$OPTARG ;;
+        n) OPT_NAMESPACE_NAME=$OPTARG ;;
+        o) OPT_INTERVAL=$OPTARG ;;
+        t) OPT_TUNNEL_TIMEOUT=$OPTARG ;;
+        D) OPT_DOWN_SCRIPT=$OPTARG ;;
+        U) OPT_UP_SCRIPT=$OPTARG ;;
+        A) OPT_UP_SCRIPT_ARGS=$OPTARG ;;
+        T)
+            if [ $ENDPOINT_COUNT = 0 ]; then
+                OPT_TUNNEL_ENDPOINTS=$OPTARG
+                ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
+            else
+                OPT_TUNNEL_ENDPOINTS="$OPT_TUNNEL_ENDPOINTS $OPTARG"
+                ENDPOINT_COUNT=$((ENDPOINT_COUNT + 1))
+            fi
+            ;;
+        *)
+            print_help
+            exit 2
+            ;;
     esac
 done
 
 # check if we got all information necessary
-if [ -z "$OPT_UPLINK_IP" ] || [ -z "$OPT_TUNNEL_COUNT" ] ||
-    [ -z "$OPT_UPLINK_GW" ] || [ -z "$OPT_UPLINK_INTERFACE" ] ||
-    [ -z "$OPT_NAMESPACE_NAME" ] || [ -z "$OPT_INTERVAL" ] ||
-    [ -z "$OPT_UP_SCRIPT" ] || [ -z "$OPT_TUNNEL_ENDPOINTS" ] ||
-    [ -z "$OPT_DOWN_SCRIPT" ] || [ -z "$OPT_MTU" ] ||
-    [ -z "$OPT_TUNNEL_TIMEOUT" ]; then
+if [ -z "$OPT_UPLINK_IP" ] || [ -z "$OPT_TUNNEL_COUNT" ] \
+    || [ -z "$OPT_UPLINK_GW" ] || [ -z "$OPT_UPLINK_INTERFACE" ] \
+    || [ -z "$OPT_NAMESPACE_NAME" ] || [ -z "$OPT_INTERVAL" ] \
+    || [ -z "$OPT_UP_SCRIPT" ] || [ -z "$OPT_TUNNEL_ENDPOINTS" ] \
+    || [ -z "$OPT_DOWN_SCRIPT" ] || [ -z "$OPT_MTU" ] \
+    || [ -z "$OPT_TUNNEL_TIMEOUT" ]; then
     printf "Not enough options. Please give all necessary options!\n\n"
     print_help
     exit 2

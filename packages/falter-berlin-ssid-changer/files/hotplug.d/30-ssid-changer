@@ -36,7 +36,7 @@ fi
 
 # delay execution for up to 280 seconds, to evenly distribute the pings
 if [ "$DELAY" ]; then
-    sleep $(( $( dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi ) % 280))
+    sleep $(($(dd if=/dev/urandom bs=2 count=1 2>&- | hexdump | if read -r line; then echo "0x${line#* }"; fi) % 280))
 fi
 
 # check, if we are online

@@ -18,19 +18,19 @@ BIND=wan
 # See the website https://www.itwissen.info/MAC-Adresse-MAC-address.html
 MAC=$(uci -q get network.${IFACE}_dev.macaddr)
 if [ $? -eq 1 ]; then
-  # start with b6 for Berliner 6ackbone
-  MAC="b6"
-  for _byte in 2 3 4 5 6; do
-    MAC=$MAC`dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"'`
-  done
+    # start with b6 for Berliner 6ackbone
+    MAC="b6"
+    for _byte in 2 3 4 5 6; do
+        MAC=$MAC$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | hexdump -e '1/1 ":%02x"')
+    done
 fi
 
 UUID=$(uci -q get tunneldigger.${IFACE}.uuid)
 if [ $? -eq 1 ]; then
-  UUID=$MAC
-  for _byte in 7 8 9 10; do
-    UUID=$UUID`dd if=/dev/urandom bs=1 count=1 2> /dev/null | hexdump -e '1/1 ":%02x"'`
-  done
+    UUID=$MAC
+    for _byte in 7 8 9 10; do
+        UUID=$UUID$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | hexdump -e '1/1 ":%02x"')
+    done
 fi
 
 # tunneldigger setup

@@ -9,11 +9,11 @@ guard "firewall"
 # skip firewall setup on backbone variants
 . /etc/freifunk_release
 case $FREIFUNK_VARIANT in
-backbone)
-  exit 0;
-  ;;
-*)
-  ;;
+    backbone)
+        exit 0
+        ;;
+    *) ;;
+
 esac
 
 # reset firewall config

@@ -7,7 +7,6 @@
 # Copyright (C) 2021   Patrick Grimm
 # Copyright (C) 2021   Martin Hübner
 
-
 # Omit warning for missing local statement. busybox-ash has them included
 # shellcheck shell=dash
 
@@ -32,7 +31,7 @@
 OWM_API_VER="1.0"
 
 printhelp() {
-	printf "owm.sh - Tool for registering routers at openwifimap.net\n
+    printf "owm.sh - Tool for registering routers at openwifimap.net\n
 Options:
 \t--help|-h:\tprint this text
 
@@ -52,11 +51,10 @@ To override the server used by this script, set freifunk.community.owm_api.
 # save positional argument, as it would get overwritten otherwise.
 CMD_1="$1"
 if [ -n "$CMD_1" ] && [ "$CMD_1" != "--dry-run" ]; then
-	[ "$CMD_1" != "-h" ] && [ "$CMD_1" != "--help" ] && printf "Unrecognized argument %s.\n\n" "$CMD_1"
-	printhelp
-	exit 1
+    [ "$CMD_1" != "-h" ] && [ "$CMD_1" != "--help" ] && printf "Unrecognized argument %s.\n\n" "$CMD_1"
+    printhelp
+    exit 1
 fi
-
 
 # calback function: This function aggregates all items of the 'contact'
 # option list from /etc/config/freifunk into one single string for better
@@ -69,7 +67,6 @@ handle_contact() {
     fi
 }
 
-
 ######################
 #                    #
 #  Collect OWM-Data  #
@@ -77,17 +74,17 @@ handle_contact() {
 ######################
 
 olsr4_links() {
-	json_select "$2"
-	json_get_var localIP localIP
-	json_get_var remoteIP remoteIP
-	remotehost="$(nslookup "$remoteIP" | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//' )"
-	json_get_var linkQuality linkQuality
-	json_get_var olsrInterface olsrInterface
-	json_get_var ifName ifName
-	json_select ..
-	if ! echo "$olsrInterface" | grep -q -E '.*(wg|ts)_.*'; then
-		olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
-	fi
+    json_select "$2"
+    json_get_var localIP localIP
+    json_get_var remoteIP remoteIP
+    remotehost="$(nslookup "$remoteIP" | grep name | sed -e 's/.*name = \(.*\)/\1/' | sed 's/^mid\d*\.//')"
+    json_get_var linkQuality linkQuality
+    json_get_var olsrInterface olsrInterface
+    json_get_var ifName ifName
+    json_select ..
+    if ! echo "$olsrInterface" | grep -q -E '.*(wg|ts)_.*'; then
+        olsr4links="$olsr4links$localIP $remoteIP $remotehost $linkQuality $ifName;"
+    fi
 }
 
 # This section is relevant for hopglass statistics feature (isUplink/isHotspot)
@@ -102,20 +99,18 @@ latitude="$(uci_get system @system[-1] latitude)"
 #   Stop execution if lat/lon is not set.
 #
 if [ -z "$latitude" ] || [ -z "$longitude" ]; then
-	printf "latitude/longitude is not set.\nStopping now...\n"
-	exit 2
+    printf "latitude/longitude is not set.\nStopping now...\n"
+    exit 2
 fi
-
 
 # collect data on OLSR-links
-json_load "$( printf "/links" | nc 127.0.0.1 9090 2>/dev/null)" 2>/dev/null
+json_load "$(printf "/links" | nc 127.0.0.1 9090 2>/dev/null)" 2>/dev/null
 #json_get_var timeSinceStartup timeSinceStartup
 olsr4links=""
-if json_is_a links array;then
-	json_for_each_item olsr4_links links
+if json_is_a links array; then
+    json_for_each_item olsr4_links links
 fi
 json_cleanup
-
 
 # collect board info
 json_load "$(ubus call system board)"
@@ -133,10 +128,10 @@ json_get_values loads load
 
 # if file freifunk_release is available, override version and revision
 if [ -f /etc/freifunk_release ]; then
-	. /etc/freifunk_release
-	distribution="$FREIFUNK_DISTRIB_ID"
-	version="$FREIFUNK_RELEASE"
-	revision="$FREIFUNK_REVISION"
+    . /etc/freifunk_release
+    distribution="$FREIFUNK_DISTRIB_ID"
+    version="$FREIFUNK_RELEASE"
+    revision="$FREIFUNK_REVISION"
 fi
 
 # Get Sysload
@@ -165,7 +160,6 @@ config_list_foreach contact contact handle_contact
 # omit the first pipe-symbol.
 contacts=$(echo "$CONTACT_AGGREGATOR" | sed 's/|//')
 
-
 # community info
 ssid="$(uci_get freifunk community ssid)"
 mesh_network="$(uci_get freifunk community mesh_network)"
@@ -178,8 +172,6 @@ com_ssid_scheme=$(uci_get freifunk community ssid_scheme)
 com_splash_network=$(uci_get freifunk community splash_network)
 com_splash_prefix=$(uci_get freifunk community splash_prefix)
 
-
-
 ###########################
 #                         #
 #  Construct JSON-string  #
@@ -189,36 +181,36 @@ com_splash_prefix=$(uci_get freifunk community splash_prefix)
 json_init
 json_add_object freifunk
 {
-	json_add_object contact
-	{
-		if [ -n "$name" ]; then json_add_string name "$name"; fi
-		# contact list superseeds the use of mail option
-		if [ -n "$contacts" ]; then
-			json_add_string mail "$contacts"
-		else
-			if [ -n "$mail" ]; then json_add_string mail "$mail"; fi
-		fi
-		if [ -n "$nick" ]; then json_add_string nickname "$nick"; fi
-		if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
-		if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi # was array of homepages
-		if [ -n "$note" ]; then json_add_string note "$note"; fi
-	}
-	json_close_object
+    json_add_object contact
+    {
+        if [ -n "$name" ]; then json_add_string name "$name"; fi
+        # contact list superseeds the use of mail option
+        if [ -n "$contacts" ]; then
+            json_add_string mail "$contacts"
+        else
+            if [ -n "$mail" ]; then json_add_string mail "$mail"; fi
+        fi
+        if [ -n "$nick" ]; then json_add_string nickname "$nick"; fi
+        if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
+        if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi # was array of homepages
+        if [ -n "$note" ]; then json_add_string note "$note"; fi
+    }
+    json_close_object
 
-	json_add_object community
-	{
-		json_add_string ssid "$ssid"
-		json_add_string mesh_network "$mesh_network"
-		json_add_string owm_api "$uci_owm_api"
-		json_add_string name "$com_name"
-		json_add_string homepage "$com_homepage"
-		json_add_string longitude "$com_longitude"
-		json_add_string latitude "$com_latitude"
-		json_add_string ssid_scheme "$com_ssid_scheme"
-		json_add_string splash_network "$com_splash_network"
-		json_add_int splash_prefix $com_splash_prefix
-	}
-	json_close_object
+    json_add_object community
+    {
+        json_add_string ssid "$ssid"
+        json_add_string mesh_network "$mesh_network"
+        json_add_string owm_api "$uci_owm_api"
+        json_add_string name "$com_name"
+        json_add_string homepage "$com_homepage"
+        json_add_string longitude "$com_longitude"
+        json_add_string latitude "$com_latitude"
+        json_add_string ssid_scheme "$com_ssid_scheme"
+        json_add_string splash_network "$com_splash_network"
+        json_add_int splash_prefix $com_splash_prefix
+    }
+    json_close_object
 }
 json_close_object
 
@@ -229,22 +221,22 @@ json_add_double api_rev $OWM_API_VER
 
 json_add_object system
 {
-	json_add_array sysinfo
-	{
-		json_add_string "" "system is deprecated"
-		json_add_string "" "$model"
-	}
-	json_close_array
-	json_add_array uptime
-	{
-		json_add_int "" $uptime
-	}
-	json_close_array
-	json_add_array loadavg
-	{
-		json_add_double "" $load5
-	}
-	json_close_array
+    json_add_array sysinfo
+    {
+        json_add_string "" "system is deprecated"
+        json_add_string "" "$model"
+    }
+    json_close_array
+    json_add_array uptime
+    {
+        json_add_int "" $uptime
+    }
+    json_close_array
+    json_add_array loadavg
+    {
+        json_add_double "" $load5
+    }
+    json_close_array
 }
 json_close_object
 
@@ -252,28 +244,28 @@ json_close_object
 # That string gets substituted by the olsrd-config-string afterwards
 json_add_object olsr
 {
-	json_add_string ipv4Config '$OLSRCONFIG'
+    json_add_string ipv4Config '$OLSRCONFIG'
 }
 json_close_object
 
 json_add_array links
 {
-	IFSORIG="$IFS"
-	IFS=';'
-	for i in ${olsr4links} ; do
-		IFS="$IFSORIG"
-		set -- $i
-		json_add_object
-		{
-			json_add_string sourceAddr4 "$1"
-			json_add_string destAddr4 "$2"
-			json_add_string id "$3"
-			json_add_double quality "$4"
-		}
-		json_close_object
-		IFS=';'
-	done
-	IFS="$IFSORIG"
+    IFSORIG="$IFS"
+    IFS=';'
+    for i in ${olsr4links}; do
+        IFS="$IFSORIG"
+        set -- $i
+        json_add_object
+        {
+            json_add_string sourceAddr4 "$1"
+            json_add_string destAddr4 "$2"
+            json_add_string id "$3"
+            json_add_double quality "$4"
+        }
+        json_close_object
+        IFS=';'
+    done
+    IFS="$IFSORIG"
 }
 json_close_array
 
@@ -287,10 +279,10 @@ json_add_int updateInterval 3600
 json_add_string hardware "$system"
 json_add_object firmware
 {
-	json_add_string name "$distribution $version"
-	json_add_string revision "$revision"
-	json_add_string kernelVersion "$kernelVersion"
-	json_add_string kernelBuildDate "$buildDate"
+    json_add_string name "$distribution $version"
+    json_add_string revision "$revision"
+    json_add_string kernelVersion "$kernelVersion"
+    json_add_string kernelBuildDate "$buildDate"
 }
 json_close_object
 
@@ -298,14 +290,13 @@ json_close_object
 
 JSON_STRING=$(json_dump)
 # insert json-string from OLSR and repair wrong syntax at string-borders (shell-quotes...)
-JSON_STRING=$(echo "$JSON_STRING" | sed -e 's|$OLSRCONFIG|'"$OLSRCONFIG"'|; s|"{|{|; s|}"|}|' )
+JSON_STRING=$(echo "$JSON_STRING" | sed -e 's|$OLSRCONFIG|'"$OLSRCONFIG"'|; s|"{|{|; s|}"|}|')
 
 # just print data to stdout, if we have test-run.
 if [ "$CMD_1" = "--dry-run" ]; then
-	printf "%s\n" "$JSON_STRING"
-	exit 0
+    printf "%s\n" "$JSON_STRING"
+    exit 0
 fi
-
 
 ################################
 #                              #

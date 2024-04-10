@@ -19,8 +19,8 @@ mac_addr=$(get_mac_label | cut -c 10-)
 
 if [ -z "$mac_addr" ]; then
     # get propable labels-MAC manually instead
-    mac_addr=$(ubus call network.device status | sed -n 's/.*macaddr": "\(.*\)".*/\1/p' |
-        sort | uniq | grep -v "00:00:00:00:00:00" | sed -n '1p' | cut -c 10-)
+    mac_addr=$(ubus call network.device status | sed -n 's/.*macaddr": "\(.*\)".*/\1/p' \
+        | sort | uniq | grep -v "00:00:00:00:00:00" | sed -n '1p' | cut -c 10-)
 fi
 
 if [ -z "$mac_addr" ]; then

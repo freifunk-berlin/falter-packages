@@ -2,7 +2,6 @@
 
 # shellcheck disable=SC1091
 
-
 . /lib/functions/freifunk-berlin-network.sh
 . /lib/functions/guard.sh
 guard "ffberlin_uplink"

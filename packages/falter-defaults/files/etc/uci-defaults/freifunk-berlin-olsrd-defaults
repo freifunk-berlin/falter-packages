@@ -37,9 +37,9 @@ uci set olsrd.$PLUGIN.ignore=0
 # add dyngw plain plugin - it is ipv4 only
 PLUGIN="$(uci add olsrd LoadPlugin)"
 uci set olsrd.$PLUGIN.library=olsrd_dyn_gw
-uci add_list olsrd.$PLUGIN.Ping=46.182.19.48      # dns.digitalcourage.de
-uci add_list olsrd.$PLUGIN.Ping=80.67.169.40      # www.fdn.fr/actions/dns
-uci add_list olsrd.$PLUGIN.Ping=194.150.168.168   # dns.as250.net
+uci add_list olsrd.$PLUGIN.Ping=46.182.19.48    # dns.digitalcourage.de
+uci add_list olsrd.$PLUGIN.Ping=80.67.169.40    # www.fdn.fr/actions/dns
+uci add_list olsrd.$PLUGIN.Ping=194.150.168.168 # dns.as250.net
 uci set olsrd.$PLUGIN.ignore=0
 
 # set olsrd defaults
@@ -82,6 +82,6 @@ uci commit olsrd
 # add routing tables
 tables="/etc/iproute2/rt_tables"
 test -d /etc/iproute2/ || mkdir -p /etc/iproute2/
-grep -q "111 olsr" $tables || echo "111 olsr" >> $tables
-grep -q "112 olsr-default" $tables || echo "112 olsr-default" >> $tables
-grep -q "113 olsr-tunnel" $tables || echo "113 olsr-tunnel" >> $tables
+grep -q "111 olsr" $tables || echo "111 olsr" >>$tables
+grep -q "112 olsr-default" $tables || echo "112 olsr-default" >>$tables
+grep -q "113 olsr-tunnel" $tables || echo "113 olsr-tunnel" >>$tables

@@ -11,10 +11,10 @@ uci import luci_statistics <<EOF
 EOF
 
 # mod_ping and collectd_rrdtool use a lot of RAM, disable on 32MB routers
-if [ "$(grep MemTotal: < /proc/meminfo | awk {'print $2'})" -gt "65536" ]; then
-  HAVE_PLENTY_RAM=1
+if [ "$(grep MemTotal: </proc/meminfo | awk {'print $2'})" -gt "65536" ]; then
+    HAVE_PLENTY_RAM=1
 else
-  HAVE_PLENTY_RAM=0
+    HAVE_PLENTY_RAM=0
 fi
 
 # rrdtool
