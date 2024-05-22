@@ -172,6 +172,24 @@ else
     log "latest release is $latest_release"
 fi
 
+if [ -z "$OPT_FORCE" ]; then
+    detect_custom_config "/etc/autoupdate/cheksums"
+    retval=$?
+    if [ $retval = 2 ]; then
+        log "You customized the configuration of your system since the first wizard run."
+        log "This can lead to incompabilities in the update process. Please consider"
+        log "updating manually."
+        exit 2
+    elif [ $retval = 1 ]; then
+        log "There were no checksums of your config files, to compare with. We were not"
+        log "able to detect, wether your config is customized. Please consider updating"
+        log "manually."
+        exit 2
+    else
+        log "Config wasn't modified since wizard run".
+    fi
+fi
+
 ##################
 #  Update-stuff
 
