@@ -6,7 +6,7 @@
 # TODO: use $dlmirror for repositories.conf as well
 
 # To run this in a rootless podman container:
-#   podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc argp-standalone musl-fts-dev musl-obstack-dev musl-libintl abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout master && build/build.sh master x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
+#   podman run -i --rm --timeout=1800 --log-driver=none alpine:edge sh -c '( apk add git bash wget xz coreutils build-base gcc argp-standalone musl-fts-dev musl-obstack-dev musl-libintl abuild binutils ncurses-dev gawk bzip2 perl python3 rsync && git clone https://github.com/freifunk-berlin/falter-packages.git /root/falter-packages && cd /root/falter-packages/ && git checkout main && build/build.sh main x86_64 out/ ) >&2 && cd /root/falter-packages/out/ && tar -c *' > out.tar
 
 function usage() {
   local br="$1"
@@ -26,7 +26,7 @@ function usage() {
     echo
   else
     echo "branch names:"
-    echo "  master  openwrt-23.05  openwrt-22.03"
+    echo "  main  openwrt-23.05  openwrt-22.03"
     echo
     echo "arch names:"
     echo "  run build/build.sh with a branch name to see available arch names"
