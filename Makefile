@@ -13,7 +13,6 @@ help:
 
 deps:
 	luarocks --local install luacheck
-	pip install black isort pylint flake8
 	@echo
 	@echo 'Done. Please also install manually with apt or dnf: shellcheck shfmt gitleaks'
 	@echo
