@@ -7,7 +7,7 @@ In the falter-packages repo, you will find a `build/` directory containing at le
 ```sh
 $ ls build
 build.sh
-targets-master.txt
+targets-main.txt
 targets-openwrt-21.02.txt
 targets-openwrt-22.03.txt
 ```
