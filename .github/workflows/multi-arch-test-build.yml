@@ -1,36 +1,24 @@
 ---
-name: Test Build
+name: test
 
 on:  # yamllint disable-line rule:truthy
   pull_request:
 
 jobs:
   build:
-    name: Test ${{ matrix.arch }}
+    name: ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: arm_cortex-a9_vfpv3-d16
-            target: mvebu-cortexa9
+          - arch: mipsel_24kc
+            target: ramips-mt7621
             runtime_test: false
 
-          - arch: mips_24kc
-            target: ath79-generic
+          - arch: aarch64_generic
+            target: armsr-armv8
             runtime_test: false
-
-          - arch: powerpc_8548
-            target: mpc85xx-p1010
-            runtime_test: false
-
-          - arch: aarch64_cortex-a53
-            target: mvebu-cortexa53
-            runtime_test: true
-
-          - arch: arm_cortex-a15_neon-vfpv4
-            target: armvirt-32
-            runtime_test: true
 
           - arch: x86_64
             target: x86-64
