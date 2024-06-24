@@ -64,4 +64,4 @@ Checking 'proper-umask'... ok.
 
 The script will download the OpenWrt-SDK for the specific architecture and compile all packages in the feed. This works for local packages, that aren't checked into git too.
 
-Please mind, that this will build the packagefeed, _but won't sign it_. Signing needs to be handled separately (i.e. automatic builds get signed on buildbot master).
+Please mind, that this will build the packagefeed, _but won't sign it_. Signing needs to be handled separately (i.e. automatic builds get signed on buildbot main).

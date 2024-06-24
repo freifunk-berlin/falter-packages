@@ -10,7 +10,7 @@ to understand the rest of what we do here.
 
 ## get LuCI translation scripts
 
-Run `fetch_translation_tools.sh` once. It will download the current luci-translation scripts from master and place them in the `build` directory. Please don't commit them, as they might change. If you feel, that those scripts aren't up to date, just run that script again.
+Run `fetch_translation_tools.sh` once. It will download the current luci-translation scripts from main and place them in the `build` directory. Please don't commit them, as they might change. If you feel, that those scripts aren't up to date, just run that script again.
 
 ## prepare translation of a new app
 
