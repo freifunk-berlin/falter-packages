@@ -30,7 +30,7 @@ as long and detailed as you wish.
 
 Signed-off-by: $YOUR_SIGNATURE
 ```
-You can add the signed-off-by line automatically via `git commit -s`. 
+You can add the signed-off-by line automatically via `git commit -s`.
 
 ## Any contributions you make will be under the GPLv3 Software License
 In short, when you submit code changes, your submissions are understood to be under the same [GPLv3 License](http://www.gnu.org/licenses/gpl-3.0.html) that covers the project. Feel free to contact the maintainers if that's a concern.
