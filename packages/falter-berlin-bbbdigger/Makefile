@@ -48,7 +48,9 @@ endef
 
 define Package/falter-berlin-bbbdigger/postinst
 #!/bin/sh
-$${IPKG_INSTROOT}/tmp/falter-berlin-bbbdigger_postinst.sh
+if [ -z $${IPKG_INSTROOT} ] ; then
+  /tmp/falter-berlin-bbbdigger_postinst.sh
+fi
 endef
 
 $(eval $(call BuildPackage,falter-berlin-bbbdigger))

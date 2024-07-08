@@ -34,7 +34,9 @@ endef
 
 define Package/falter-berlin-admin-keys/postinst
 #!/bin/sh
-$${IPKG_INSTROOT}/tmp/falter-berlin-admin-keys/register_keys.sh
+if [ -z $${IPKG_INSTROOT} ] ; then
+  /tmp/falter-berlin-admin-keys/register_keys.sh
+fi
 endef
 
 $(eval $(call BuildPackage,falter-berlin-admin-keys))

@@ -1,5 +1,6 @@
 #!/bin/sh
-#
+
+[ -z $IPKG_INSTROOT ] || exit 0
 
 # if autoupdate is not present in crontab, include it.
 crontab -l | grep /usr/bin/autoupdate >>/dev/null

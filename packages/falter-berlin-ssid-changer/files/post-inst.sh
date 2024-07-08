@@ -1,5 +1,6 @@
 #!/bin/sh
-#
+
+[ -z $IPKG_INSTROOT ] || exit 0
 
 # if ssid-changer is not present in crontab, include it.
 crontab -l | grep ssid-changer >>/dev/null
