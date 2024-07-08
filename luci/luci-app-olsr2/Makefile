@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=OLSRv2 status module
-LUCI_EXTRA_DEPENDS:=+luci-compat +oonf-olsrd2 +luci-lib-json
+LUCI_EXTRA_DEPENDS:=luci-compat, oonf-olsrd2, luci-lib-json
 PKG_RELEASE:=2
 
 include ../include-luci.mk
