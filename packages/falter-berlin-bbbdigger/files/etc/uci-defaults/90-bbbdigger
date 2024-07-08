@@ -8,6 +8,8 @@
 #
 # All other config sections are overwritten with current settings
 
+[ -z $IPKG_INSTROOT ] || exit 0
+
 . /lib/functions.sh
 
 TUNNEL_SRV='_bbb-vpn._udp.berlin.freifunk.net'
