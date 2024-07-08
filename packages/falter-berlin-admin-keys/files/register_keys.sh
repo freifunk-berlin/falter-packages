@@ -6,8 +6,8 @@ SCRIPTPATH=$(dirname "$(readlink -f "$0")")
 KEY_FILES=$(find "$SCRIPTPATH" -name "*.pub")
 
 for KEY_FILE in $KEY_FILES; do
-    KEY=$(cat "$KEY_FILE")
-    if ! grep -q "$KEY" /etc/dropbear/authorized_keys; then
-        echo "$KEY" >> /etc/dropbear/authorized_keys
+    KEY=$(cat $KEY_FILE)
+    if [ -z "$(grep "$KEY" $IPKG_INSTROOT/etc/dropbear/authorized_keys)" ]; then
+        echo "$KEY" >> $IPKG_INSTROOT/etc/dropbear/authorized_keys
     fi
 done
