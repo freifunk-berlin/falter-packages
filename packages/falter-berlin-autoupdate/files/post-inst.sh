@@ -4,6 +4,8 @@
 # intended. You better shouldn't touch anything here.
 # shellcheck disable=all
 
+[ -z $IPKG_INSTROOT ] || exit 0
+
 # if autoupdate is not present in crontab, include it.
 crontab -l | grep /usr/bin/autoupdate >>/dev/null
 if [ $? != 0 ]; then
