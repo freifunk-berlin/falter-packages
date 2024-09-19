@@ -46,7 +46,6 @@ config wg-interface
   option ipv4 "10.31.174.138/32"
   option mtu 1280
   option port 51820
-  option keyfile "/etc/tunspace/ts_wg0.key"
   option disabled 0
 
 EOT
