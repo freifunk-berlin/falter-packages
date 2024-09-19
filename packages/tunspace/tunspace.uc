@@ -57,15 +57,11 @@ function load_config(name) {
   });
 
   ctx.foreach(name, "wg-interface", function(c) {
-    let key = fs.readfile(""+c.keyfile);
-    assert(key, fs.error());
-
     cfg.wireguard_interfaces[""+c.ifname] = {
       "ipv6": ""+c.ipv6,
       "ipv4": ""+c.ipv4,
       "mtu": int(c.mtu),
       "port": int(c.port),
-      "private_key": rtrim(key),
       "disabled": int(c.disabled) != 0,
     };
   });
@@ -199,7 +195,6 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
   wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "listenPort": ifcfg.port,
-    "privateKey": ifcfg.private_key
   });
   if (err = wg.error()) {
     log("WG_CMD_SET_DEVICE failed: "+err);
@@ -247,6 +242,24 @@ function wg_interface_ok(st, ifname) {
 function wg_replace_endpoint(ifname, cfg, url) {
   let ifcfg = cfg.wireguard_interfaces[ifname];
 
+  // generate a fresh private key
+  let randfd = fs.open("/dev/random");
+  let privkey = randfd.read(32);
+  randfd.close();
+  if (length(privkey) < 32) {
+    log("failed to read 32 bytes from /dev/random");
+    return false;
+  }
+  let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
+    "ifname": ifname,
+    "privateKey": b64enc(privkey),
+  });
+  if (err = wg.error()) {
+    log("WG_CMD_SET_DEVICE failed: "+err);
+    return false;
+  }
+
+  // get the public key for registration
   let reply = wg_request(wg.const.WG_CMD_GET_DEVICE,
                          rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_DUMP, {
     "ifname": ifname,
@@ -261,6 +274,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
   }
   let pubkey = reply[0].publicKey;
 
+  // ubus login on the tunnel server
   let msg = {
     "jsonrpc": "2.0",
     "id": 1,
@@ -286,6 +300,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
   }
   let sid = reply.result[1].ubus_rpc_session;
 
+  // tunnel registration
   let msg = {
     "jsonrpc": "2.0",
     "id": 1,
@@ -319,6 +334,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
     "endpoint": replace(url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
   };
 
+  // set tunnel server as our peer
   let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "flags": wg.const.WGDEVICE_F_REPLACE_PEERS,

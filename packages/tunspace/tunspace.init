@@ -23,7 +23,6 @@ boot() {
 
 start_service() {
   config_load tunspace
-  config_foreach gen_wg_key "wg-interface"
 
   procd_open_instance
   procd_set_param command /usr/bin/tunspace
@@ -34,20 +33,6 @@ stop_service() {
   config_load tunspace
   config_foreach del_wg_iface "wg-interface"
   del_uplink_netns
-}
-
-gen_wg_key() {
-  local section="$1"
-  local _value keyfile
-  config_get keyfile "$section" keyfile
-  test -n "$keyfile" || return # path is empty, skip
-  test -s "$keyfile" && return # keyfile exists, skip
-  mkdir -p "$(dirname "$keyfile")"
-
-  config_get _value "$section" ifname
-  logger -t tunspace "generating private key for $_value, this could take a while..."
-  head -c32 /dev/random | ucode -lfs -p 'b64enc(fs.stdin.read("all"));' > "$keyfile"
-  logger -t tunspace "finished generating key for $_value"
 }
 
 del_wg_iface() {
