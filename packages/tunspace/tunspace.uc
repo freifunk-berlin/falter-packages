@@ -35,6 +35,7 @@ function load_config(name) {
     "debug": int(ts.debug) != 0,
     "uplink_netns": ""+ts.uplink_netns,
     "uplink_ifname": ""+ts.uplink_ifname,
+    "uplink_mode": ""+ts.uplink_mode,
     "maintenance_interval": int(ts.maintenance_interval),
     "wireguard_servers": {},
     "wireguard_interfaces": {},
@@ -388,31 +389,36 @@ function wireguard_maintenance(st, cfg) {
 }
 
 // TODO: ts_uplink interface leaks into default namespace when uplink namespace is deleted
-function uplink_maintenance(nsid, netns, ifname) {
+function uplink_maintenance(nsid, netns, ifname, mode) {
   let netnsifname = UPLINK_NETNS_IFNAME;
 
-  if (interface_exists_netns(netnsifname, netns)) {
-    // try dhcp for 5 seconds
-    shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
-  } else {
-    if (!interface_exists(ifname)) {
-      log(sprintf("missing uplink interface %s", ifname));
-      return false;
-    } else {
-      // move uplink interface directly:
-      // shell_command("ip link set dev "+ifname+" netns "+netns);
-      // shell_command("ip -n "+netns+" link set "+ifname+" up");
-      // shell_command("ip -n "+netns+" link set "+ifname+" name "+netnsifname);
-
-      // or create a macvlan bridge:
-      shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode bridge");
-      shell_command("ip link set dev "+netnsifname+" netns "+netns);
-      shell_command("ip -n "+netns+" link set up "+netnsifname+"");
-
-      // try dhcp for 5 seconds
-      shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
-    }
+  if (interface_exists(netnsifname)) {
+    // the uplink interface will sometimes leak out of the namespace on shutdown
+    shell_command("ip link set "+netnsifname+" netns "+netns);
   }
+
+  if (interface_exists_netns(netnsifname, netns)) {
+    shell_command("ip -n "+netns+" link set "+netnsifname+" up");
+  } else if (!interface_exists(ifname)) {
+    log(sprintf("missing uplink interface %s", ifname));
+    return false;
+  } else if (mode == "direct") {
+    // move uplink interface directly:
+    shell_command("ip link set dev "+ifname+" netns "+netns);
+    shell_command("ip -n "+netns+" link set "+ifname+" name "+netnsifname);
+    shell_command("ip -n "+netns+" link set "+netnsifname+" up");
+  } else if (mode == "bridge") {
+    // or create a macvlan bridge:
+    shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode bridge");
+    shell_command("ip link set dev "+netnsifname+" netns "+netns);
+    shell_command("ip -n "+netns+" link set up "+netnsifname+"");
+  } else {
+    log(sprintf("uplink mode must be 'bridge' or 'direct', got '%s'", mode));
+    return false;
+  }
+
+  // try dhcp for 5 seconds
+  shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
 
   return true;
 }
@@ -439,7 +445,7 @@ function boot(st, cfg) {
 function tick(st, cfg) {
   debug("tick");
 
-  if (!uplink_maintenance(st.nsid, cfg.uplink_netns, cfg.uplink_ifname)) {
+  if (!uplink_maintenance(st.nsid, cfg.uplink_netns, cfg.uplink_ifname, cfg.uplink_mode)) {
     log("uplink maintenance failed");
   }
   wireguard_maintenance(st, cfg);
