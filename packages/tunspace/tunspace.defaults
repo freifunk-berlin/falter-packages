@@ -7,6 +7,7 @@ package 'tunspace'
 config tunspace "tunspace"
   option uplink_netns "uplink"
   option uplink_ifname "br-wan"
+  option uplink_mode "bridge"
   option maintenance_interval 15
   option debug 0
 
