@@ -237,7 +237,13 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         if [ -n "$OPT_N" ]; then
             sysupgrade -n "$PATH_BIN"
         else
-            sysupgrade "$PATH_BIN"
+            check_ignore_minor_compat
+            ret_code=$?
+            if [ $ret_code = 0 ]; then
+                sysupgrade --ignore-minor-compat-version "$PATH_BIN"
+            else
+                sysupgrade "$PATH_BIN"
+            fi
         fi
         log "done."
     fi
