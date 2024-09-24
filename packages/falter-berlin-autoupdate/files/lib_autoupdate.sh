@@ -246,3 +246,14 @@ min_valid_certificates() {
 
     return $cert_cnt
 }
+
+check_ignore_minor_compat() {
+    # checks if the installed sysupgrade tool supports the option
+    # --ignore-minor-compat-version already.
+    # returns 0 if option is available, 1 otherwise
+    if sysupgrade -h | grep -q 'ignore-minor-compat-version'; then
+        return 0
+    else
+        return 1
+    fi
+}
