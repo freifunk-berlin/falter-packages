@@ -105,6 +105,7 @@ function shell_command(cmd) {
 function create_namespace(st, nsname) {
   let p = fs.popen("ip -j netns list-id", "r");
   let out = p.read("all");
+  p.close();
   debug("ip -j netns list-id (error="+p.error()+")");
   if (out == null) {
     return false;
