@@ -11,11 +11,11 @@
 // - [x] test multiple ifaces
 // - [x] bug: possible multiple use of servers
 // - [x] better logging
+// - [x] handle dhcp renewals
 // - [ ] disable strom temporarily
 // - [ ] nftables rules for mss clamping
 // - [ ] retry dhcp on boot
 // - [ ] less logging
-// - [ ] omit dhcp if lease isn't old, allows for more frequent maintenance intervals
 // - [ ] implement check_cert option
 // - [ ] implement disabled option
 // - [ ] warn if ipv6 RA is disabled
@@ -422,8 +422,26 @@ function uplink_maintenance(nsid, netns, ifname, mode) {
     return false;
   }
 
+  // if we already have an IP, we'll try to renew it.
+  // some routers will otherwise give us a different new IP, exhausting the IP pool.
+  let p = fs.popen("ip -j -n "+netns+" a s "+netnsifname);
+  let out = p.read("all");
+  p.close();
+  if (out == null) {
+    log("unable to read current ip address of "+netnsifname)
+  }
+  let reqip = "0.0.0.0";
+  let iplist = json(out);
+  for (ipobj in iplist) {
+    for (ipaddr in ipobj.addr_info) {
+      if (ipaddr.family == "inet" && ipaddr.scope == "global") {
+        reqip = ipaddr.local;
+      }
+    }
+  }
+
   // try dhcp for 5 seconds
-  shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
+  shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -r "+reqip+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
 
   return true;
 }
