@@ -32,7 +32,7 @@ define Package/falter-common
 	$(call Package/falter-standard/template)
 	TITLE:=Falter common files
 	EXTRA_DEPENDS:=uci, libuci-lua, lua, ip, ethtool, iwinfo, libiwinfo-lua,
-	EXTRA_DEPENDS+= uhttpd, uhttpd-mod-ubus, luci, luci-app-opkg, luci-i18n-base-de, luci-i18n-opkg-de, luci-proto-ppp, luci-theme-bootstrap,
+	EXTRA_DEPENDS+= uhttpd, uhttpd-mod-ubus, luci, luci-app-package-manager, luci-i18n-base-de, luci-i18n-package-manager-de, luci-proto-ppp, luci-theme-bootstrap,
 	EXTRA_DEPENDS+= luci-mod-falter, luci-i18n-falter-de, luci-app-falter-owm, luci-app-falter-owm-ant, luci-app-falter-owm-cmd, luci-app-falter-owm-gui,
 	EXTRA_DEPENDS+= olsrd, olsrd-utils, olsrd-mod-arprefresh, olsrd-mod-dyn-gw, olsrd-mod-jsoninfo, olsrd-mod-txtinfo, olsrd-mod-nameservice, olsrd-mod-watchdog, kmod-ipip, luci-app-olsr, luci-app-olsr-services, luci-i18n-olsr-de,
 	EXTRA_DEPENDS+= vnstat, luci-app-statistics, luci-i18n-statistics-de, collectd, collectd-mod-dhcpleases, collectd-mod-interface, collectd-mod-iwinfo, collectd-mod-network, collectd-mod-olsrd, collectd-mod-rrdtool, collectd-mod-ping, collectd-mod-uptime, collectd-mod-memory,
