@@ -1,0 +1,45 @@
+ipv6 table v6_bgpdisco;
+ipv4 table v4_bgpdisco;
+
+# Define BGP attribute 250 for our custom nameservice extension :)
+attribute bgp 250 bytestring bgpdisco;
+
+protocol static static_bgpdisco_v4 {
+	ipv4 { table v4_bgpdisco; };
+{% for (let _rt in data): if (index(_rt, ':') == -1): %}
+        route {{ _rt }}/32 blackhole { bgpdisco = hex:{{ hexenc(data[_rt]) }}; };
+{% endif; endfor %}
+};
+
+protocol static static_bgpdisco_v6 {
+	ipv6 { table v6_bgpdisco; };
+{% for (let _rt in data): if (index(_rt, ':') != -1): %}
+	route {{ _rt }}/128 blackhole { bgpdisco = hex:{{ hexenc(data[_rt]) }}; };
+{% endif; endfor %}
+}
+
+{% let i = 0; %}
+{% for (let neigh in neighbors): %}
+protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', '_') }} {
+	local as 65000;
+	debug { states };
+	interface "{{ neigh.iface }}";
+	neighbor {{ neigh.ip }} as 65000 internal;
+	direct;
+	rr client yes;
+	ipv4 {
+		table v4_bgpdisco;
+		import all;
+		export all;
+		gateway recursive;
+		next hop address 192.0.2.0;
+	};
+	ipv6 {
+		table v6_bgpdisco;
+		import all;
+		export all;
+		gateway recursive;
+		next hop address 2001:db8::; # TODO: Safe some memory by using IPv4 NH
+	};
+}
+{% endfor %}
