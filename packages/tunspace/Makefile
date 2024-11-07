@@ -1,9 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2024 Packet Please <pktpls@systemli.org>
+#
+
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=tunspace
 PKG_RELEASE:=0
 
 PKG_MAINTAINER:=Packet Please <pktpls@systemli.org>
+PKG_LICENSE:=GPL-2.0-only
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -33,10 +39,6 @@ define Package/tunspace/install
 	$(INSTALL_BIN) ./tunspace.init $(1)/etc/init.d/tunspace
 	$(INSTALL_BIN) ./tunspace.defaults $(1)/etc/uci-defaults/tunspace
 	$(INSTALL_BIN) ./tunspace.uc $(1)/usr/bin/tunspace
-endef
-
-define Package/tunspace/conffiles
-/etc/config/tunspace
 endef
 
 $(eval $(call BuildPackage,tunspace))
