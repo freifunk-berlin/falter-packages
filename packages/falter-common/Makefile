@@ -60,7 +60,7 @@ define Package/falter-more
 	$(call Package/falter-standard/template)
 	TITLE:=Falter more packages
 	EXTRA_DEPENDS:=falter-common, falter-profiles, luci-app-ffwizard-falter, falter-berlin-migration, falter-berlin-tunneldigger, falter-policyrouting, falter-berlin-ssid-changer, falter-berlin-bbbdigger,
-	EXTRA_DEPENDS+= qos-scripts, firewall4, luci-app-firewall, luci-i18n-firewall-de,
+	EXTRA_DEPENDS+= qos-scripts, firewall4, iptables-nft, ip6tables-nft, luci-app-firewall, luci-i18n-firewall-de,
 	EXTRA_DEPENDS+= falter-berlin-autoupdate, falter-berlin-autoupdate-keys, luci-app-falter-autoupdate, luci-i18n-falter-autoupdate-de,
 	EXTRA_DEPENDS+= falter-berlin-service-registrar, luci-app-falter-service-registrar, luci-i18n-falter-service-registrar-de,
 	EXTRA_DEPENDS+= collectd-mod-cpu, collectd-mod-load
