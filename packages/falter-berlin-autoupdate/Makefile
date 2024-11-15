@@ -20,7 +20,7 @@ endef
 define Package/falter-berlin-autoupdate
 	$(call Package/falter-berlin-autoupdate/default)
 	TITLE:=Freifunk Berlin Autoupdater
-	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys uci usign
+	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys, uci, usign
 endef
 
 define Package/falter-berlin-autoupdate-keys
