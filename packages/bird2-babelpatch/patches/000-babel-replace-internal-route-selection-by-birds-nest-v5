@@ -1,8 +1,6 @@
 # Patch by Daniel Gröber <dxld at darkboxed.org>
 # Source: https://bird.network.cz/pipermail/bird-users/2023-February/016705.html
 
-diff --git a/proto/babel/babel.c b/proto/babel/babel.c
-index 04613788..c030784a 100644
 --- a/proto/babel/babel.c
 +++ b/proto/babel/babel.c
 @@ -28,10 +28,12 @@
@@ -22,7 +20,7 @@ index 04613788..c030784a 100644
   *
   * Supported standards:
   * RFC 8966 - The Babel Routing Protocol
-@@ -59,8 +61,8 @@ static inline int gt_mod64k(uint a, uint b)
+@@ -59,8 +61,8 @@ static inline int gt_mod64k(uint a, uint
  { return ge_mod64k(a, b) && a != b; }
  
  static void babel_expire_requests(struct babel_proto *p, struct babel_entry *e);
@@ -44,7 +42,7 @@ index 04613788..c030784a 100644
  }
  
  static void
-@@ -192,9 +192,6 @@ babel_flush_route(struct babel_proto *p UNUSED, struct babel_route *r)
+@@ -192,9 +192,6 @@ babel_flush_route(struct babel_proto *p
    rem_node(NODE r);
    rem_node(&r->neigh_route);
  
@@ -54,7 +52,7 @@ index 04613788..c030784a 100644
    sl_free(r);
  }
  
-@@ -210,6 +207,7 @@ babel_expire_route(struct babel_proto *p, struct babel_route *r)
+@@ -210,6 +207,7 @@ babel_expire_route(struct babel_proto *p
    {
      r->metric = r->advert_metric = BABEL_INFINITY;
      r->expires = current_time() + cf->hold_time;
@@ -62,7 +60,7 @@ index 04613788..c030784a 100644
    }
    else
    {
-@@ -239,8 +237,6 @@ babel_expire_routes_(struct babel_proto *p, struct fib *rtable)
+@@ -239,8 +237,6 @@ babel_expire_routes_(struct babel_proto
  loop:
    FIB_ITERATE_START(rtable, &fit, struct babel_entry, e)
    {
@@ -106,7 +104,7 @@ index 04613788..c030784a 100644
        goto loop;
      }
  
-@@ -457,6 +442,8 @@ babel_get_neighbor(struct babel_iface *ifa, ip_addr addr)
+@@ -457,6 +442,8 @@ babel_get_neighbor(struct babel_iface *i
  
    nbr = mb_allocz(ifa->pool, sizeof(struct babel_neighbor));
    nbr->ifa = ifa;
@@ -115,7 +113,7 @@ index 04613788..c030784a 100644
    nbr->addr = addr;
    nbr->rxcost = BABEL_INFINITY;
    nbr->txcost = BABEL_INFINITY;
-@@ -484,6 +471,9 @@ babel_flush_neighbor(struct babel_proto *p, struct babel_neighbor *nbr)
+@@ -484,6 +471,9 @@ babel_flush_neighbor(struct babel_proto
    }
  
    nbr->ifa = NULL;
@@ -125,7 +123,7 @@ index 04613788..c030784a 100644
    rem_node(NODE nbr);
    mb_free(nbr);
  }
-@@ -663,11 +653,47 @@ done:
+@@ -663,12 +653,48 @@ done:
      WALK_LIST2(r, n, nbr->routes, neigh_route)
      {
        r->metric = babel_compute_metric(nbr, r->advert_metric);
@@ -135,7 +133,7 @@ index 04613788..c030784a 100644
    }
  }
  
-+/**
+ /**
 + * This function handles announcing the special unreachable route we insert for
 + * a prefix whenever we have no more feasible routes available as per RFC8966
 + * section 3.5.4 as well as retracting it when such routes are available
@@ -171,9 +169,10 @@ index 04613788..c030784a 100644
 +  rte_update2(c, e->n.addr, rte, p->p.main_source);
 +}
 +
- /**
++/**
   * babel_announce_rte - announce selected route to the core
   * @p: Babel protocol instance
+  * @e: Babel route entry to announce
 @@ -678,12 +704,11 @@ done:
   * the entry is valid and ours, the unreachable route is announced instead.
   */
@@ -189,7 +188,7 @@ index 04613788..c030784a 100644
    {
      rta a0 = {
        .source = RTS_BABEL,
-@@ -727,122 +752,24 @@ babel_announce_rte(struct babel_proto *p, struct babel_entry *e)
+@@ -727,122 +752,24 @@ babel_announce_rte(struct babel_proto *p
        a0.nh.flags = RNF_ONLINK;
  
      rta *a = rta_lookup(&a0);
@@ -324,7 +323,7 @@ index 04613788..c030784a 100644
  }
  
  /*
-@@ -1405,7 +1332,12 @@ babel_handle_update(union babel_msg *m, struct babel_iface *ifa)
+@@ -1405,7 +1332,12 @@ babel_handle_update(union babel_msg *m,
    /*
     * RFC 8966 3.8.2.2 - dealing with unfeasible updates. Generate a one-off
     * (not retransmitted) unicast seqno request to the originator of this update.
@@ -338,7 +337,7 @@ index 04613788..c030784a 100644
     */
    if (!feasible && s && (metric != BABEL_INFINITY) &&
        (!best || (r == best) || (metric < best->metric)))
-@@ -1439,7 +1371,7 @@ babel_handle_update(union babel_msg *m, struct babel_iface *ifa)
+@@ -1439,7 +1371,7 @@ babel_handle_update(union babel_msg *m,
      e->updated = current_time();
    }
  
@@ -365,7 +364,7 @@ index 04613788..c030784a 100644
      babel_dump_route(r);
    }
  }
-@@ -2303,7 +2235,7 @@ babel_show_entries_(struct babel_proto *p, struct fib *rtable)
+@@ -2303,7 +2235,7 @@ babel_show_entries_(struct babel_proto *
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -374,7 +373,7 @@ index 04613788..c030784a 100644
      uint rts = 0, srcs = 0;
      node *n;
  
-@@ -2316,7 +2248,7 @@ babel_show_entries_(struct babel_proto *p, struct fib *rtable)
+@@ -2316,7 +2248,7 @@ babel_show_entries_(struct babel_proto *
      if (e->valid)
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, e->router_id, e->metric, e->seqno, rts, srcs);
@@ -383,7 +382,7 @@ index 04613788..c030784a 100644
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, r->router_id, r->metric, r->seqno, rts, srcs);
      else
-@@ -2353,10 +2285,10 @@ babel_show_routes_(struct babel_proto *p, struct fib *rtable)
+@@ -2353,10 +2285,10 @@ babel_show_routes_(struct babel_proto *p
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -396,7 +395,7 @@ index 04613788..c030784a 100644
        btime time = r->expires ? r->expires - current_time() : 0;
        cli_msg(-1025, "%-*N %-25I %-10s %5u %c %5u %7t", width,
  	      e->n.addr, r->next_hop, r->neigh->ifa->ifname,
-@@ -2428,8 +2360,9 @@ babel_preexport(struct channel *C, struct rte *new)
+@@ -2428,8 +2360,9 @@ babel_preexport(struct channel *C, struc
  }
  
  /*
@@ -408,7 +407,7 @@ index 04613788..c030784a 100644
   */
  static void
  babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
-@@ -2437,15 +2370,19 @@ babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
+@@ -2437,15 +2370,19 @@ babel_rt_notify(struct proto *P, struct
  {
    struct babel_proto *p = (void *) P;
    struct babel_entry *e;
@@ -429,7 +428,7 @@ index 04613788..c030784a 100644
      {
        rt_seqno = ea_find(new->attrs->eattrs, EA_BABEL_SEQNO)->u.data;
        eattr *e = ea_find(new->attrs->eattrs, EA_BABEL_ROUTER_ID);
-@@ -2454,6 +2391,8 @@ babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
+@@ -2454,6 +2391,8 @@ babel_rt_notify(struct proto *P, struct
      }
      else
      {
@@ -438,7 +437,7 @@ index 04613788..c030784a 100644
        rt_seqno = p->update_seqno;
        rt_router_id = p->router_id;
      }
-@@ -2467,6 +2406,27 @@ babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
+@@ -2467,6 +2406,27 @@ babel_rt_notify(struct proto *P, struct
  
      e = babel_get_entry(p, net->n.addr);
  
@@ -466,7 +465,7 @@ index 04613788..c030784a 100644
      /* Activate triggered updates */
      if ((e->valid != BABEL_ENTRY_VALID) ||
  	(e->router_id != rt_router_id))
-@@ -2488,8 +2448,26 @@ babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
+@@ -2488,8 +2448,26 @@ babel_rt_notify(struct proto *P, struct
      if (!e || e->valid != BABEL_ENTRY_VALID)
        return;
  
@@ -501,8 +500,6 @@ index 04613788..c030784a 100644
  
    p->log_pkt_tbf = (struct tbf){ .rate = 1, .burst = 5 };
  
-diff --git a/proto/babel/babel.h b/proto/babel/babel.h
-index edde4cab..3868d7c4 100644
 --- a/proto/babel/babel.h
 +++ b/proto/babel/babel.h
 @@ -25,6 +25,7 @@
@@ -529,4 +526,3 @@ index edde4cab..3868d7c4 100644
  
    ip_addr addr;
    u16 rxcost;				/* Sent in last IHU */
--- 
