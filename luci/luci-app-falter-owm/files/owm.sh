@@ -305,7 +305,7 @@ json_close_array
 json_add_double latitude $latitude
 json_add_double longitude $longitude
 json_add_string hostname "$hostname"
-json_add_int updateInterval 3600
+json_add_int updateInterval 1800
 json_add_string hardware "$system"
 json_add_object firmware
 	json_add_string name "$distribution $version"
