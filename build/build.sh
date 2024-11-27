@@ -60,7 +60,8 @@ srcmirror="https://sources.openwrt.org;https://firmware.berlin.freifunk.net/sour
 # srcmirror="http://192.168.1.1/sources.openwrt.org;http://192.168.1.1/firmware.berlin.freifunk.net/sources"
 
 # Mirror URL for Git repositories in feeds.conf
-gitmirror="https://git.openwrt.org"
+# gitmirror="https://git.openwrt.org"
+gitmirror=github
 # gitmirror="file:///mnt/mirror/git.openwrt.org"
 # gitmirror="http://192.168.1.1/git.openwrt.org"
 
@@ -95,7 +96,13 @@ unbuf="stdbuf --output=0 --error=0"
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
   cp "$sdkdir/feeds.conf.default" "$sdkdir/feeds.conf"
-  if [ "$gitmirror" != "https://git.openwrt.org" ]; then
+  if [ "$gitmirror" == "github" ]; then
+    sed -i "s|https://git.openwrt.org/openwrt/openwrt.git|https://github.com/openwrt/openwrt.git|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/feed/packages.git|https://github.com/openwrt/packages.git|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/project/luci.git|https://github.com/openwrt/luci.git|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/feed/routing.git|https://github.com/openwrt/routing.git|g" "$sdkdir/feeds.conf"
+    sed -i "s|https://git.openwrt.org/feed/telephony.git|https://github.com/openwrt/telephony.git|g" "$sdkdir/feeds.conf"
+  elif [ "$gitmirror" != "https://git.openwrt.org" ]; then
     sed -i "s|https://git.openwrt.org/openwrt|$gitmirror|g" "$sdkdir/feeds.conf"
     sed -i "s|https://git.openwrt.org/feed|$gitmirror|g" "$sdkdir/feeds.conf"
     sed -i "s|https://git.openwrt.org/project|$gitmirror|g" "$sdkdir/feeds.conf"
