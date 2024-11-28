@@ -80,7 +80,7 @@ unbuf="stdbuf --output=0 --error=0"
 
   # download and extract sdk tarball
   mkdir -p "./tmp/dl/$branch"
-  wget --progress=dot:giga -O "./tmp/dl/$branch/$sdkfile" "$dlurl/$target/$sdkfile"
+  wget -nv -N -P "./tmp/dl/$branch" "$dlurl/$target/$sdkfile"
   rm -rf "$sdkdir"
   mkdir -p "$sdkdir"
   tar -x -C "$sdkdir" --strip-components=1 -f "./tmp/dl/$branch/$sdkfile"
