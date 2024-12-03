@@ -60,8 +60,8 @@ srcmirror="https://sources.openwrt.org;https://firmware.berlin.freifunk.net/sour
 # srcmirror="http://192.168.1.1/sources.openwrt.org;http://192.168.1.1/firmware.berlin.freifunk.net/sources"
 
 # Mirror URL for Git repositories in feeds.conf
-# gitmirror="https://git.openwrt.org"
-gitmirror=github
+gitmirror="https://git.openwrt.org"
+# gitmirror=github
 # gitmirror="file:///mnt/mirror/git.openwrt.org"
 # gitmirror="http://192.168.1.1/git.openwrt.org"
 
