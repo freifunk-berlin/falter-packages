@@ -90,11 +90,16 @@ unbuf="stdbuf --output=0 --error=0"
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
   cat <<EOF1 >"$sdkdir/feeds.conf"
-src-git base https://github.com/openwrt/openwrt.git;main
-src-git packages https://github.com/openwrt/packages.git;master
-src-git luci https://github.com/openwrt/luci.git;master
-src-git routing https://github.com/openwrt/routing.git;master
-src-git telephony https://github.com/openwrt/telephony.git;master
+# src-git base https://github.com/openwrt/openwrt.git;main
+# src-git packages https://github.com/openwrt/packages.git;master
+# src-git luci https://github.com/openwrt/luci.git;master
+# src-git routing https://github.com/openwrt/routing.git;master
+# src-git telephony https://github.com/openwrt/telephony.git;master
+src-git base https://git.openwrt.org/openwrt/openwrt.git;main
+src-git packages https://git.openwrt.org/feed/packages.git;master
+src-git luci https://git.openwrt.org/project/luci.git;master
+src-git routing https://git.openwrt.org/feed/routing.git;master
+src-git telephony https://git.openwrt.org/feed/telephony.git;master
 src-link falter $(pwd)/tmp/feed
 EOF1
 
