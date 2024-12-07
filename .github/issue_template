@@ -1,12 +1,46 @@
-Please make sure that the issue subject starts with `<package-name>: `
+# Vorlage für einen Bugreport
 
-# Issue template (remove lines from top till here)
+English version below.
 
-Maintainer: @\<github-user> (find it by checking history of the package Makefile)
-Environment: (put here arch, model, OpenWrt version)
+Bitte benenne deinen Bugreport in etwa so: `<package-name>: `
+Wenn du den Namen des Pakets nicht kennst, bei dem der Fehler auftritt, versuche bitte,
+eine andere sinnvolle Überschrift zu finden.
 
-Description:
+Dein Bericht kann uns am meisten weiterhelfen, wenn du uns so viele Informationen
+wie möglich gibst. Bitte gib uns mindestens diese Infos:
 
-```
-Formating code blocks by wrapping them with pairs of ```
+- Falter-Firmware Version
+- Was hast du gemacht, unmittelbar bevor dir der Fehler aufgefallen ist? Wie können wir das nachstellen?
+- Hast du auf deinem Router eine spezielle Konfiguration? (Irgendetwas, außer einfach nur den Einrichtungs-Wizard durchgehen?)
+
+Bitte schreibe deinen Report auf Englisch oder Deutsch. Nimm gerne die Sprache, mit der du dich wohler fühlst.
+
+## Issue template
+
+Please try to start the issue subject similar to `<package-name>: `
+If you don't know the package name, please make sure at least, that you use a
+meaningful headline.
+
+Your Issue is most useful to us, if you provide as much information as you
+can. Please give at least these information:
+
+- Falter-Firmware version
+- What did you do, before you get known of the bug? How could we reproduce this?
+- Did you configure something special on your router? (Anything other than just running the wizard?)
+
+Feel free to either write your report in English or German. Whichever you feel more comfortable with.
+
+---------- Bitte entferne alles oberhalb dieser Zeilen --------
+---------- Please remove everything above these lines ---------
+--------------------- snip / schnipp --------------------------
+
+Falter Firmware Version:
+
+Special config/Besondere Einstellungen:
+
+Description/Beschreibung:
+
+```text
+You can include code blocks by wrapping them with pairs of backticks (```)
+Du kannst Codeblocks erstellen, indem du den Code mit Backticks (```) umschließt.
 ```
