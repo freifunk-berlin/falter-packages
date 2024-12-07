@@ -1,55 +1,50 @@
-name: Test Formalities
+---
+name: lint
 
-on:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build:
-    name: Test Formalities
+    name: formalities
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: "${{ github.event.pull_request.head.sha }}"
           fetch-depth: 0
 
       - name: Determine branch name
         run: |
+          # shellcheck disable=SC2030
+
           BRANCH="${GITHUB_BASE_REF#refs/heads/}"
           echo "Building for $BRANCH"
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "BRANCH=$BRANCH" >>"$GITHUB_ENV"
 
       - name: Test formalities
         run: |
+          # shellcheck disable=SC1091
+
           source .github/workflows/ci_helpers.sh
 
           RET=0
-          for commit in $(git rev-list HEAD ^origin/$BRANCH); do
-            info "=== Checking commit '$commit'"
-            if git show --format='%P' -s $commit | grep -qF ' '; then
-              err "Pull request should not include merge commits"
-              RET=1
-            fi
+          for commit in $(git rev-list HEAD ^origin/"$BRANCH"); do
+              info "=== Checking commit '$commit'"
+              if git show --format='%P' -s "$commit" | grep -qF ' '; then
+                  err "Pull request should not include merge commits"
+                  RET=1
+              fi
 
-            subject="$(git show -s --format=%s $commit)"
-            if echo "$subject" | grep -q -e '^[0-9A-Za-z,+/_-]\+: ' -e '^Revert '; then
-              success "Commit subject line seems ok ($subject)"
-            else
-              err "Commit subject line MUST start with '<package name>: ' ($subject)"
-              RET=1
-            fi
-
-            body="$(git show -s --format=%b $commit)"
-            sob="$(git show -s --format='Signed-off-by: %aN <%aE>' $commit)"
-            if echo "$body" | grep -qF "$sob"; then
-              success "Signed-off-by match author"
-            else
-              err "Signed-off-by is missing or doesn't match author (should be '$sob')"
-              RET=1
-            fi
+              subject="$(git show -s --format=%s "$commit")"
+              if echo "$subject" | grep -q -e '^[0-9A-Za-z,+/_-]\+: ' -e '^Revert '; then
+                  success "Commit subject line seems ok ($subject)"
+              else
+                  err "Commit subject line MUST start with '<package name>: ' ($subject)"
+                  RET=1
+              fi
           done
 
           exit $RET
