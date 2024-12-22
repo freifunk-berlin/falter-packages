@@ -324,7 +324,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
     debug(sprintf(cmd+" (error=%s)", "...", p.error()));
   }
   let reply = json(out);
-  if (reply.result[0] != 0 || reply.result[1].response_code != 0) {
+  if (!reply.result || reply.result[0] != 0 || reply.result[1].response_code != 0) {
     // response_code 1 means "public key is already used"
     // see wg-installer/wg-server/lib/wg_functions.sh
     log(sprintf(cmd+" (error=unexpected content, data=%s)", "...", out));
