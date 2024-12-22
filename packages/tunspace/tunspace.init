@@ -26,6 +26,7 @@ start_service() {
 
   procd_open_instance
   procd_set_param command /usr/bin/tunspace
+  procd_set_param respawn 60 10 0  # respawn indefinitely, wait 10s before retry
   procd_close_instance
 }
 
