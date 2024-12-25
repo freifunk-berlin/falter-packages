@@ -16,7 +16,7 @@
 // - [ ] nftables rules for mss clamping
 // - [ ] retry dhcp on boot
 // - [ ] less logging
-// - [ ] implement check_cert option
+// - [x] implement insecure_cert option
 // - [ ] implement disabled option
 // - [ ] warn if ipv6 RA is disabled
 
@@ -52,7 +52,7 @@ function load_config(name) {
   ctx.foreach(name, "wg-server", function(c) {
     cfg.wireguard_servers[""+c.name] = {
       "url": ""+c.url,
-      "check_cert": int(c.check_cert) != 0,
+      "insecure_cert": int(c.insecure_cert) != 0,
       "disabled": int(c.disabled) != 0,
     };
   });
@@ -241,8 +241,10 @@ function wg_interface_ok(st, ifname) {
     && 0 == shell_command("ping -c 3 -w 3 -A fe80::1%"+ifname+" >/dev/null");
 }
 
-function wg_replace_endpoint(ifname, cfg, url) {
+function wg_replace_endpoint(ifname, cfg, next) {
   let ifcfg = cfg.wireguard_interfaces[ifname];
+  let srvcfg = cfg.wireguard_servers[next];
+  let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
 
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
@@ -286,7 +288,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
       "session",
       "login",
       WG_LOGIN]};
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - --no-check-certificate --post-data='%s' %s", cfg.uplink_netns, "%s", url);
+  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
   let p = fs.popen(sprintf(cmd, msg), "r");
   let out = p.read("all");
   if (substr(out, 0, 1) != "{") {
@@ -314,7 +316,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
       { "public_key": pubkey, "mtu": ifcfg.mtu },
     ],
   };
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - --no-check-certificate --post-data='%s' %s", cfg.uplink_netns, "%s", url);
+  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
   let p = fs.popen(sprintf(cmd, msg), "r");
   let out = p.read("all");
   if (substr(out, 0, 1) != "{") {
@@ -333,7 +335,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
 
   let peer = {
     "public_key": reply.result[1].gw_pubkey,
-    "endpoint": replace(url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
+    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
   };
 
   // set tunnel server as our peer
@@ -390,7 +392,7 @@ function wireguard_maintenance(st, cfg) {
 
     log(sprintf("tunnel %s -> %s not healthy, moving to %s", ifname, current, next));
 
-    wg_replace_endpoint(ifname, cfg, cfg.wireguard_servers[next].url);
+    wg_replace_endpoint(ifname, cfg, next);
   }
 }
 
