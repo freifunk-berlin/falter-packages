@@ -17,7 +17,7 @@
 // - [ ] retry dhcp on boot
 // - [ ] less logging
 // - [x] implement insecure_cert option
-// - [ ] implement disabled option
+// - [x] implement disabled option
 // - [ ] warn if ipv6 RA is disabled
 
 const uloop = require("uloop");
@@ -366,6 +366,10 @@ function wg_replace_endpoint(ifname, cfg, next) {
 
 function wireguard_maintenance(st, cfg) {
   for (ifname, ifcfg in cfg.wireguard_interfaces) {
+    if (ifcfg.disabled) {
+      continue;
+    }
+
     let in_use = map(values(st.interfaces), (ifst) => ifst.server);
     let current = (st.interfaces[ifname] && st.interfaces[ifname].server) || null;
     if (wg_interface_ok(st, ifname)) {
@@ -376,7 +380,7 @@ function wireguard_maintenance(st, cfg) {
     // refill candidates if neccessary, but skip servers that are already in use
     if (length(st.candidates) == 0) {
       st.candidates = filter(keys(cfg.wireguard_servers), function(name) {
-        return index(in_use, name) == -1;
+        return index(in_use, name) == -1 && !cfg.wireguard_servers[name].disabled;
       });
     }
     if (length(st.candidates) == 0) {
@@ -459,6 +463,9 @@ function boot(st, cfg) {
   assert(st.nsid > 0);
 
   for (ifname, ifcfg in cfg.wireguard_interfaces) {
+    if (ifcfg.disabled) {
+      continue;
+    }
     if (!create_wg_interface(st.nsid, ifname, ifcfg, cfg.uplink_netns)) {
       log("failed to create "+ifname+" interface");
       exit(1);
