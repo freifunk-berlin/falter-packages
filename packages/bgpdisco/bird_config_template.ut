@@ -18,6 +18,11 @@ protocol static static_bgpdisco_v6 {
 {% endif; endfor %}
 }
 
+filter bgpdisco_export_v6 {
+	bgp_next_hop = 2001:db8::;
+	accept;
+}
+
 {% let i = 0; %}
 {% for (let neigh in neighbors): %}
 protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', '_') }} {
@@ -37,9 +42,8 @@ protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', 
 	ipv6 {
 		table v6_bgpdisco;
 		import all;
-		export all;
+		export filter bgpdisco_export_v6;
 		gateway recursive;
-		next hop address 2001:db8::; # TODO: Safe some memory by using IPv4 NH
 	};
 }
 {% endfor %}
