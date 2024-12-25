@@ -14,31 +14,31 @@ config tunspace "tunspace"
 config wg-server
   option name "ak36"
   option url "https://77.87.51.11/ubus"
-  option check_cert 0
+  option insecure_cert 1
   option disabled 0
 
 config wg-server
   option name "l105"
   option url "https://77.87.49.8/ubus"
-  option check_cert 0
+  option insecure_cert 1
   option disabled 0
 
 config wg-server
   option name "ohlauer"
   option url "https://176.74.57.19/ubus"
-  option check_cert 0
+  option insecure_cert 1
   option disabled 0
 
 config wg-server
   option name "saarbruecker"
   option url "https://176.74.57.43/ubus"
-  option check_cert 0
+  option insecure_cert 1
   option disabled 0
 
 config wg-server
   option name "strom"
   option url "https://77.87.51.131/ubus"
-  option check_cert 0
+  option insecure_cert 1
   option disabled 0
 
 config wg-interface

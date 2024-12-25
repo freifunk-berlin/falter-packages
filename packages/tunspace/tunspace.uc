@@ -1,25 +1,5 @@
 #!/usr/bin/ucode
 
-// TODO:
-// - [x] procd service
-// - [x] config via uci
-// - [x] load keys from file
-// - [x] bug: high cpu usage
-// - [x] generate private keys
-// - [x] don't abort for common failures
-// - [x] test olsrd and babel
-// - [x] test multiple ifaces
-// - [x] bug: possible multiple use of servers
-// - [x] better logging
-// - [x] handle dhcp renewals
-// - [ ] disable strom temporarily
-// - [ ] nftables rules for mss clamping
-// - [ ] retry dhcp on boot
-// - [ ] less logging
-// - [ ] implement check_cert option
-// - [ ] implement disabled option
-// - [ ] warn if ipv6 RA is disabled
-
 const uloop = require("uloop");
 const rtnl = require("rtnl");
 const wg = require("wireguard");
@@ -28,7 +8,7 @@ const math = require("math");
 const uci = require("uci");
 
 const UPLINK_NETNS_IFNAME = 'ts_uplink';
-const WG_LOGIN = { "username": "wginstaller", "password": "wginstaller" };
+const UBUS_LOGIN = { "username": "wginstaller", "password": "wginstaller" };
 
 let cfg = {};
 
@@ -51,14 +31,16 @@ function load_config(name) {
 
   ctx.foreach(name, "wg-server", function(c) {
     cfg.wireguard_servers[""+c.name] = {
+      "name": ""+c.name,
       "url": ""+c.url,
-      "check_cert": int(c.check_cert) != 0,
+      "insecure_cert": int(c.insecure_cert) != 0,
       "disabled": int(c.disabled) != 0,
     };
   });
 
   ctx.foreach(name, "wg-interface", function(c) {
     cfg.wireguard_interfaces[""+c.ifname] = {
+      "ifname": ""+c.ifname,
       "ipv6": ""+c.ipv6,
       "ipv4": ""+c.ipv4,
       "mtu": int(c.mtu),
@@ -241,8 +223,10 @@ function wg_interface_ok(st, ifname) {
     && 0 == shell_command("ping -c 3 -w 3 -A fe80::1%"+ifname+" >/dev/null");
 }
 
-function wg_replace_endpoint(ifname, cfg, url) {
+function wg_replace_endpoint(ifname, cfg, next) {
   let ifcfg = cfg.wireguard_interfaces[ifname];
+  let srvcfg = cfg.wireguard_servers[next];
+  let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
 
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
@@ -285,8 +269,8 @@ function wg_replace_endpoint(ifname, cfg, url) {
       "00000000000000000000000000000000",
       "session",
       "login",
-      WG_LOGIN]};
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - --no-check-certificate --post-data='%s' %s", cfg.uplink_netns, "%s", url);
+      UBUS_LOGIN]};
+  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
   let p = fs.popen(sprintf(cmd, msg), "r");
   let out = p.read("all");
   if (substr(out, 0, 1) != "{") {
@@ -314,7 +298,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
       { "public_key": pubkey, "mtu": ifcfg.mtu },
     ],
   };
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - --no-check-certificate --post-data='%s' %s", cfg.uplink_netns, "%s", url);
+  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
   let p = fs.popen(sprintf(cmd, msg), "r");
   let out = p.read("all");
   if (substr(out, 0, 1) != "{") {
@@ -333,7 +317,7 @@ function wg_replace_endpoint(ifname, cfg, url) {
 
   let peer = {
     "public_key": reply.result[1].gw_pubkey,
-    "endpoint": replace(url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
+    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
   };
 
   // set tunnel server as our peer
@@ -364,6 +348,10 @@ function wg_replace_endpoint(ifname, cfg, url) {
 
 function wireguard_maintenance(st, cfg) {
   for (ifname, ifcfg in cfg.wireguard_interfaces) {
+    if (ifcfg.disabled) {
+      continue;
+    }
+
     let in_use = map(values(st.interfaces), (ifst) => ifst.server);
     let current = (st.interfaces[ifname] && st.interfaces[ifname].server) || null;
     if (wg_interface_ok(st, ifname)) {
@@ -374,7 +362,7 @@ function wireguard_maintenance(st, cfg) {
     // refill candidates if neccessary, but skip servers that are already in use
     if (length(st.candidates) == 0) {
       st.candidates = filter(keys(cfg.wireguard_servers), function(name) {
-        return index(in_use, name) == -1;
+        return index(in_use, name) == -1 && !cfg.wireguard_servers[name].disabled;
       });
     }
     if (length(st.candidates) == 0) {
@@ -390,7 +378,7 @@ function wireguard_maintenance(st, cfg) {
 
     log(sprintf("tunnel %s -> %s not healthy, moving to %s", ifname, current, next));
 
-    wg_replace_endpoint(ifname, cfg, cfg.wireguard_servers[next].url);
+    wg_replace_endpoint(ifname, cfg, next);
   }
 }
 
@@ -457,6 +445,9 @@ function boot(st, cfg) {
   assert(st.nsid > 0);
 
   for (ifname, ifcfg in cfg.wireguard_interfaces) {
+    if (ifcfg.disabled) {
+      continue;
+    }
     if (!create_wg_interface(st.nsid, ifname, ifcfg, cfg.uplink_netns)) {
       log("failed to create "+ifname+" interface");
       exit(1);
