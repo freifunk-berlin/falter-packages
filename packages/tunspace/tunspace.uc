@@ -1,25 +1,5 @@
 #!/usr/bin/ucode
 
-// TODO:
-// - [x] procd service
-// - [x] config via uci
-// - [x] load keys from file
-// - [x] bug: high cpu usage
-// - [x] generate private keys
-// - [x] don't abort for common failures
-// - [x] test olsrd and babel
-// - [x] test multiple ifaces
-// - [x] bug: possible multiple use of servers
-// - [x] better logging
-// - [x] handle dhcp renewals
-// - [ ] disable strom temporarily
-// - [ ] nftables rules for mss clamping
-// - [ ] retry dhcp on boot
-// - [ ] less logging
-// - [x] implement insecure_cert option
-// - [x] implement disabled option
-// - [ ] warn if ipv6 RA is disabled
-
 const uloop = require("uloop");
 const rtnl = require("rtnl");
 const wg = require("wireguard");
@@ -28,7 +8,7 @@ const math = require("math");
 const uci = require("uci");
 
 const UPLINK_NETNS_IFNAME = 'ts_uplink';
-const WG_LOGIN = { "username": "wginstaller", "password": "wginstaller" };
+const UBUS_LOGIN = { "username": "wginstaller", "password": "wginstaller" };
 
 let cfg = {};
 
@@ -51,6 +31,7 @@ function load_config(name) {
 
   ctx.foreach(name, "wg-server", function(c) {
     cfg.wireguard_servers[""+c.name] = {
+      "name": ""+c.name,
       "url": ""+c.url,
       "insecure_cert": int(c.insecure_cert) != 0,
       "disabled": int(c.disabled) != 0,
@@ -59,6 +40,7 @@ function load_config(name) {
 
   ctx.foreach(name, "wg-interface", function(c) {
     cfg.wireguard_interfaces[""+c.ifname] = {
+      "ifname": ""+c.ifname,
       "ipv6": ""+c.ipv6,
       "ipv4": ""+c.ipv4,
       "mtu": int(c.mtu),
@@ -287,7 +269,7 @@ function wg_replace_endpoint(ifname, cfg, next) {
       "00000000000000000000000000000000",
       "session",
       "login",
-      WG_LOGIN]};
+      UBUS_LOGIN]};
   let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
   let p = fs.popen(sprintf(cmd, msg), "r");
   let out = p.read("all");
