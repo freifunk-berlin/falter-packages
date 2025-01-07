@@ -124,4 +124,5 @@ unbuf="stdbuf --output=0 --error=0"
   | tee "$destdir/build.log" \
   >&2
 
+[ ! -f "$sdkdir/public-key.pem" ] || mv "$sdkdir/public-key.pem" "$destdir/"
 mv "$sdkdir/bin/packages/$arch"/falter/* "$destdir/falter/"
