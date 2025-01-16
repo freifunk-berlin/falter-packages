@@ -18,9 +18,11 @@ function load_config(name) {
   let ts = ctx.get_all(name, "tunspace");
   let cfg = {
     "debug": int(ts.debug) != 0,
-    "uplink_netns": ""+ts.uplink_netns,
-    "uplink_ifname": ""+ts.uplink_ifname,
-    "uplink_mode": ""+ts.uplink_mode,
+    "uplink_netns": type(ts.uplink_netns) ? ts.uplink_netns : "",
+    "uplink_ifname": type(ts.uplink_ifname) ? ts.uplink_ifname : "",
+    "uplink_mode": type(ts.uplink_mode) ? ts.uplink_mode : "",
+    "uplink_ipv4": type(ts.uplink_ipv4) ? ts.uplink_ipv4 : "",
+    "uplink_gateway": type(ts.uplink_gateway) ? ts.uplink_gateway : "",
     "maintenance_interval": int(ts.maintenance_interval),
     "wireguard_servers": {},
     "wireguard_interfaces": {},
@@ -30,19 +32,21 @@ function load_config(name) {
   };
 
   ctx.foreach(name, "wg-server", function(c) {
-    cfg.wireguard_servers[""+c.name] = {
-      "name": ""+c.name,
-      "url": ""+c.url,
+    let name = type(c.name) ? c.name : "";
+    cfg.wireguard_servers[name] = {
+      "name": name,
+      "url": type(c.url) ? c.url : "",
       "insecure_cert": int(c.insecure_cert) != 0,
       "disabled": int(c.disabled) != 0,
     };
   });
 
   ctx.foreach(name, "wg-interface", function(c) {
-    cfg.wireguard_interfaces[""+c.ifname] = {
-      "ifname": ""+c.ifname,
-      "ipv6": ""+c.ipv6,
-      "ipv4": ""+c.ipv4,
+    let ifname = type(c.ifname) ? c.ifname : "";
+    cfg.wireguard_interfaces[ifname] = {
+      "ifname": ifname,
+      "ipv6": type(c.ipv6) ? c.ipv6 : "",
+      "ipv4": type(c.ipv4) ? c.ipv4 : "",
       "mtu": int(c.mtu),
       "port": int(c.port),
       "disabled": int(c.disabled) != 0,
@@ -382,12 +386,47 @@ function wireguard_maintenance(st, cfg) {
   }
 }
 
+function uplink_dhcp(netns, netnsifname) {
+  // if we already have an IP, we'll try to renew it.
+  // some routers will otherwise give us a different new IP, exhausting the IP pool.
+  let p = fs.popen("ip -j -n "+netns+" a s "+netnsifname);
+  let out = p.read("all");
+  p.close();
+  if (out == null) {
+    log("unable to read current ip address of "+netnsifname)
+  }
+  let reqip = "0.0.0.0";
+  let iplist = json(out);
+  for (ipobj in iplist) {
+    for (ipaddr in ipobj.addr_info) {
+      if (ipaddr.family == "inet" && ipaddr.scope == "global") {
+        reqip = ipaddr.local;
+      }
+    }
+  }
+
+  // try dhcp for 5 seconds
+  shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -r "+reqip+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
+}
+
+function uplink_static(netns, netnsifname, ipv4, gw) {
+  shell_command("ip -n "+netns+" addr show dev "+netnsifname+" | grep -F '"+ipv4+"' >/dev/null || ip -n "+netns+" addr add "+ipv4+" dev "+netnsifname);
+  shell_command("ip -n "+netns+" route show default dev "+netnsifname+" | grep -F '"+gw+"' >/dev/null || ip -n "+netns+" route add default via "+gw);
+}
+
 // TODO: ts_uplink interface leaks into default namespace when uplink namespace is deleted
-function uplink_maintenance(nsid, netns, ifname, mode) {
+function uplink_maintenance(cfg) {
   let netnsifname = UPLINK_NETNS_IFNAME;
 
+  let netns = cfg.uplink_netns;
+  let ifname = cfg.uplink_ifname;
+  let mode = cfg.uplink_mode;
+  let ipv4 = cfg.uplink_ipv4;
+  let gw = cfg.uplink_gateway;
+
   if (interface_exists(netnsifname)) {
-    // the uplink interface will sometimes leak out of the namespace on shutdown
+    // the uplink interface will sometimes leak out of the namespace on shutdown.
+    // in that case we'll just reuse it.
     shell_command("ip link set "+netnsifname+" netns "+netns);
   }
 
@@ -411,26 +450,11 @@ function uplink_maintenance(nsid, netns, ifname, mode) {
     return false;
   }
 
-  // if we already have an IP, we'll try to renew it.
-  // some routers will otherwise give us a different new IP, exhausting the IP pool.
-  let p = fs.popen("ip -j -n "+netns+" a s "+netnsifname);
-  let out = p.read("all");
-  p.close();
-  if (out == null) {
-    log("unable to read current ip address of "+netnsifname)
+  if (length(ipv4) > 0) {
+    uplink_static(netns, netnsifname, ipv4, gw);
+  } else {
+    uplink_dhcp(netns, netnsifname);
   }
-  let reqip = "0.0.0.0";
-  let iplist = json(out);
-  for (ipobj in iplist) {
-    for (ipaddr in ipobj.addr_info) {
-      if (ipaddr.family == "inet" && ipaddr.scope == "global") {
-        reqip = ipaddr.local;
-      }
-    }
-  }
-
-  // try dhcp for 5 seconds
-  shell_command("ip netns exec "+netns+" udhcpc -f -n -q -A 5 -i "+netnsifname+" -r "+reqip+" -s /usr/share/tunspace/udhcpc.script 2>&1 | grep 'ip addr add'");
 
   return true;
 }
@@ -460,7 +484,7 @@ function boot(st, cfg) {
 function tick(st, cfg) {
   debug("tick");
 
-  if (!uplink_maintenance(st.nsid, cfg.uplink_netns, cfg.uplink_ifname, cfg.uplink_mode)) {
+  if (!uplink_maintenance(cfg)) {
     log("uplink maintenance failed");
   }
   wireguard_maintenance(st, cfg);
