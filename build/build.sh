@@ -124,4 +124,5 @@ EOF1
   | tee "$destdir/build.log" \
   >&2
 
+[ ! -f "$sdkdir/public-key.pem" ] || mv "$sdkdir/public-key.pem" "$destdir/"
 mv "$sdkdir/bin/packages/$arch"/falter/* "$destdir/falter/"
