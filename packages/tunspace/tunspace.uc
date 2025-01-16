@@ -171,11 +171,8 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
     return false;
   }
 
-  // set mtu and bring the interface up
+  // set mtu. interface will be brought up later when it's fully configured.
   if (0 != shell_command("ip link set "+ifname+" mtu "+ifcfg.mtu)) {
-    return false;
-  }
-  if (0 != shell_command("ip link set up "+ifname)) {
     return false;
   }
 
@@ -231,6 +228,11 @@ function wg_replace_endpoint(ifname, cfg, next) {
   let ifcfg = cfg.wireguard_interfaces[ifname];
   let srvcfg = cfg.wireguard_servers[next];
   let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
+
+  // bring interface down to prevent OLSR and Babel from spamming syslog.
+  if (0 != shell_command("ip link set down "+ifname)) {
+    return false;
+  }
 
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
@@ -347,6 +349,12 @@ function wg_replace_endpoint(ifname, cfg, next) {
     log("WG_CMD_SET_DEVICE failed: "+err);
     return false;
   }
+
+  // bring interface up, it's fully configured now
+  if (0 != shell_command("ip link set up "+ifname)) {
+    return false;
+  }
+
   return true;
 }
 
