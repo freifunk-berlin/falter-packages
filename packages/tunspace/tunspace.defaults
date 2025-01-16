@@ -8,6 +8,8 @@ config tunspace "tunspace"
   option uplink_netns "uplink"
   option uplink_ifname "br-wan"
   option uplink_mode "bridge"
+  option uplink_ipv4 ""
+  option uplink_gateway ""
   option maintenance_interval 15
   option debug 0
 
