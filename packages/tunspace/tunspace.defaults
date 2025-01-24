@@ -10,46 +10,46 @@ config tunspace "tunspace"
   option uplink_mode "bridge"
   option uplink_ipv4 ""
   option uplink_gateway ""
-  option maintenance_interval 15
-  option debug 0
+  option maintenance_interval "15"
+  option debug "0"
 
 config wg-server
   option name "ak36"
   option url "https://77.87.51.11/ubus"
-  option insecure_cert 1
-  option disabled 0
+  option insecure_cert "1"
+  option disabled "0"
 
 config wg-server
   option name "l105"
   option url "https://77.87.49.8/ubus"
-  option insecure_cert 1
-  option disabled 0
+  option insecure_cert "1"
+  option disabled "0"
 
 config wg-server
   option name "ohlauer"
   option url "https://176.74.57.19/ubus"
-  option insecure_cert 1
-  option disabled 0
+  option insecure_cert "1"
+  option disabled "0"
 
 config wg-server
   option name "saarbruecker"
   option url "https://176.74.57.43/ubus"
-  option insecure_cert 1
-  option disabled 0
+  option insecure_cert "1"
+  option disabled "0"
 
 config wg-server
   option name "strom"
   option url "https://77.87.51.131/ubus"
-  option insecure_cert 1
-  option disabled 0
+  option insecure_cert "1"
+  option disabled "0"
 
 config wg-interface
   option ifname "ts_wg0"
   option ipv6 "fe80::2/64"
   option ipv4 "10.31.174.138/32"
-  option mtu 1280
-  option port 51820
-  option disabled 0
+  option mtu "1280"
+  option port "51820"
+  option disabled "0"
 
 EOT
 fi
