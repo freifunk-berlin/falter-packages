@@ -6,10 +6,10 @@ USE_PROCD=1
 START=96
 
 boot() {
-  [ -d /etc/rc.local.d ] && {
-    for file in /etc/rc.local.d/*; do
-      logger -t rclocal "executing $file"
-      test -f "$file" && . "$file"
-    done
-  }
+    [ -d /etc/rc.local.d ] && {
+        for file in /etc/rc.local.d/*; do
+            logger -t rclocal "executing $file"
+            test -f "$file" && . "$file"
+        done
+    }
 }
