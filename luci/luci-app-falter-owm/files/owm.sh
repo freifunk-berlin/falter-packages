@@ -77,10 +77,10 @@ olsr4_links() {
     json_select "$2"
     json_get_var localIP localIP
     json_get_var remoteIP remoteIP
-    # extract the second level domain from the host and append .olsr to be compatible with bgbdisco suffix .ff 
+    # extract the second level domain from the host and append .olsr to be compatible with bgbdisco suffix .ff
     remotehost="$(nslookup "$remoteIP" 2>/dev/null | grep name | sed -e 's/.*name = \(.*\)/\1/' | awk -F. '{print $(NF-1)".olsr"}')"
     if [ -z "$remotehost" ]; then
-      remotehost="$remoteIP"
+        remotehost="$remoteIP"
     fi
     json_get_var linkQuality linkQuality
     json_get_var olsrInterface olsrInterface
