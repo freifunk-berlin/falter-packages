@@ -229,11 +229,6 @@ function wg_replace_endpoint(ifname, cfg, next) {
   let srvcfg = cfg.wireguard_servers[next];
   let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
 
-  // bring interface down to prevent OLSR and Babel from spamming syslog.
-  if (0 != shell_command("ip link set down "+ifname)) {
-    return false;
-  }
-
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
   let privkey = randfd.read(32);
