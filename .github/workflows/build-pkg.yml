@@ -8,6 +8,8 @@ jobs:
   build:
     name: ${{ matrix.arch }}
     runs-on: self-hosted
+    container:
+      image: ubuntu:latest
     strategy:
       fail-fast: false
       matrix:
