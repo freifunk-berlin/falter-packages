@@ -186,21 +186,10 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
     return false;
   }
 
-  // add ipv6 address
-  if (length(ifcfg.ipv6) > 0) {
-    rtnl_request(rtnl.const.RTM_NEWADDR,
-                 rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
-      "dev": ifname,
-      "family": rtnl.const.AF_INET6,
-      "address": ifcfg.ipv6,
-    });
-    if (err = rtnl.error()) {
-      log("RTM_NEWADDR with AF_INET6 failed: "+err);
-      return false;
-    }
-  }
-
   // add ipv4 address
+  // ipv4 addresses dont get flushed when the interface goes down, so we can
+  // add it once at the beginning (here) and be done with it.
+  // the ipv6 address will be added everytime we change the endpoint.
   if (length(ifcfg.ipv4) > 0) {
     rtnl_request(rtnl.const.RTM_NEWADDR,
                  rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
@@ -229,7 +218,8 @@ function wg_replace_endpoint(ifname, cfg, next) {
   let srvcfg = cfg.wireguard_servers[next];
   let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
 
-  // bring interface down to prevent OLSR and Babel from spamming syslog.
+  // bring interface down
+  // it's not technically neccessary, just for aesthetics.
   if (0 != shell_command("ip link set down "+ifname)) {
     return false;
   }
@@ -353,6 +343,22 @@ function wg_replace_endpoint(ifname, cfg, next) {
   // bring interface up, it's fully configured now
   if (0 != shell_command("ip link set up "+ifname)) {
     return false;
+  }
+
+  // add ipv6 address
+  // as ipv6 addresses get flushed when and interface is set down,
+  // we need to re-add it everytime we bring it up.
+  if (length(ifcfg.ipv6) > 0) {
+    rtnl_request(rtnl.const.RTM_NEWADDR,
+                 rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
+      "dev": ifname,
+      "family": rtnl.const.AF_INET6,
+      "address": ifcfg.ipv6,
+    });
+    if (err = rtnl.error()) {
+      log("RTM_NEWADDR with AF_INET6 failed: "+err);
+      return false;
+    }
   }
 
   return true;
