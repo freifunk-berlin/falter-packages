@@ -8,7 +8,7 @@ arm_arm926ej-s at91/sam9x mxs/generic
 arm_cortex-a15_neon-vfpv4 armsr/armv7 ipq806x/generic ipq806x/chromium
 arm_cortex-a5_vfpv4 at91/sama5
 arm_cortex-a7 mediatek/mt7629
-arm_cortex-a7_neon-vfpv4 bcm27xx/bcm2709 imx/cortexa7 ipq40xx/generic ipq40xx/chromium ipq40xx/mikrotik layerscape/armv7 mediatek/mt7623 sunxi/cortexa7
+arm_cortex-a7_neon-vfpv4 bcm27xx/bcm2709 imx/cortexa7 ipq40xx/generic ipq40xx/chromium ipq40xx/mikrotik layerscape/armv7 mediatek/mt7623 stm32/stm32mp1 sunxi/cortexa7
 arm_cortex-a7_vfpv4 at91/sama7
 arm_cortex-a8_vfpv3 omap/generic sunxi/cortexa8
 arm_cortex-a9 bcm53xx/generic
@@ -23,7 +23,7 @@ loongarch64_generic loongarch64/generic
 mips64_mips64r2 malta/be64
 mips64_octeonplus octeon/generic
 mips64el_mips64r2 malta/le64
-mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xrx200 lantiq/xway lantiq/xway_legacy malta/be realtek/rtl839x realtek/rtl930x realtek/rtl931x
+mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xrx200 lantiq/xrx200_legacy lantiq/xway lantiq/xway_legacy malta/be realtek/rtl839x realtek/rtl930x realtek/rtl931x
 mips_4kec realtek/rtl838x
 mips_mips32 bmips/bcm6318 bmips/bcm6328 bmips/bcm6358 bmips/bcm6362 bmips/bcm6368 bmips/bcm63268 lantiq/ase
 mipsel_24kc malta/le ramips/mt7620 ramips/mt7621 ramips/mt76x8 ramips/rt288x ramips/rt305x
