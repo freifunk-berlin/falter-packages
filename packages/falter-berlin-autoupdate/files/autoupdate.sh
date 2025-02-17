@@ -144,7 +144,7 @@ rm -rf "$PATH_DIR"
 mkdir -p "$PATH_DIR"
 
 log "fetch autoupdate.json from $FW_SERVER_URL ..."
-if load_overview_and_certs "$FW_SERVER_URL"; then
+if ! load_overview_and_certs "$FW_SERVER_URL"; then
     log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
 fi
@@ -165,11 +165,29 @@ else
     log "ignoring certificates as requested."
 fi
 
-if latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json"); then
+if ! latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json"); then
     log "wasn't able to read latest stable version from autoupdate.json"
     exit 2
 else
     log "latest release is $latest_release"
+fi
+
+if [ -z "$OPT_FORCE" ]; then
+    detect_custom_config "/etc/autoupdate/cheksums"
+    retval=$?
+    if [ $retval = 2 ]; then
+        log "You customized the configuration of your system since the first wizard run."
+        log "This can lead to incompabilities in the update process. Please consider"
+        log "updating manually."
+        exit 2
+    elif [ $retval = 1 ]; then
+        log "There were no checksums of your config files, to compare with. We were not"
+        log "able to detect, wether your config is customized. Please consider updating"
+        log "manually."
+        exit 2
+    else
+        log "Config wasn't modified since wizard run".
+    fi
 fi
 
 ##################

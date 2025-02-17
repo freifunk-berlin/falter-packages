@@ -4,7 +4,9 @@
 
 return view.extend({
   render: function () {
-    var m, s, o1, o2, o3, o4;
+    var m, s, t, o1, o2, o3, o4, o5;
+
+    addNotification('Warnasdfads', )
 
     m = new form.Map('autoupdate', _('Freifunk Berlin Autoupdate'),
       _("Autoupdate will update your router automatically, once there is a new\
@@ -35,6 +37,14 @@ return view.extend({
     o4 = s.option(form.Flag, 'disabled', _('Disabled'),
       _('Deactivates the Autoupdater. We do not recommend this!'));
     o4.rmempty = false;
+
+    o5 = s.option(form.Flag, 'ignore_mod', _('Ignore config changes'),
+    _("The autoupdater will detect custom changes you've applied to your router since you've run the wizard.\
+       It will refuse an autoupdate then, to avoid breaking your customized setup. If you wish to automatically\
+       update anyway, activate this option. We do not recommend this, as this might break your setup on auto-updates."));
+
+
+    // t = m.section(form.TypedSection, 'autoupdatehints', _())
 
     return m.render();
   }
