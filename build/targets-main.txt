@@ -33,5 +33,5 @@ mipsel_mips32 bcm47xx/generic bcm47xx/legacy
 powerpc64_e5500 qoriq/generic
 powerpc_464fp apm821xx/nand apm821xx/sata
 powerpc_8548 mpc85xx/p1010 mpc85xx/p1020 mpc85xx/p2020
-riscv64_riscv64 d1/generic sifiveu/generic siflower/sf21 starfive/generic
+riscv64_generic d1/generic sifiveu/generic siflower/sf21 starfive/generic
 x86_64 x86/64
