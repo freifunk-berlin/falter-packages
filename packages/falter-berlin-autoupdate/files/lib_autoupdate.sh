@@ -15,6 +15,8 @@
 # shellcheck disable=SC2059
 # FW_SERVER_URL isn't mispelled, but a global variable defined in autoupdate.sh
 # shellcheck disable=SC2153
+# file names will not contain whispaces...
+# shellcheck disable=SC2044
 
 # Those dependencies aren't available for CI checking.
 # shellcheck source=/dev/null
@@ -66,6 +68,41 @@ read_latest_stable() {
     sed -e 's|.*"falter-version":\s*"\([0-9]*\.[0-9]*\.[0-9]*\)".*|\1|' "$path_autoupdate_json"
 
     return $?
+}
+
+detect_custom_config() {
+    # Doing updates on highly customized systems can fail. Detect these systems
+    # by comparing hashes.
+    local path_config_chcksums="$1"
+    local files_different=0
+    local differing_files=""
+
+    if ! [ -d "$path_config_chcksums" ]; then
+        # there are no checksums to compare against.
+        return 1
+    fi
+
+    for file in $(find "$path_config_chcksums" -type f); do
+        # slice the prefix away, where checksums got stored
+        config_file="/$(echo "$file" | cut -d'/' -f5-)"
+        # check, if config file at /etc/config still exists
+        if [ -f "$config_file" ]; then
+            curr_chksum=$(md5sum "$config_file"| cut -d' ' -f1)
+            stored_checksum=$(cat "$file")
+            if [ "$curr_chksum" != "$stored_checksum" ]; then
+                differing_files="$differing_files $file"
+                files_different=2
+            fi
+        else
+            continue
+        fi
+    done
+
+    if [ $files_different != 0 ]; then
+        log "Found differing files: $differing_files"
+    fi
+
+    return $files_different
 }
 
 get_firmware_flavour() {

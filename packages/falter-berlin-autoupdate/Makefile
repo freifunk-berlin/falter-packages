@@ -59,6 +59,7 @@ define Package/falter-berlin-autoupdate/install
 	$(CP) ./files/lib_autoupdate.sh $(1)/lib/autoupdate/lib_autoupdate.sh
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(CP) ./files/post-inst.sh $(1)/etc/uci-defaults/90_autoupdate-post-inst.sh
+	$(CP) ./files/zz-autoupdate_diff.sh $(1)/etc/uci-defaults/zz-autoupdate_diff.sh
 endef
 
 define Package/falter-berlin-autoupdate-keys/install
