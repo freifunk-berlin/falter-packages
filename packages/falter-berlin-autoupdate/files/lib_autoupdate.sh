@@ -1,5 +1,23 @@
 #!/bin/sh
 
+# This software originates from Freifunk Berlin and implements a basic autoupdate mechanism
+# by using OpenWrts built-in sysupgrade.
+# It is licensed under GNU General Public License v3.0 or later
+# Copyright (C) 2022   Martin Hübner and Tobias Schwarz
+
+# shellcheck shell=dash
+
+# jshn assigns the variables for us, but shellcheck doesn't get it.
+# shellcheck disable=SC2154
+# We don't need the return values and check the correct execution in other ways.
+# shellcheck disable=SC2155
+# using printf with variables and nc didn't work correctly. Thus this hack
+# shellcheck disable=SC2059
+# FW_SERVER_URL isn't mispelled, but a global variable defined in autoupdate.sh
+# shellcheck disable=SC2153
+
+# Those dependencies aren't available for CI checking.
+# shellcheck source=/dev/null
 . /lib/functions.sh
 . /lib/functions/semver.sh
 . /lib/config/uci.sh
@@ -142,6 +160,11 @@ get_download_link_and_hash() {
     # load board-specific json with image-name from selector
     board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
 
+    if [ -z "$board_json" ]; then
+        log "Failed to download board-specific JSON-File from firmware selector. Exiting..."
+        exit 2
+    fi
+
     json_init
     json_load "$board_json"
     json_for_each_item "iter_images" "images"
@@ -215,11 +238,22 @@ min_valid_certificates() {
                 #pop key from list. Thus one key cannot validate multiple certs.
                 key_list=$(pop_element "$key_list" "$key")
             fi
-            if [ $cert_cnt = $min_cnt ]; then
+            if [ $cert_cnt = "$min_cnt" ]; then
                 return 255
             fi
         done
     done
 
     return $cert_cnt
+}
+
+check_ignore_minor_compat() {
+    # checks if the installed sysupgrade tool supports the option
+    # --ignore-minor-compat-version already.
+    # returns 0 if option is available, 1 otherwise
+    if sysupgrade -h | grep -q 'ignore-minor-compat-version'; then
+        return 0
+    else
+        return 1
+    fi
 }

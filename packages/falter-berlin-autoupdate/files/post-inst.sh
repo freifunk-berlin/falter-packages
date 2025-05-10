@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# I can remember, that this script was fairly horrible to get it working as
+# intended. You better shouldn't touch anything here.
+# shellcheck disable=all
+
 [ -z $IPKG_INSTROOT ] || exit 0
 
 # if autoupdate is not present in crontab, include it.

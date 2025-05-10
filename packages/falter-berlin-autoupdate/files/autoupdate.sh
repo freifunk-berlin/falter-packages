@@ -1,10 +1,22 @@
-#! /bin/sh
+#!/bin/sh
+
+# This software originates from Freifunk Berlin and implements a basic autoupdate mechanism
+# by using OpenWrts built-in sysupgrade.
+# It is licensed under GNU General Public License v3.0 or later
+# Copyright (C) 2022   Martin Hübner and Tobias Schwarz
+
+# shellcheck shell=dash
 
 # except than noted, this script is not posix-compliant in one way: we use "local"
 # variables definition. As nearly all shells out there implement local, this should
 # work anyway. This is a little reminder to you, if you use some rare shell without
 # a builtin "local" statement.
 
+# We don't need the return values and check the correct execution in other ways.
+# shellcheck disable=SC2155
+
+# we can't check those dependencies at the CI
+# shellcheck source=/dev/null
 . /lib/functions.sh
 . /lib/config/uci.sh
 . /etc/freifunk_release
@@ -54,14 +66,14 @@ Example call:
 #   Load Configuration   #
 ##########################
 
-SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
+export SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
 FW_SERVER_URL=$(uci_get autoupdate cfg fw_server_fqdn)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
 PATH_DIR="/tmp/autoupdate"
 PATH_BIN="$PATH_DIR/freifunk_syupgrade.bin"
-KEY_DIR="/etc/autoupdate/keys/"
+export KEY_DIR="/etc/autoupdate/keys/"
 
 MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-download
 
@@ -107,19 +119,19 @@ log "starting autoupdate..."
 #  Checks and Checks again
 
 is_stable_release=$(echo "$FREIFUNK_RELEASE" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')
-if [ -z $OPT_FORCE ] && [ -z "$is_stable_release" ]; then
+if [ -z "$OPT_FORCE" ] && [ -z "$is_stable_release" ]; then
     log "automatic updates aren't supported for development-firmwares. Please update manually or use the force update option '-f' or new-install option '-n'."
     exit 2
 fi
 
-if [ -z $OPT_FORCE ] && { [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; }; then
+if [ -z "$OPT_FORCE" ] && { [ "$DISABLED" = "1" ] || [ "$DISABLED" = "yes" ] || [ "$DISABLED" = "true" ]; }; then
     log "autoupdate is disabled. Change the configs at /et/config/autoupdate to enable it."
     exit 2
 fi
 
 UPTIME=$(cut -d'.' -f1 </proc/uptime)
 # only update, if router runs for at least two hours (so the update probably won't get disrupted)
-if [ -z $OPT_FORCE ] && [ "$UPTIME" -lt 7200 ]; then
+if [ -z "$OPT_FORCE" ] && [ "$UPTIME" -lt 7200 ]; then
     log "Router didn't run for two hours. It might be just plugged in for testing. Aborting..."
     exit 2
 fi
@@ -129,15 +141,14 @@ rm -rf "$PATH_DIR"
 mkdir -p "$PATH_DIR"
 
 log "fetch autoupdate.json from $FW_SERVER_URL ..."
-load_overview_and_certs "$FW_SERVER_URL"
-if [ $? != 0 ]; then
+if load_overview_and_certs "$FW_SERVER_URL"; then
     log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
 fi
 log "done."
 
 # prove to be signed by minimum amount of certs
-if [ -z $OPT_IGNORE_CERTS ]; then
+if [ -z "$OPT_IGNORE_CERTS" ]; then
     log "Verifying image-signatures..."
     min_valid_certificates "$PATH_DIR/autoupdate.json" "$MIN_CERTS"
     ret_code=$?
@@ -151,8 +162,7 @@ else
     log "ignoring certificates as requested."
 fi
 
-latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json")
-if [ $? != 0 ]; then
+if latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json"); then
     log "wasn't able to read latest stable version from autoupdate.json"
     exit 2
 else
@@ -182,7 +192,7 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
     log "download link is: $link."
 
     # delete json and signatures to save space in RAM
-    if [ -z $OPT_TESTRUN ]; then
+    if [ -z "$OPT_TESTRUN" ]; then
         json_sig_files=$(find "$PATH_DIR" -name "autoupdate.json*")
         for f in $json_sig_files; do
             rm "$f"
@@ -222,12 +232,18 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
     fi
 
     # flash image
-    if [ -z $OPT_TESTRUN ]; then
+    if [ -z "$OPT_TESTRUN" ]; then
         log "start flashing the image..."
         if [ -n "$OPT_N" ]; then
             sysupgrade -n "$PATH_BIN"
         else
-            sysupgrade "$PATH_BIN"
+            check_ignore_minor_compat
+            ret_code=$?
+            if [ $ret_code = 0 ]; then
+                sysupgrade --ignore-minor-compat-version "$PATH_BIN"
+            else
+                sysupgrade "$PATH_BIN"
+            fi
         fi
         log "done."
     fi

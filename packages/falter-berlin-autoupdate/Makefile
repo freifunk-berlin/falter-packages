@@ -1,7 +1,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-autoupdate
-PKG_VERSION:=0.1
+PKG_VERSION:=2022.08.29
+
+PKG_LICENSE:=GPL-3.0-or-later
+PKG_LICENSE_FILES:=LICENSE
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -10,12 +13,14 @@ define Package/falter-berlin-autoupdate/default
   CATEGORY:=falter-berlin
   URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
+  # falter-berlin-migration holds the semver-library needed by the autoupdater
+  EXTRA_DEPENDS:=uci, jshn, falter-berlin-migration
 endef
 
 define Package/falter-berlin-autoupdate
 	$(call Package/falter-berlin-autoupdate/default)
 	TITLE:=Freifunk Berlin Autoupdater
-	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys uci usign
+	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys, uci, usign
 endef
 
 define Package/falter-berlin-autoupdate-keys
