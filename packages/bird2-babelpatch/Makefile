@@ -73,7 +73,7 @@ define Package/bird2-babelpatch/install
 	$(INSTALL_DIR)  $(1)/usr/sbin
 	$(INSTALL_BIN)  $(PKG_BUILD_DIR)/bird $(1)/usr/sbin/
 	$(INSTALL_DIR)  $(1)/etc
-	$(INSTALL_DATA) ./files/bird.conf $(1)/etc/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/doc/bird.conf.example $(1)/etc/bird.conf
 	$(INSTALL_DIR)  $(1)/etc/init.d
 	$(INSTALL_BIN)  ./files/bird.init $(1)/etc/init.d/bird
 endef
