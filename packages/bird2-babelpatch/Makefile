@@ -7,12 +7,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bird2-babelpatch
-PKG_VERSION:=2.15.1
+PKG_VERSION:=2.17
 PKG_RELEASE:=1
 
 PKG_SOURCE:=bird-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=ftp://bird.network.cz/pub/bird
-PKG_HASH:=48e85c622de164756c132ea77ad1a8a95cc9fd0137ffd0d882746589ce75c75d
+PKG_SOURCE_URL:=https://bird.network.cz/download/
+PKG_HASH:=79bbcc77c63e9e1b7a10a48389c86f4f75b053fd3dec48e3c6cbe0df1ba81eb3
 
 PKG_MAINTAINER:=Toke Høiland-Jørgensen <toke@toke.dk>
 PKG_LICENSE:=GPL-2.0-or-later
