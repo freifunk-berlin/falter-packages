@@ -57,10 +57,6 @@ This is the 2.0 branch of Bird which integrates support for IPv4 and IPv6
 into a single branch, and also adds support for the Babel routing protocol.
 endef
 
-ifeq ($(ARCH),arm)
-TARGET_CFLAGS+=-mno-unaligned-access
-endif
-
 CONFIGURE_ARGS += --disable-libssh
 
 define Package/bird2/conffiles
