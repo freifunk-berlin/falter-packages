@@ -323,7 +323,7 @@
  }
  
  /*
-@@ -1405,7 +1332,12 @@ babel_handle_update(union babel_msg *m,
+@@ -1410,7 +1337,12 @@ babel_handle_update(union babel_msg *m,
    /*
     * RFC 8966 3.8.2.2 - dealing with unfeasible updates. Generate a one-off
     * (not retransmitted) unicast seqno request to the originator of this update.
@@ -337,7 +337,7 @@
     */
    if (!feasible && s && (metric != BABEL_INFINITY) &&
        (!best || (r == best) || (metric < best->metric)))
-@@ -1439,7 +1371,7 @@ babel_handle_update(union babel_msg *m,
+@@ -1444,7 +1376,7 @@ babel_handle_update(union babel_msg *m,
      e->updated = current_time();
    }
  
@@ -346,25 +346,25 @@
  }
  
  void
-@@ -2122,7 +2054,7 @@ static void
- babel_dump_entry(struct babel_entry *e)
+@@ -2127,7 +2059,7 @@ static void
+ babel_dump_entry(struct dump_request *dreq, struct babel_entry *e)
  {
    struct babel_source *s;
 -  struct babel_route *r;
 +  struct babel_route *r, *best = e->selected;
  
-   debug("Babel: Entry %N:\n", e->n.addr);
+   RDUMP("Babel: Entry %N:\n", e->n.addr);
  
-@@ -2132,7 +2064,7 @@ babel_dump_entry(struct babel_entry *e)
+@@ -2137,7 +2069,7 @@ babel_dump_entry(struct dump_request *dr
    WALK_LIST(r,e->routes)
    {
-     debug(" ");
--    if (r == e->selected) debug("*");
-+    if (r == best) debug("*");
-     babel_dump_route(r);
+     RDUMP(" ");
+-    if (r == e->selected) RDUMP("*");
++    if (r == best) RDUMP("*");
+     babel_dump_route(dreq, r);
    }
  }
-@@ -2303,7 +2235,7 @@ babel_show_entries_(struct babel_proto *
+@@ -2308,7 +2240,7 @@ babel_show_entries_(struct babel_proto *
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -373,7 +373,7 @@
      uint rts = 0, srcs = 0;
      node *n;
  
-@@ -2316,7 +2248,7 @@ babel_show_entries_(struct babel_proto *
+@@ -2321,7 +2253,7 @@ babel_show_entries_(struct babel_proto *
      if (e->valid)
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, e->router_id, e->metric, e->seqno, rts, srcs);
@@ -382,7 +382,7 @@
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, r->router_id, r->metric, r->seqno, rts, srcs);
      else
-@@ -2353,10 +2285,10 @@ babel_show_routes_(struct babel_proto *p
+@@ -2358,10 +2290,10 @@ babel_show_routes_(struct babel_proto *p
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -395,7 +395,7 @@
        btime time = r->expires ? r->expires - current_time() : 0;
        cli_msg(-1025, "%-*N %-25I %-10s %5u %c %5u %7t", width,
  	      e->n.addr, r->next_hop, r->neigh->ifa->ifname,
-@@ -2428,8 +2360,9 @@ babel_preexport(struct channel *C, struc
+@@ -2433,8 +2365,9 @@ babel_preexport(struct channel *C, struc
  }
  
  /*
@@ -407,7 +407,7 @@
   */
  static void
  babel_rt_notify(struct proto *P, struct channel *c UNUSED, struct network *net,
-@@ -2437,15 +2370,19 @@ babel_rt_notify(struct proto *P, struct
+@@ -2442,15 +2375,19 @@ babel_rt_notify(struct proto *P, struct
  {
    struct babel_proto *p = (void *) P;
    struct babel_entry *e;
@@ -428,7 +428,7 @@
      {
        rt_seqno = ea_find(new->attrs->eattrs, EA_BABEL_SEQNO)->u.data;
        eattr *e = ea_find(new->attrs->eattrs, EA_BABEL_ROUTER_ID);
-@@ -2454,6 +2391,8 @@ babel_rt_notify(struct proto *P, struct
+@@ -2459,6 +2396,8 @@ babel_rt_notify(struct proto *P, struct
      }
      else
      {
@@ -437,7 +437,7 @@
        rt_seqno = p->update_seqno;
        rt_router_id = p->router_id;
      }
-@@ -2467,6 +2406,27 @@ babel_rt_notify(struct proto *P, struct
+@@ -2472,6 +2411,27 @@ babel_rt_notify(struct proto *P, struct
  
      e = babel_get_entry(p, net->n.addr);
  
@@ -465,7 +465,7 @@
      /* Activate triggered updates */
      if ((e->valid != BABEL_ENTRY_VALID) ||
  	(e->router_id != rt_router_id))
-@@ -2488,8 +2448,26 @@ babel_rt_notify(struct proto *P, struct
+@@ -2493,8 +2453,26 @@ babel_rt_notify(struct proto *P, struct
      if (!e || e->valid != BABEL_ENTRY_VALID)
        return;
  
@@ -492,7 +492,7 @@
  
      babel_trigger_update(p);
      e->updated = current_time();
-@@ -2581,6 +2559,7 @@ babel_start(struct proto *P)
+@@ -2586,6 +2564,7 @@ babel_start(struct proto *P)
    p->source_slab = sl_new(P->pool, sizeof(struct babel_source));
    p->msg_slab = sl_new(P->pool, sizeof(struct babel_msg_node));
    p->seqno_slab = sl_new(P->pool, sizeof(struct babel_seqno_request));
@@ -510,7 +510,7 @@
  
  #define EA_BABEL_METRIC		EA_CODE(PROTOCOL_BABEL, 0)
  #define EA_BABEL_ROUTER_ID	EA_CODE(PROTOCOL_BABEL, 1)
-@@ -191,6 +192,7 @@ struct babel_proto {
+@@ -197,6 +198,7 @@ struct babel_proto {
    slab *source_slab;
    slab *msg_slab;
    slab *seqno_slab;
@@ -518,7 +518,7 @@
  
    struct tbf log_pkt_tbf;		/* TBF for packet messages */
  };
-@@ -233,6 +235,7 @@ struct babel_iface {
+@@ -239,6 +241,7 @@ struct babel_iface {
  struct babel_neighbor {
    node n;
    struct babel_iface *ifa;
