@@ -144,7 +144,8 @@ rm -rf "$PATH_DIR"
 mkdir -p "$PATH_DIR"
 
 log "fetch autoupdate.json from $FW_SERVER_URL ..."
-if load_overview_and_certs "$FW_SERVER_URL"; then
+load_overview_and_certs "$FW_SERVER_URL"
+if [ $? != 0 ]; then
     log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
 fi
@@ -165,7 +166,8 @@ else
     log "ignoring certificates as requested."
 fi
 
-if latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json"); then
+latest_release=$(read_latest_stable "$PATH_DIR/autoupdate.json")
+if [ $? != 0 ]; then
     log "wasn't able to read latest stable version from autoupdate.json"
     exit 2
 else
