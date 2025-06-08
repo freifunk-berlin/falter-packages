@@ -4,7 +4,7 @@
 guard "network"
 
 # change default ip to avoid collision with user's local network
-uci set network.lan.ipaddr=192.168.42.1
+uci set network.lan.ipaddr=192.168.42.1/24
 
 WANDEV=$(uci -q get network.wan.device)
 echo ${WANDEV} | grep ^br- > /dev/null
