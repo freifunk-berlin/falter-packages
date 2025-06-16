@@ -83,11 +83,6 @@ get_firmware_flavour() {
     fi
 }
 
-get_board_name() {
-    # echos the boards name like used in firmware-selector
-    board_name | tr ',' '_'
-}
-
 get_board_target() {
     # echo the boards target. i.e. ath79/generic
 
@@ -97,6 +92,7 @@ get_board_target() {
     json_load "$(ubus call system board)"
     json_select release
     json_get_var target target
+    json_cleanup
 
     echo "$target"
 }
@@ -112,7 +108,8 @@ iter_images() {
     if [ "$image_type" = "sysupgrade" ]; then
         json_get_var image_name name
         IMAGE_NAME="$image_name"
-        #json_get_var image_hash sha256
+        json_get_var image_hash sha256
+        IMAGE_HASH="$image_hash"
         # don't take image hash from unsigned file, but from signed autoupdate.json
     fi
 
@@ -136,46 +133,54 @@ get_download_link_and_hash() {
     #
     # capitalised vars get modified by called functions directly
 
-    local version="$1"
+    local _version="$1"
     local flavour="$2"
-    local curr_target=""
-    local BOARD=""
-    local board_json=""
-    local IMAGE_NAME=""
+
+    local board="$(board_name)"
+    local target=""
+    local profile=""
+    local profiles_url=""
+    local hash_expected=""
+    local image_name=""
     local image_hash=""
 
-    # Idea: Don't check for target-change. If the Target changed, the download
-    # will fail anyway at fetching the board-json
-    curr_target=$(get_board_target)
-    BOARD=$(get_board_name)
-
-    # get secure hash from signed autoupdate.json
+    json_cleanup
     json_init
     json_load_file "$PATH_DIR/autoupdate.json"
-    json_select target
-    json_select "$curr_target"
-    json_select "$BOARD"
-    json_get_var image_hash "$flavour"
+    json_select devices
+    json_select "$board"
+    json_get_var profile profile
+    json_get_var target target
+    json_select ..
+    json_select ..
+    json_select profiles
+    json_select "$target"
+    json_select "$flavour"
+    json_get_var profiles_url url
+    json_get_var hash_expected sha256sum
+    json_cleanup
 
-    # load board-specific json with image-name from selector
-    board_json=$(wget -qO - "https://${SELECTOR_URL}/${version}/${flavour}/${curr_target}/${BOARD}.json")
-
-    if [ -z "$board_json" ]; then
-        log "Failed to download board-specific JSON-File from firmware selector. Exiting..."
+    rm -f "$PATH_DIR/profiles.json"
+    wget -O "$PATH_DIR/profiles.json" "https://${FW_SERVER_URL}$profiles_url"
+    local hash_actual="$(sha256sum "$PATH_DIR/profiles.json" | cut -d' ' -f1)"
+    if [ "$hash_actual" != "$hash_expected" ]; then
+        log "failed to verify profiles.json - expected=$hash_expected actual=$hash_actual"
         exit 2
     fi
 
     json_init
-    json_load "$board_json"
-    json_for_each_item "iter_images" "images"
+    json_load_file "$PATH_DIR/profiles.json"
+    json_select profiles
+    json_select "$profile"
+    json_for_each_item iter_images images
+    json_cleanup
 
     if [ -z "$IMAGE_NAME" ]; then
         log "Failed to get image download link. There might be no automatic update for your Router. This can have several reasons. You may try to find a newer frimware by yourself."
         exit 2
     fi
 
-    # construct download-link
-    echo "https://${FW_SERVER_URL}/stable/${version}/${flavour}/${curr_target}/${IMAGE_NAME} $image_hash"
+    echo "https://${FW_SERVER_URL}$(dirname "$profiles_url")/$IMAGE_NAME $IMAGE_HASH"
 }
 
 verify_image_hash() {
