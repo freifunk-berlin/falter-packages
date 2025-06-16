@@ -179,9 +179,8 @@ fi
 
 if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
 
-    router_board=$(get_board_name)
     flavour=$(get_firmware_flavour)
-    log "router board is: $router_board. firmware-flavour is: $flavour."
+    log "router board is: $(board_name). firmware-flavour is: $flavour."
     if [ "$flavour" = "unknown" ]; then
         log "failed to determine the firmware-type of your installation. Please consider a manual update."
         exit 1
