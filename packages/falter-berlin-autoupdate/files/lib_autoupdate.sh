@@ -63,7 +63,7 @@ read_latest_stable() {
 
     local path_autoupdate_json="$1"
 
-    sed -e 's|.*"falter-version":\s*"\([0-9]*\.[0-9]*\.[0-9]*\)".*|\1|' "$path_autoupdate_json"
+    cat "$path_autoupdate_json" | grep -F 'falter-version' | sed -e 's|.*"falter-version":\s*"\([^"]*\)".*|\1|g'
 
     return $?
 }
