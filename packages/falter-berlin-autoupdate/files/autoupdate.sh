@@ -253,5 +253,5 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         log "done."
     fi
 else
-    log "v$FREIFUNK_RELEASE is the latest version. Nothing to do. I will recheck tomorrow."
+    log "$FREIFUNK_RELEASE is the latest version. Nothing to do. I will recheck tomorrow."
 fi
