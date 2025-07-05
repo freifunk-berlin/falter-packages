@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+# These two files are added by the olsrd package,
+# even if the separate olsrd6 is NOT installed.
+# Their presents somehow results in an additional olsrd process
+# being spawned, but with the bad incomplete olsrd6 config,
+# which results in repeating logread entries:
+#
+#     daemon.err olsrd[123]: olsrd exit: main: Bad configuration
+#
+# Let's just remove them manually to get rid of the log spam.
+#
+
+rm -f /etc/config/olsrd6
+rm -f /tmp/etc/olsrd6.conf
