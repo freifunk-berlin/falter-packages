@@ -36,7 +36,7 @@ config 'defaults' 'wifi_iface_80211s'
 
 config 'defaults' 'interface'
 	option 'netmask' '255.255.255.255'
-	option 'dns' '46.182.19.48 80.67.169.40 194.150.168.168 9.9.9.10 149.112.112.10 2001:910:800::12 2a02:2970:1002::18 2620:fe::10 2620:fe::fe:10'
+	option 'dns' '194.150.168.168 9.9.9.10 149.112.112.10 2a02:2970:1002::18 2620:fe::10 2620:fe::fe:10'
 
 config 'dhcp' 'dhcp'
 	option leasetime '5m'
