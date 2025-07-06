@@ -11,7 +11,7 @@ uci set dhcp.@dnsmasq[0].quietdhcp=1
 uci add_list dhcp.@dnsmasq[0].notinterface='wan'
 
 # on IPv6-islands we also should give a default-route to the clients,
-# so they can also reach IPv6-neighbours. 
+# so they can also reach IPv6-neighbours.
 uci set dhcp.lan.ra_default=1
 
 # add dns entry frei.funk
@@ -28,5 +28,9 @@ uci set dhcp.frei_funk_ipv6.ip=$router_ula
 # don't send default-route to clients to prevent them sending pakets
 # to us, that we can't forward now
 uci add_list dhcp.lan.dhcp_option='3'
+
+# default DNS, will be overwritten by community profile later on
+uci add_list dhcp.@dnsmasq[0].server='9.9.9.10'         # Quad9 unfiltered
+uci add_list dhcp.@dnsmasq[0].server='194.150.168.168'  # AS250 dns resolver
 
 uci commit dhcp
