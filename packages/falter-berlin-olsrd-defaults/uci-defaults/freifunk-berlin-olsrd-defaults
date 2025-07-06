@@ -34,9 +34,9 @@ uci set olsrd.$PLUGIN.ignore=0
 # add dyngw plain plugin - it is ipv4 only
 PLUGIN="$(uci add olsrd LoadPlugin)"
 uci set olsrd.$PLUGIN.library=olsrd_dyn_gw
-uci add_list olsrd.$PLUGIN.Ping=46.182.19.48      # dns.digitalcourage.de
-uci add_list olsrd.$PLUGIN.Ping=80.67.169.40      # www.fdn.fr/actions/dns
-uci add_list olsrd.$PLUGIN.Ping=194.150.168.168   # dns.as250.net
+uci add_list olsrd.$PLUGIN.Ping=9.9.9.10        # Quad9 unfiltered
+uci add_list olsrd.$PLUGIN.Ping=194.150.168.168 # dns.as250.net
+uci add_list olsrd.$PLUGIN.Ping=149.112.112.10  # Quad9 secondary
 uci set olsrd.$PLUGIN.ignore=0
 
 # set olsrd defaults
