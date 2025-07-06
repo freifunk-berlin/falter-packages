@@ -29,4 +29,8 @@ uci set dhcp.frei_funk_ipv6.ip=$router_ula
 # to us, that we can't forward now
 uci add_list dhcp.lan.dhcp_option='3'
 
+# default DNS, will be overwritten by community profile later on
+uci add_list dhcp.@dnsmasq[0].server='9.9.9.10'         # Quad9 unfiltered
+uci add_list dhcp.@dnsmasq[0].server='194.150.168.168'  # AS250 dns resolver
+
 uci commit dhcp
