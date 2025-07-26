@@ -48,21 +48,15 @@ set -o pipefail
 set -e
 set -x
 
-# Mirror base URL for SDK download.
-# We search in $dlmirror/releases/$version-SNAPSHOT/targets/sha256sum.
-dlmirror="https://downloads.openwrt.org"
-# dlmirror="file:///mnt/mirror/downloads.openwrt.org"
-# dlmirror="http://192.168.1.1/downloads.openwrt.org"
-
-# Mirror URL for source tarball downloads.
-srcmirror="https://sources.openwrt.org;https://firmware.berlin.freifunk.net/sources"
-# srcmirror="file:///mnt/mirror/sources.openwrt.org;file:///mnt/mirror/firmware.berlin.freifunk.net/sources"
-# srcmirror="http://192.168.1.1/sources.openwrt.org;http://192.168.1.1/firmware.berlin.freifunk.net/sources"
-
-# Mirror URL for Git repositories in feeds.conf
-gitmirror="https://git.openwrt.org"
-# gitmirror="file:///mnt/mirror/git.openwrt.org"
-# gitmirror="http://192.168.1.1/git.openwrt.org"
+if [ -z "$FALTER_MIRROR" ] ; then
+  dlmirror="https://downloads.openwrt.org"
+  srcmirror="https://sources.openwrt.org"
+  gitmirror="https://git.openwrt.org"
+else
+  dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
+  srcmirror="$FALTER_MIRROR/sources.openwrt.org"
+  gitmirror="$FALTER_MIRROR/git.openwrt.org"
+fi
 
 mkdir -p "$dest/falter"
 destdir=$(realpath "$dest")
@@ -94,14 +88,34 @@ unbuf="stdbuf --output=0 --error=0"
   mkdir -p ./tmp/feed
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
-  cp "$sdkdir/feeds.conf.default" "$sdkdir/feeds.conf"
-  if [ "$gitmirror" != "https://git.openwrt.org" ]; then
-    sed -i "s|https://git.openwrt.org/openwrt|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i "s|https://git.openwrt.org/feed|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i "s|https://git.openwrt.org/project|$gitmirror|g" "$sdkdir/feeds.conf"
-    sed -i 's|src-git |src-git-full |g' "$sdkdir/feeds.conf"
+  if [ "$gitmirror" == "https://git.openwrt.org" ]; then
+    cat <<EOF >"$sdkdir/feeds.conf"
+src-git base https://git.openwrt.org/openwrt/openwrt.git;main
+src-git packages https://git.openwrt.org/feed/packages.git;master
+src-git luci https://git.openwrt.org/project/luci.git;master
+src-git routing https://git.openwrt.org/feed/routing.git;master
+src-git telephony https://git.openwrt.org/feed/telephony.git;master
+src-link falter $(pwd)/tmp/feed
+EOF
+  elif [ "$gitmirror" == "https://github.com" ] ; then
+    cat <<EOF >"$sdkdir/feeds.conf"
+src-git base https://github.com/openwrt/openwrt.git;main
+src-git packages https://github.com/openwrt/packages.git;master
+src-git luci https://github.com/openwrt/luci.git;master
+src-git routing https://github.com/openwrt/routing.git;master
+src-git telephony https://github.com/openwrt/telephony.git;master
+src-link falter $(pwd)/tmp/feed
+EOF
+  else
+    cat <<EOF >"$sdkdir/feeds.conf"
+src-git-full base $gitmirror/openwrt/openwrt.git;main
+src-git-full packages $gitmirror/feed/packages.git;master
+src-git-full luci $gitmirror/project/luci.git;master
+src-git-full routing $gitmirror/feed/routing.git;master
+src-git-full telephony $gitmirror/feed/telephony.git;master
+src-link falter $(pwd)/tmp/feed
+EOF
   fi
-  echo "src-link falter $(pwd)/tmp/feed" >> "$sdkdir/feeds.conf"
 
   cd "$sdkdir"
 
