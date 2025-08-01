@@ -88,31 +88,33 @@ unbuf="stdbuf --output=0 --error=0"
   mkdir -p ./tmp/feed
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
+  branchmaster="master"
+  [ "$branch" == "main" ] || branchmaster="$branch"
   if [ "$gitmirror" == "https://git.openwrt.org" ]; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://git.openwrt.org/openwrt/openwrt.git;main
-src-git packages https://git.openwrt.org/feed/packages.git;master
-src-git luci https://git.openwrt.org/project/luci.git;master
-src-git routing https://git.openwrt.org/feed/routing.git;master
-src-git telephony https://git.openwrt.org/feed/telephony.git;master
+src-git base https://git.openwrt.org/openwrt/openwrt.git;$branch
+src-git packages https://git.openwrt.org/feed/packages.git;$branchmaster
+src-git luci https://git.openwrt.org/project/luci.git;$branchmaster
+src-git routing https://git.openwrt.org/feed/routing.git;$branchmaster
+src-git telephony https://git.openwrt.org/feed/telephony.git;$branchmaster
 src-link falter $(pwd)/tmp/feed
 EOF
   elif [ "$gitmirror" == "https://github.com" ] ; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://github.com/openwrt/openwrt.git;main
-src-git packages https://github.com/openwrt/packages.git;master
-src-git luci https://github.com/openwrt/luci.git;master
-src-git routing https://github.com/openwrt/routing.git;master
-src-git telephony https://github.com/openwrt/telephony.git;master
+src-git base https://github.com/openwrt/openwrt.git;$branch
+src-git packages https://github.com/openwrt/packages.git;$branchmaster
+src-git luci https://github.com/openwrt/luci.git;$branchmaster
+src-git routing https://github.com/openwrt/routing.git;$branchmaster
+src-git telephony https://github.com/openwrt/telephony.git;$branchmaster
 src-link falter $(pwd)/tmp/feed
 EOF
   else
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git-full base $gitmirror/openwrt/openwrt.git;main
-src-git-full packages $gitmirror/feed/packages.git;master
-src-git-full luci $gitmirror/project/luci.git;master
-src-git-full routing $gitmirror/feed/routing.git;master
-src-git-full telephony $gitmirror/feed/telephony.git;master
+src-git-full base $gitmirror/openwrt/openwrt.git;$branch
+src-git-full packages $gitmirror/feed/packages.git;$branchmaster
+src-git-full luci $gitmirror/project/luci.git;$branchmaster
+src-git-full routing $gitmirror/feed/routing.git;$branchmaster
+src-git-full telephony $gitmirror/feed/telephony.git;$branchmaster
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
