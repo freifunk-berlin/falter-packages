@@ -126,6 +126,9 @@ EOF
   make defconfig
   ./scripts/feeds update -a
   ./scripts/feeds install -a -p falter
+
+  sed -i 's#cc -o contrib/lemon#cc -std=gnu17 -o contrib/lemon#g' feeds/luci/modules/luci-base/src/Makefile
+
   export DOWNLOAD_MIRROR="$srcmirror"
   for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}'); do
     make -j8 V=s "package/$p/compile"
