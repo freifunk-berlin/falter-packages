@@ -7,7 +7,7 @@ PKG_RELEASE:=3
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/wlanslovenija/tunneldigger.git
 PKG_SOURCE_VERSION:=b8fd97efbacfc0ec5d67b153bc83eb5dbc1cb1f9
-PKG_MIRROR_HASH:=46ab3898a94e92e0d157ecb7e07b523454c3802dd4cf6c64f7f80c5a99922297
+PKG_MIRROR_HASH:=761be5a6e484cfe477a6998536ff850ca14fb72e1830882d46d37a0d164ff821
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
