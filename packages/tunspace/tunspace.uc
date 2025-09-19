@@ -377,7 +377,7 @@ function wireguard_maintenance(st, cfg) {
       continue;
     }
 
-    // refill candidates if neccessary, but skip servers that are already in use
+    // refill candidates if necessary, but skip servers that are already in use
     if (length(st.candidates) == 0) {
       st.candidates = filter(keys(cfg.wireguard_servers), function(name) {
         return index(in_use, name) == -1 && !cfg.wireguard_servers[name].disabled;
@@ -456,7 +456,19 @@ function uplink_maintenance(cfg) {
     shell_command("ip -n "+netns+" link set "+netnsifname+" up");
   } else if (mode == "bridge") {
     // or create a macvlan bridge:
-    shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode bridge");
+
+    // Generate a deterministic mac first
+    let mac = split(trim(fs.readfile("/sys/class/net/"+ifname+"/address")), ":");
+    let macpart = hex(mac[5]);
+    // Adds 42 to the hex-value, but subtracts 42 if we are to high to avoid counting over ff
+    if (macpart <= 167){
+      mac[5] = sprintf("%x", macpart + 42);
+    } else {
+      mac[5] = sprintf("%x", macpart - 42);
+    }
+    macstr = join(":", mac);
+
+    shell_command("ip link add "+netnsifname+" address "+macstr+" link "+ifname+" type macvlan mode bridge");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
   } else {
