@@ -23,6 +23,7 @@ function load_config(name) {
     "uplink_mode": type(ts.uplink_mode) ? ts.uplink_mode : "",
     "uplink_ipv4": type(ts.uplink_ipv4) ? ts.uplink_ipv4 : "",
     "uplink_gateway": type(ts.uplink_gateway) ? ts.uplink_gateway : "",
+    "uplink_mac": type(ts.uplink_mac) ? ts.uplink_mac : "",
     "maintenance_interval": int(ts.maintenance_interval),
     "wireguard_servers": {},
     "wireguard_interfaces": {},
@@ -437,6 +438,7 @@ function uplink_maintenance(cfg) {
   let mode = cfg.uplink_mode;
   let ipv4 = cfg.uplink_ipv4;
   let gw = cfg.uplink_gateway;
+  let mac = cfg.uplink_mac;
 
   if (interface_exists(netnsifname)) {
     // the uplink interface will sometimes leak out of the namespace on shutdown.
@@ -456,19 +458,7 @@ function uplink_maintenance(cfg) {
     shell_command("ip -n "+netns+" link set "+netnsifname+" up");
   } else if (mode == "bridge") {
     // or create a macvlan bridge:
-
-    // Generate a deterministic mac first
-    let mac = split(trim(fs.readfile("/sys/class/net/"+ifname+"/address")), ":");
-    let macpart = hex(mac[5]);
-    // Adds 42 to the hex-value, but subtracts 42 if we are to high to avoid counting over ff
-    if (macpart <= 167){
-      mac[5] = sprintf("%x", macpart + 42);
-    } else {
-      mac[5] = sprintf("%x", macpart - 42);
-    }
-    macstr = join(":", mac);
-
-    shell_command("ip link add "+netnsifname+" address "+macstr+" link "+ifname+" type macvlan mode bridge");
+    shell_command("ip link add "+netnsifname+" address "+mac+" link "+ifname+" type macvlan mode bridge");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
   } else {
