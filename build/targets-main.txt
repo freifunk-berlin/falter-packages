@@ -23,7 +23,7 @@ loongarch64_generic loongarch64/generic
 mips64_mips64r2 malta/be64
 mips64_octeonplus octeon/generic
 mips64el_mips64r2 malta/le64
-mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xrx200 lantiq/xrx200_legacy lantiq/xway malta/be realtek/rtl838x realtek/rtl839x realtek/rtl930x
+mips_24kc ath79/generic ath79/mikrotik ath79/nand ath79/tiny lantiq/xrx200 lantiq/xrx200_legacy lantiq/xway malta/be realtek/rtl838x realtek/rtl839x realtek/rtl930x realtek/rtl930x_nand realtek/rtl931x realtek/rtl931x_nand
 mips_mips32 bmips/bcm6318 bmips/bcm6328 bmips/bcm6358 bmips/bcm6362 bmips/bcm6368 bmips/bcm63268
 mipsel_24kc malta/le ramips/mt7620 ramips/mt7621 ramips/mt76x8 ramips/rt305x
 mipsel_24kc_24kf pistachio/generic
