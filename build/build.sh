@@ -88,33 +88,36 @@ unbuf="stdbuf --output=0 --error=0"
   mkdir -p ./tmp/feed
   ln -sfT "$(pwd)/packages" ./tmp/feed/packages
   ln -sfT "$(pwd)/luci" ./tmp/feed/luci
-  branchmaster="master"
-  [ "$branch" == "main" ] || branchmaster="$branch"
+
+  owbranch="main"
+  owbranch2="master"
+  [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch="$branch"
+  [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch2="$branch"
   if [ "$gitmirror" == "https://git.openwrt.org" ]; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://git.openwrt.org/openwrt/openwrt.git;$branch
-src-git packages https://git.openwrt.org/feed/packages.git;$branchmaster
-src-git luci https://git.openwrt.org/project/luci.git;$branchmaster
-src-git routing https://git.openwrt.org/feed/routing.git;$branchmaster
-src-git telephony https://git.openwrt.org/feed/telephony.git;$branchmaster
+src-git base https://git.openwrt.org/openwrt/openwrt.git;$owbranch
+src-git packages https://git.openwrt.org/feed/packages.git;$owbranch2
+src-git luci https://git.openwrt.org/project/luci.git;$owbranch2
+src-git routing https://git.openwrt.org/feed/routing.git;$owbranch2
+src-git telephony https://git.openwrt.org/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   elif [ "$gitmirror" == "https://github.com" ] ; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://github.com/openwrt/openwrt.git;$branch
-src-git packages https://github.com/openwrt/packages.git;$branchmaster
-src-git luci https://github.com/openwrt/luci.git;$branchmaster
-src-git routing https://github.com/openwrt/routing.git;$branchmaster
-src-git telephony https://github.com/openwrt/telephony.git;$branchmaster
+src-git base https://github.com/openwrt/openwrt.git;$owbranch
+src-git packages https://github.com/openwrt/packages.git;$owbranch2
+src-git luci https://github.com/openwrt/luci.git;$owbranch2
+src-git routing https://github.com/openwrt/routing.git;$owbranch2
+src-git telephony https://github.com/openwrt/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   else
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git-full base $gitmirror/openwrt/openwrt.git;$branch
-src-git-full packages $gitmirror/feed/packages.git;$branchmaster
-src-git-full luci $gitmirror/project/luci.git;$branchmaster
-src-git-full routing $gitmirror/feed/routing.git;$branchmaster
-src-git-full telephony $gitmirror/feed/telephony.git;$branchmaster
+src-git-full base $gitmirror/openwrt/openwrt.git;$owbranch
+src-git-full packages $gitmirror/feed/packages.git;$owbranch2
+src-git-full luci $gitmirror/project/luci.git;$owbranch2
+src-git-full routing $gitmirror/feed/routing.git;$owbranch2
+src-git-full telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
