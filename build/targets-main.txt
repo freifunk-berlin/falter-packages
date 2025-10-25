@@ -4,7 +4,7 @@ aarch64_cortex-a72 bcm27xx/bcm2711 mvebu/cortexa72
 aarch64_cortex-a76 bcm27xx/bcm2712
 aarch64_generic armsr/armv8 layerscape/armv8_64b rockchip/armv8
 arm_arm1176jzf-s_vfp bcm27xx/bcm2708
-arm_arm926ej-s at91/sam9x mxs/generic
+arm_arm926ej-s at91/sam9x mxs/generic sunxi/arm926ejs
 arm_cortex-a15_neon-vfpv4 armsr/armv7 ipq806x/generic ipq806x/chromium
 arm_cortex-a5_vfpv4 at91/sama5
 arm_cortex-a7 mediatek/mt7629
