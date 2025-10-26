@@ -36,6 +36,10 @@ function usage() {
   echo "  path to a writable directory where the 'falter' feed directory will end up."
   echo "  default: ./out/<branch>/<arch>"
   echo
+  echo "FALTER_MIRROR env variable:"
+  echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
+  echo "  default: <empty>"
+  echo
   exit 1
 }
 
