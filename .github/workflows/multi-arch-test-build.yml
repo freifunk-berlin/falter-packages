@@ -25,7 +25,7 @@ jobs:
             runtime_test: true
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -61,7 +61,7 @@ jobs:
           echo "PACKAGES=$PACKAGES" >> "$GITHUB_ENV"
 
       - name: Build
-        uses: openwrt/gh-action-sdk@v7
+        uses: openwrt/gh-action-sdk@v9
         env:
           ARCH: ${{ matrix.arch }}-${{ env.BRANCH }}
           FEEDNAME: packages_ci
