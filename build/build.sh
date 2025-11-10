@@ -129,7 +129,7 @@ EOF
   cd "$sdkdir"
 
   # build a repository from all packages in our feed
-  echo "CONFIG_SIGNED_PACKAGES=n" > .config
+  [ "$branch" == "main" ] || echo "CONFIG_SIGNED_PACKAGES=n" > .config
   make defconfig
   ./scripts/feeds update -a
   ./scripts/feeds install -a -p falter
