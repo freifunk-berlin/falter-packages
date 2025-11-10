@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=bird3-babelpatch
+PKG_VERSION:=3.1.4
+PKG_RELEASE:=1
+
+PKG_SOURCE:=bird-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://bird.nic.cz/download/
+PKG_HASH:=a5757b60e1de9ac5efc9765f87b7c8baefa31db789966c83870d070f7608278c
+
+PKG_MAINTAINER:=Toke Høiland-Jørgensen <toke@toke.dk>, Nick Hainke <vincent@systemli.org>
+PKG_LICENSE:=GPL-2.0-or-later
+
+PKG_BUILD_DEPENDS:=ncurses readline
+PKG_BUILD_DIR:=$(BUILD_DIR)/bird-$(PKG_VERSION)
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/bird3-babelpatch
+  TITLE:=The BIRD Internet Routing Daemon (v3)
+  URL:=https://bird.nic.cz/
+  SECTION:=net
+  CATEGORY:=Network
+  SUBMENU:=Routing and Redirection
+  PROVIDES:=bird3
+  DEPENDS:=+libpthread +libatomic
+  CONFLICTS:=bird2 bird3
+endef
+
+define Package/bird3-babelpatch/Default/description
+BIRD is an internet routing daemon which manages TCP/IP routing tables
+with support of modern routing protocols, easy to use configuration
+interface and powerful route filtering language. It is lightweight and
+efficient and therefore appropriate for small embedded routers.
+endef
+
+define Package/bird3-babelpatch/description
+$(call Package/bird3-babelpatch/Default/description)
+
+BIRD supports OSPFv2, RIPv2, Babel and BGP protocols for IPv4 and
+OSPFv3, RIPng, Babel and BGP protocols for IPv6.
+
+In BGP, BIRD supports communities, multiprotocol extensions, MD5
+authentication, 32bit AS numbers and could act as a route server or a
+route reflector. BIRD also supports multiple RIBs, multiple kernel
+routing tables and redistribution between the protocols with a powerful
+configuration syntax.
+
+This is the 3.0 branch of Bird which is a multithreaded rewrite.
+endef
+
+CONFIGURE_ARGS += --disable-libssh
+TARGET_LDFLAGS += -latomic
+
+define Package/bird3-babelpatch/conffiles
+/etc/bird.conf
+/etc/bird4.conf
+/etc/bird6.conf
+endef
+
+define Package/bird3-babelpatch/install
+	$(INSTALL_DIR)  $(1)/usr/sbin
+	$(INSTALL_BIN)  $(PKG_BUILD_DIR)/bird $(1)/usr/sbin/
+	$(INSTALL_DIR)  $(1)/etc
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/doc/bird.conf.example $(1)/etc/bird.conf
+	$(INSTALL_DIR)  $(1)/etc/init.d
+	$(INSTALL_BIN)  ./files/bird.init $(1)/etc/init.d/bird
+endef
+
+$(eval $(call BuildPackage,bird3-babelpatch))
