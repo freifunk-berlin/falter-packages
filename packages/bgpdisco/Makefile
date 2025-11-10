@@ -28,7 +28,6 @@ endef
 define Package/bgpdisco
 	$(Package/bgpdisco/default)
 	EXTRA_DEPENDS:= \
-		bird2, bird2c, \
 		ucode, ucode-mod-rtnl, ucode-mod-debug, ucode-mod-fs, \
 		ucode-mod-uloop, ucode-mod-log, ucode-mod-struct
 endef
