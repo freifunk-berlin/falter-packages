@@ -40,6 +40,10 @@ function usage() {
   echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
   echo "  default: <empty>"
   echo
+  echo "FALTER_DEBUG env variable:"
+  echo "  set to any non-empty value (e.g. 1) to include debug symbols in binaries."
+  echo "  default: <empty>"
+  echo
   exit 1
 }
 
@@ -61,6 +65,9 @@ else
   srcmirror="$FALTER_MIRROR/sources.openwrt.org"
   gitmirror="$FALTER_MIRROR/git.openwrt.org"
 fi
+
+makeargs="V=s"
+[ -z "$FALTER_DEBUG" ] || makeargs="$makeargs CONFIG_DEBUG=y STRIP=true"
 
 mkdir -p "$dest/falter"
 destdir=$(realpath "$dest")
@@ -138,7 +145,9 @@ EOF
 
   export DOWNLOAD_MIRROR="$srcmirror"
   for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}'); do
-    make -j8 V=s "package/$p/compile"
+    cmd="make -j8 package/$p/compile $makeargs"
+    echo "-- $cmd"
+    $cmd
   done
   make package/index V=s
 
