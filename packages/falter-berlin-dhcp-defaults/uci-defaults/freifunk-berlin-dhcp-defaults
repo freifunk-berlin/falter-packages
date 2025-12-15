@@ -6,6 +6,9 @@ guard "dhcp"
 # quieten down dnsmasq a bit (do not log lease-mgmt)
 uci set dhcp.@dnsmasq[0].quietdhcp=1
 
+# set the domain to ff
+uci set dhcp.@dnsmasq[0].domain='ff'
+
 # dnsmasq should not care for 'wan',
 # prevents: daemon.warn dnsmasq-dhcp: DHCP packet received on xxx-wan which has no address.
 uci add_list dhcp.@dnsmasq[0].notinterface='wan'
