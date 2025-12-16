@@ -137,7 +137,9 @@ EOF
   cd "$sdkdir"
 
   # build a repository from all packages in our feed
-  [ "$branch" == "main" ] || echo "CONFIG_SIGNED_PACKAGES=n" > .config
+  if [ "$branch" != "main" ] && [ "$branch" != "openwrt-25.12" ] ; then
+    echo "CONFIG_SIGNED_PACKAGES=n" > .config
+  fi
   make defconfig
   ./scripts/feeds update -a
   ./scripts/feeds install -a -p falter
