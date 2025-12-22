@@ -21,17 +21,6 @@
 . /lib/config/uci.sh
 . /etc/freifunk_release
 
-cleanup() {
-    log "exiting..."
-
-    if [ -d "$PATH_DIR" ] && [ -z "$OPT_TESTRUN" ]; then
-        rm -rf "$PATH_DIR"
-    fi
-
-    exit
-}
-trap cleanup EXIT
-
 print_help() {
     printf "\
 
@@ -240,7 +229,6 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         else
             sysupgrade "$PATH_BIN"
         fi
-        log "done."
     fi
 else
     log "$FREIFUNK_RELEASE is the latest version. Nothing to do. I will recheck tomorrow."
