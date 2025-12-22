@@ -221,13 +221,57 @@ if semverLT "$FREIFUNK_RELEASE" "$latest_release"; then
         log "Image hash is correct. sha256sum: $hash_sum"
     fi
 
-    # flash image
+    # The following emulates sysupgrade's option --ignore-minor-compat-version,
+    # which isn't available until OpenWrt 23.05.
+    # We need it to allow autoupdates for devices that received DSA support
+    # and had their compat_version increased from 1.0 to 1.1.
+    # In this case, we manually set 1.1 in the system config, check the image,
+    # and then do the upgrade.
+    # If anything goes wrong, we try to set compat_version back to 1.0.
+    #
+    # Once we've moved off OpenWrt 21.02 and 22.03, most of this can be removed
+    # and we'll simply use the --ignore-minor-compat-version option.
+
+    sysupargs=""
+    [ -z "$OPT_N" ] || sysupargs="$sysupargs -n"
+
+    compver_up=""
+    compver_cur=""
+    compmsg=""
+    fwtool -i "$PATH_DIR/sysupgrade.json" "$PATH_BIN"
+    json_init
+    json_load_file "$PATH_DIR/sysupgrade.json"
+    json_get_var "compver_up" "compat_version"
+    json_get_var "compmsg" "compat_message"
+    json_cleanup
+    compver_cur="$(uci get system.@system[0].compat_version 2>/dev/null || echo "1.0")"
+    compmsg2="$(echo "$compmsg" | fgrep DSA)"
+
+    if [ "$compver_cur" == "1.0" ] && [ "$compver_up" == "1.1" ] && [ -n "$compmsg2" ]; then
+        log "this is a DSA sysupgrade."
+        uci set system.@system[0].compat_version=$compver_up
+        sysupgrade -T "$PATH_BIN"
+        ret_code=$?
+        if [ $ret_code != 0 ]; then
+            uci set system.@system[0].compat_version=$compver_cur
+            log "sysupgrade -T failed."
+            exit 2
+        else
+            log "sysupgrade -T succeeded."
+        fi
+        if [ -z "$OPT_TESTRUN" ]; then
+            sysupargs="$sysupargs -F"
+        else
+            uci set system.@system[0].compat_version=$compver_cur
+        fi
+    fi
     if [ -z "$OPT_TESTRUN" ]; then
         log "start flashing the image..."
-        if [ -n "$OPT_N" ]; then
-            sysupgrade -n "$PATH_BIN"
-        else
-            sysupgrade "$PATH_BIN"
+        echo "running sysupgrade $sysupargs $PATH_BIN"
+        sysupgrade $sysupargs "$PATH_BIN"
+        ret_code=$?
+        if [ $ret_code != 0 ]; then
+            uci set system.@system[0].compat_version=$compver_cur
         fi
     fi
 else
