@@ -60,7 +60,7 @@ dhcp="$(uci_get ffwizard settings dhcpmesh)"
 uci_load autoupdate
 # swap value, as we have different properties here.
 autoupdate_enabled="$(( ! $(uci_get autoupdate cfg disabled) ))"
-
+autoupdate_url="$(uci_get autoupdate cfg url)"
 
 # tunnel-stuff
 uci_load ffberlin-uplink
@@ -122,9 +122,8 @@ json_init
 
         json_add_object autoupdate
             json_add_boolean enabled $autoupdate_enabled
-            json_add_string branch "stable"
+            json_add_string url "$autoupdate_url"
         json_close_object
-
 
         json_add_object ips
             json_add_array mesh

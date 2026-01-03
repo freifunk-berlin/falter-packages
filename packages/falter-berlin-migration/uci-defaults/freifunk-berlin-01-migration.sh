@@ -1066,6 +1066,31 @@ r1_4_1_update_dns() {
     service network restart
 }
 
+r1_3_0_autoupdate_url() {
+    uci set autoupdate.cfg.url=https://firmware.berlin.freifunk.net/stable/autoupdate.json
+    uci delete autoupdate.cfg.fw_server_fqdn
+    uci delete autoupdate.cfg.selector_fqdn
+    uci commit autoupdate
+}
+
+# TODO: needs testing before release, but there will be much more to migrate
+r1_5_0_remove_unused_stuff() {
+    log "remove unused stuff"
+    rm -f /etc/config/openvpn
+    rm -f /etc/openvpn/ffuplink.crt
+    rm -f /etc/openvpn/ffuplink.key
+    rm -f /etc/luci-uploads/cbid.ffuplink.1.cert
+    rm -f /etc/luci-uploads/cbid.ffuplink.1.key
+    guard_delete tunnelberlin_openvpn
+    guard_delete vpn03_openvpn
+    [ -f /etc/init.d/olsrd2 ] && /etc/init.d/olsrd2 disable || true
+    rm -f /etc/config/olsrd2
+    guard_delete olsrd2
+    [ -f /etc/init.d/olsrd6 ] && /etc/init.d/olsrd6 disable || true
+    rm -f /etc/config/olsrd6
+    guard_delete olsrd6
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1193,6 +1218,14 @@ migrate() {
         r1_2_2_https_interface
         r1_2_3_update_dns
         r1_2_3_update_owm_cron
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.3.0"; then
+        r1_3_0_autoupdate_url
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.5.0"; then
+        r1_5_0_remove_unused_stuff
     fi
 
     # overwrite version with the new version
