@@ -42,10 +42,10 @@ load_overview_and_certs() {
     # autoupdate.json.2.sig
     # autoupdate.json.3.sig and so forth
 
-    local fw_server_url="$1"
+    local fw_url="$1"
 
     # load autoupdate.json
-    wget -q "https://${fw_server_url}/stable/autoupdate.json" -O "$PATH_DIR/autoupdate.json"
+    wget -q "$fw_url" -O "$PATH_DIR/autoupdate.json"
     ret_code=$?
     if [ $ret_code != 0 ]; then
         return $ret_code
@@ -53,7 +53,7 @@ load_overview_and_certs() {
 
     # load certificates
     local cnt=1
-    while wget -q "https://${fw_server_url}/stable/autoupdate.json.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
+    while wget -q "$fwurl.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
         cnt=$((cnt + 1))
     done
 }
