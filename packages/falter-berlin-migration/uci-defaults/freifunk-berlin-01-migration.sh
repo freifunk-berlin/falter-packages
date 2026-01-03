@@ -1066,6 +1066,13 @@ r1_4_1_update_dns() {
     service network restart
 }
 
+r1_3_0_autoupdate_url() {
+    uci set autoupdate.cfg.url=https://firmware.berlin.freifunk.net/stable/autoupdate.json
+    uci delete autoupdate.cfg.fw_server_fqdn
+    uci delete autoupdate.cfg.selector_fqdn
+    uci commit autoupdate
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1193,6 +1200,10 @@ migrate() {
         r1_2_2_https_interface
         r1_2_3_update_dns
         r1_2_3_update_owm_cron
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.3.0"; then
+        r1_3_0_autoupdate_url
     fi
 
     # overwrite version with the new version
