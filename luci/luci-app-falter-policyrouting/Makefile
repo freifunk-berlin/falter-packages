@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=Policy routing for mesh traffic
-LUCI_EXTRA_DEPENDS:=falter-policyrouting
+LUCI_EXTRA_DEPENDS:=falter-policyrouting (>=0)
 
 include ../include-luci.mk
 

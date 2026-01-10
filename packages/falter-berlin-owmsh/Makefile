@@ -15,7 +15,7 @@ endef
 define Package/falter-berlin-owmsh
 	$(call Package/falter-berlin-owmsh/default)
 	TITLE:=Freifunk Berlin owm.sh
-	EXTRA_DEPENDS:=uci jshn
+	EXTRA_DEPENDS:=uci (>=0), jshn (>=0)
 endef
 
 

@@ -14,13 +14,13 @@ define Package/falter-berlin-autoupdate/default
   URL:=https://github.com/freifunk-berlin/falter-packages
   PKGARCH:=all
   # falter-berlin-migration holds the semver-library needed by the autoupdater
-  EXTRA_DEPENDS:=uci, jshn, falter-berlin-migration
+  EXTRA_DEPENDS:=uci (>=0), jshn (>=0), falter-berlin-migration (>=0)
 endef
 
 define Package/falter-berlin-autoupdate
 	$(call Package/falter-berlin-autoupdate/default)
 	TITLE:=Freifunk Berlin Autoupdater
-	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys, uci, usign
+	EXTRA_DEPENDS:=falter-berlin-autoupdate-keys (>=0), uci (>=0), usign (>=0)
 endef
 
 define Package/falter-berlin-autoupdate-keys
