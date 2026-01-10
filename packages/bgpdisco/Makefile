@@ -28,14 +28,14 @@ endef
 define Package/bgpdisco
 	$(Package/bgpdisco/default)
 	EXTRA_DEPENDS:= \
-		ucode, ucode-mod-rtnl, ucode-mod-debug, ucode-mod-fs, \
-		ucode-mod-uloop, ucode-mod-log, ucode-mod-struct
+		ucode (>=0), ucode-mod-rtnl (>=0), ucode-mod-debug (>=0), ucode-mod-fs (>=0), \
+		ucode-mod-uloop (>=0), ucode-mod-log (>=0), ucode-mod-struct (>=0)
 endef
 
 define Package/bgpdisco-plugin-nameservice
 	$(Package/bgpdisco/default)
 	TITLE+= - Nameservice Plugin
-	EXTRA_DEPENDS:= bgpdisco
+	EXTRA_DEPENDS:=bgpdisco (=$(PKG_VERSION)-r$(PKG_RELEASE))
 endef
 
 

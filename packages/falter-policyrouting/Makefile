@@ -15,7 +15,7 @@ define Package/falter-policyrouting
   CATEGORY:=LuCI
   SUBMENU:=9. Freifunk
   TITLE:=Freifunk policy routing addon
-  EXTRA_DEPENDS:=ip, pingcheck
+  EXTRA_DEPENDS:=ip (>=0), pingcheck (>=0)
   PKGARCH:=all
 endef
 
