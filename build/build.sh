@@ -59,7 +59,7 @@ set -x
 if [ -z "$FALTER_MIRROR" ] ; then
   dlmirror="https://downloads.openwrt.org"
   srcmirror="https://sources.openwrt.org"
-  gitmirror="https://git.openwrt.org"
+  gitmirror="https://github.com"
 else
   dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
   srcmirror="$FALTER_MIRROR/sources.openwrt.org"
