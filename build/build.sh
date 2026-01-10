@@ -147,8 +147,8 @@ EOF
   sed -i 's#cc -o contrib/lemon#cc -std=gnu17 -o contrib/lemon#g' feeds/luci/modules/luci-base/src/Makefile
 
   export DOWNLOAD_MIRROR="$srcmirror"
-  for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}'); do
-    cmd="make -j8 package/$p/compile $makeargs"
+  for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}' | sort); do
+    cmd="make package/$p/compile $makeargs"
     echo "-- $cmd"
     $cmd
   done
