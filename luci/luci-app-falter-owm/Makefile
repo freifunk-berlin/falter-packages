@@ -25,7 +25,7 @@ endef
 
 define Package/luci-app-falter-owm
   $(call Package/luci-app-falter-owm/default)
-  EXTRA_DEPENDS:=luci-lib-json, olsrd-mod-jsoninfo, luci-lib-ip
+  EXTRA_DEPENDS:=luci-lib-json (>=0), olsrd-mod-jsoninfo (>=0), luci-lib-ip (>=0)
   TITLE:=Luci JSON Export for Open Wireless Map
 endef
 
@@ -35,19 +35,19 @@ endef
 
 define Package/luci-app-falter-owm-cmd
   $(call Package/luci-app-falter-owm/default)
-  EXTRA_DEPENDS:=luci-app-falter-owm, luci-lib-httpclient
+  EXTRA_DEPENDS:=luci-app-falter-owm (>=0), luci-lib-httpclient (>=0)
   TITLE:=luci-app-falter-owm-cmd - Commandline update tool
 endef
 
 define Package/luci-app-falter-owm-gui
   $(call Package/luci-app-falter-owm/default)
-  EXTRA_DEPENDS:=luci-app-falter-owm, luci-base
+  EXTRA_DEPENDS:=luci-app-falter-owm (>=0), luci-base (>=0)
   TITLE:=luci-app-falter-owm-gui - GUI Open Wireless Map
 endef
 
 define Package/luci-app-falter-owm-ant
   $(call Package/luci-app-falter-owm/default)
-  EXTRA_DEPENDS:=luci-app-falter-owm, luci-base
+  EXTRA_DEPENDS:=luci-app-falter-owm (>=0), luci-base (>=0)
   TITLE:=luci-app-falter-owm-ant - GUI Antenna settings
 endef
 
