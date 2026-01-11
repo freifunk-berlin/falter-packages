@@ -1,3 +1,71 @@
+From e0ae7ff4c5000c4c4db9c3df3bc3b51a84ff69f1 Mon Sep 17 00:00:00 2001
+Date: Sat, 8 Nov 2025 18:57:18 +0100
+Subject: [PATCH] Babel: Replace internal route selection by bird's nest
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This introduces the ability to filter routes from specific interfaces and
+neighbours. With the current internal route selection proto babel exports
+only up to one route and an admin cannot do fine-grained filtering.
+
+To fix this we rip out the internal route selection entirely and export
+evey babel route as a distinct route into the bird's nest instead.
+
+In the presence of esoteric route filters this change may be observable by
+users however we feel the additional filtering power is more important. A
+release note entry for this change is recommended.
+
+Co-developed-by: Daniel Gröber <dxld@darkboxed.org>
+Signed-off-by: Daniel Gröber <dxld@darkboxed.org>
+Co-developed-by: Lars Gierth <larsg@systemli.org>
+Signed-off-by: Lars Gierth <larsg@systemli.org>
+---
+Changes in v6:
+  - Rebase on Bird 3.2, changes to extended attributes handling
+Changes in v7:
+  - Proper patch email formatting
+  - Removed stray debugging lines
+Changes in v8:
+  - Documentation for the new route visibility and selection behavior
+ 
+ doc/bird.sgml       |  16 +++
+ proto/babel/babel.c | 304 ++++++++++++++++++++++----------------------
+ proto/babel/babel.h |   3 +
+ 3 files changed, 168 insertions(+), 155 deletions(-)
+
+--- a/doc/bird.sgml
++++ b/doc/bird.sgml
+@@ -2436,6 +2436,11 @@ but must be configured accordingly to us
+ interoperate with non-SADR Babel router, but the later would ignore routes
+ with specific (non-zero) source prefix.
+ 
++<p>The full power of BIRD's filtering mechanics can be applied to Babel routes.
++All suitable routes for a destination are visible to BIRD, and BIRD decides
++which of the routes is selected. In previous versions of BIRD, the Babel
++subsystem selected the route on its own, and made visible only this route.
++
+ <sect1>Configuration
+ <label id="babel-config">
+ 
+@@ -2672,6 +2677,17 @@ protocol babel {
+ 	};
+ 	ipv6 {
+ 		export where (source = RTS_DEVICE) || (source = RTS_BABEL);
++		import filter {
++			# Anything over our secondary wifi is more expensive.
++			if ifname = "wlan1" then {
++				babel_metric = babel_metric + 3072;
++			}
++			# Distribute only routes that are at most /64 long.
++			if net.len > 64 {
++				reject;
++			}
++			accept;
++		};
+ 	};
+ }
+ </code>
 --- a/proto/babel/babel.c
 +++ b/proto/babel/babel.c
 @@ -28,10 +28,12 @@
@@ -120,7 +188,7 @@
    rem_node(NODE nbr);
    mb_free(nbr);
  }
-@@ -667,12 +657,61 @@ done:
+@@ -667,12 +657,59 @@ done:
      WALK_LIST2(r, n, nbr->routes, neigh_route)
      {
        r->metric = babel_compute_metric(nbr, r->advert_metric);
@@ -138,6 +206,11 @@
 + *
 + * We also remember if we inserted an unreachable route in e->unreachable in
 + * order to clean it up later in babel_expire_routes_.
++ *
++ * Unlike the regular per-neighbour routes we only want one unreachable route
++ * for each prefix. This is mainly due to the lifetime of the unreachable rte
++ * exceeding that of the neighbour's rte_src ID as the babal neighbour may be
++ * flushed before the unreachable route is retracted.
 + */
 +static void
 +babel_rte_update_unreachable(struct babel_proto *p, struct babel_entry *e, u8 announce)
@@ -155,7 +228,6 @@
 +  EA_LITERAL_EMBEDDED(&ea_gen_preference, 0, 1),
 +  EA_LITERAL_EMBEDDED(&ea_gen_source, 0, RTS_BABEL),
 +  EA_LITERAL_STORE_ADATA(&ea_gen_nexthop, 0, nhad.ad.data, nhad.ad.length),
-+  EA_LITERAL_EMBEDDED(&ea_babel_metric, 0, 1),
 +      }
 +    };
 +    rte e0 = {
@@ -171,19 +243,13 @@
 +    e->unreachable = 0;
 +    rte_update(c, e->n.addr, NULL, p->p.main_source);
 +  }
-+
-+  /* Unlike the regular per-neighbour routes we only want one unreachable route
-+   * for each prefix. This is mainly due to the lifetime of the unreachable rte
-+   * exceeding that of the neighbour's rte_src ID as the babal neighbour may be
-+   * flushed before the unreachable route is retracted. */
-+  // rte_update(c, e->n.addr, rtee, p->p.main_source);
 +}
 +
 +/**
   * babel_announce_rte - announce selected route to the core
   * @p: Babel protocol instance
   * @e: Babel route entry to announce
-@@ -682,12 +721,11 @@ done:
+@@ -682,12 +719,11 @@ done:
   * the entry is valid and ours, the unreachable route is announced instead.
   */
  static void
@@ -198,7 +264,7 @@
    {
      struct nexthop_adata nhad = {
        .nh = {
-@@ -706,7 +744,7 @@ babel_announce_rte(struct babel_proto *p
+@@ -706,7 +742,7 @@ babel_announce_rte(struct babel_proto *p
       */
      if (!neigh_find(&p->p, r->next_hop, r->neigh->ifa->iface, 0))
        nhad.nh.flags = RNF_ONLINK;
@@ -207,7 +273,7 @@
      struct {
        ea_list l;
        eattr a[7];
-@@ -725,124 +763,25 @@ babel_announce_rte(struct babel_proto *p
+@@ -725,124 +761,25 @@ babel_announce_rte(struct babel_proto *p
  
      rte e0 = {
        .attrs = &eattrs.l,
@@ -344,7 +410,7 @@
  }
  
  /*
-@@ -1414,7 +1353,12 @@ babel_handle_update(union babel_msg *m,
+@@ -1414,7 +1351,12 @@ babel_handle_update(union babel_msg *m,
    /*
     * RFC 8966 3.8.2.2 - dealing with unfeasible updates. Generate a one-off
     * (not retransmitted) unicast seqno request to the originator of this update.
@@ -358,7 +424,7 @@
     */
    if (!feasible && s && (metric != BABEL_INFINITY) &&
        (!best || (r == best) || (metric < best->metric)))
-@@ -1448,7 +1392,7 @@ babel_handle_update(union babel_msg *m,
+@@ -1448,7 +1390,7 @@ babel_handle_update(union babel_msg *m,
      e->updated = current_time();
    }
  
@@ -367,7 +433,7 @@
  }
  
  void
-@@ -2136,7 +2080,7 @@ static void
+@@ -2136,7 +2078,7 @@ static void
  babel_dump_entry(struct dump_request *dreq, struct babel_entry *e)
  {
    struct babel_source *s;
@@ -376,7 +442,7 @@
  
    RDUMP("Babel: Entry %N:\n", e->n.addr);
  
-@@ -2146,7 +2090,7 @@ babel_dump_entry(struct dump_request *dr
+@@ -2146,7 +2088,7 @@ babel_dump_entry(struct dump_request *dr
    WALK_LIST(r,e->routes)
    {
      RDUMP(" ");
@@ -385,7 +451,7 @@
      babel_dump_route(dreq, r);
    }
  }
-@@ -2324,7 +2268,7 @@ babel_show_entries_(struct babel_proto *
+@@ -2324,7 +2266,7 @@ babel_show_entries_(struct babel_proto *
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -394,7 +460,7 @@
      uint rts = 0, srcs = 0;
      node *n;
  
-@@ -2337,7 +2281,7 @@ babel_show_entries_(struct babel_proto *
+@@ -2337,7 +2279,7 @@ babel_show_entries_(struct babel_proto *
      if (e->valid)
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, e->router_id, e->metric, e->seqno, rts, srcs);
@@ -403,7 +469,7 @@
        cli_msg(-1025, "%-*N %-23lR %6u %5u %7u %7u", width,
  	      e->n.addr, r->router_id, r->metric, r->seqno, rts, srcs);
      else
-@@ -2374,10 +2318,10 @@ babel_show_routes_(struct babel_proto *p
+@@ -2374,10 +2316,10 @@ babel_show_routes_(struct babel_proto *p
  
    FIB_WALK(rtable, struct babel_entry, e)
    {
@@ -416,7 +482,7 @@
        btime time = r->expires ? r->expires - current_time() : 0;
        cli_msg(-1025, "%-*N %-25I %-10s %5u %c %5u %7t", width,
  	      e->n.addr, r->next_hop, r->neigh->ifa->ifname,
-@@ -2466,8 +2410,9 @@ babel_entry_invalidate(struct babel_entr
+@@ -2466,8 +2408,9 @@ babel_entry_invalidate(struct babel_entr
  
  
  /*
@@ -428,7 +494,7 @@
   */
  static void
  babel_rt_notify(struct proto *P, struct channel *c UNUSED, const net_addr *net,
-@@ -2475,6 +2420,8 @@ babel_rt_notify(struct proto *P, struct
+@@ -2475,6 +2418,8 @@ babel_rt_notify(struct proto *P, struct
  {
    struct babel_proto *p = (void *) P;
    struct babel_entry *e;
@@ -437,7 +503,7 @@
  
    /* Ignore everything on shutdown */
    if (SHUTTING_DOWN)
-@@ -2483,11 +2430,13 @@ babel_rt_notify(struct proto *P, struct
+@@ -2483,11 +2428,13 @@ babel_rt_notify(struct proto *P, struct
    if (new)
    {
      /* Update */
@@ -452,7 +518,7 @@
      {
        rt_seqno = ea_get_int(new->attrs, &ea_babel_seqno, 0);
        eattr *e = ea_find(new->attrs, &ea_babel_router_id);
-@@ -2496,6 +2445,8 @@ babel_rt_notify(struct proto *P, struct
+@@ -2496,6 +2443,8 @@ babel_rt_notify(struct proto *P, struct
      }
      else
      {
@@ -461,7 +527,7 @@
        rt_seqno = p->update_seqno;
        rt_router_id = p->router_id;
      }
-@@ -2509,6 +2460,29 @@ babel_rt_notify(struct proto *P, struct
+@@ -2509,6 +2458,29 @@ babel_rt_notify(struct proto *P, struct
  
      e = babel_get_entry(p, net);
  
@@ -491,7 +557,7 @@
      /* Activate triggered updates */
      if (!(e->valid & BABEL_ENTRY_VALID) ||
  	(e->router_id != rt_router_id))
-@@ -2530,6 +2504,27 @@ babel_rt_notify(struct proto *P, struct
+@@ -2530,6 +2502,27 @@ babel_rt_notify(struct proto *P, struct
      if (!e || e->valid != BABEL_ENTRY_VALID)
        return;
  
@@ -519,7 +585,7 @@
      babel_entry_invalidate(e);
      babel_trigger_update(p);
    }
-@@ -2626,6 +2621,7 @@ babel_start(struct proto *P)
+@@ -2626,6 +2619,7 @@ babel_start(struct proto *P)
    p->source_slab = sl_new(P->pool, sizeof(struct babel_source));
    p->msg_slab = sl_new(P->pool, sizeof(struct babel_msg_node));
    p->seqno_slab = sl_new(P->pool, sizeof(struct babel_seqno_request));
