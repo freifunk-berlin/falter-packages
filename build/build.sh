@@ -81,9 +81,9 @@ unbuf="stdbuf --output=0 --error=0"
   dlurl="$dlmirror/snapshots/targets"
   [ "$branch" == "openwrt-25.12" ] && dlurl="$dlmirror/releases/25.12-SNAPSHOT/targets"
   [ "$branch" == "openwrt-24.10" ] && dlurl="$dlmirror/releases/24.10-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05.6/targets"
+  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03.7/targets"
+  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02.7/targets"
 
   # determine the sdk tarball's filename
   target=$( (grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2) < "./build/targets-$branch.txt")
