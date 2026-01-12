@@ -63,7 +63,7 @@ if [ -z "$FALTER_MIRROR" ] ; then
 else
   dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
   srcmirror="$FALTER_MIRROR/sources.openwrt.org"
-  gitmirror="$FALTER_MIRROR/git.openwrt.org"
+  gitmirror="$FALTER_MIRROR/github.com"
 fi
 
 makeargs="V=s"
@@ -105,31 +105,22 @@ unbuf="stdbuf --output=0 --error=0"
   owbranch2="master"
   [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch="$branch"
   [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch2="$branch"
-  if [ "$gitmirror" == "https://git.openwrt.org" ]; then
+  if [[ "$gitmirror" =~ "git.openwrt.org" ]]; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://git.openwrt.org/openwrt/openwrt.git;$owbranch
-src-git packages https://git.openwrt.org/feed/packages.git;$owbranch2
-src-git luci https://git.openwrt.org/project/luci.git;$owbranch2
-src-git routing https://git.openwrt.org/feed/routing.git;$owbranch2
-src-git telephony https://git.openwrt.org/feed/telephony.git;$owbranch2
+src-git base $gitmirror/openwrt/openwrt.git;$owbranch
+src-git packages $gitmirror/feed/packages.git;$owbranch2
+src-git luci $gitmirror/project/luci.git;$owbranch2
+src-git routing $gitmirror/feed/routing.git;$owbranch2
+src-git telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
-  elif [ "$gitmirror" == "https://github.com" ] ; then
+  elif [[ "$gitmirror" =~ "github.com" ]] ; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://github.com/openwrt/openwrt.git;$owbranch
-src-git packages https://github.com/openwrt/packages.git;$owbranch2
-src-git luci https://github.com/openwrt/luci.git;$owbranch2
-src-git routing https://github.com/openwrt/routing.git;$owbranch2
-src-git telephony https://github.com/openwrt/telephony.git;$owbranch2
-src-link falter $(pwd)/tmp/feed
-EOF
-  else
-    cat <<EOF >"$sdkdir/feeds.conf"
-src-git-full base $gitmirror/openwrt/openwrt.git;$owbranch
-src-git-full packages $gitmirror/feed/packages.git;$owbranch2
-src-git-full luci $gitmirror/project/luci.git;$owbranch2
-src-git-full routing $gitmirror/feed/routing.git;$owbranch2
-src-git-full telephony $gitmirror/feed/telephony.git;$owbranch2
+src-git base $gitmirror/openwrt/openwrt.git;$owbranch
+src-git packages $gitmirror/openwrt/packages.git;$owbranch2
+src-git luci $gitmirror/openwrt/luci.git;$owbranch2
+src-git routing $gitmirror/openwrt/routing.git;$owbranch2
+src-git telephony $gitmirror/openwrt/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
