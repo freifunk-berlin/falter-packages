@@ -127,6 +127,9 @@ EOF
 
   cd "$sdkdir"
 
+  # disable shallow cloning, so the http mirrors can be used
+  sed -i 's/--depth 1//;s/--depth=1//' scripts/feeds
+
   # build a repository from all packages in our feed
   if [ "$branch" != "main" ] && [ "$branch" != "openwrt-25.12" ] ; then
     echo "CONFIG_SIGNED_PACKAGES=n" > .config
