@@ -57,8 +57,7 @@ Example call:
 #   Load Configuration   #
 ##########################
 
-export SELECTOR_URL=$(uci_get autoupdate cfg selector_fqdn)
-FW_SERVER_URL=$(uci_get autoupdate cfg fw_server_fqdn)
+FW_URL=$(uci_get autoupdate cfg url)
 MIN_CERTS=$(uci_get autoupdate cfg minimum_certs)
 DISABLED=$(uci_get autoupdate cfg disabled)
 
@@ -132,8 +131,8 @@ fi
 rm -rf "$PATH_DIR"
 mkdir -p "$PATH_DIR"
 
-log "fetch autoupdate.json from $FW_SERVER_URL ..."
-load_overview_and_certs "$FW_SERVER_URL"
+log "fetching $FW_URL ..."
+load_overview_and_certs "$FW_URL"
 if [ $? != 0 ]; then
     log "fetching autoupdate.json failed. Probably no internet connection."
     exit 2
