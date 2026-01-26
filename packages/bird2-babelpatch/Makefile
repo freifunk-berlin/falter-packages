@@ -57,7 +57,7 @@ This is the 2.0 branch of Bird which integrates support for IPv4 and IPv6
 into a single branch, and also adds support for the Babel routing protocol.
 endef
 
-CONFIGURE_ARGS += --disable-libssh
+CONFIGURE_ARGS += --disable-libssh --with-protocols=babel,bgp,mrt,pipe,static
 
 define Package/bird2/conffiles
 /etc/bird.conf
