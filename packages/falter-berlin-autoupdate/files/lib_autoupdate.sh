@@ -233,6 +233,10 @@ min_valid_certificates() {
     local key_list=""
     local cert_cnt=0
 
+    if [ "0" = "$min_cnt" ]; then
+        return 255
+    fi
+
     cert_list=$(find "$PATH_DIR/" -name "*.sig")
     key_list=$(find "$KEY_DIR" -name "*.pub")
 
