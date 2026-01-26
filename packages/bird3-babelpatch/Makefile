@@ -51,7 +51,7 @@ configuration syntax.
 This is the 3.0 branch of Bird which is a multithreaded rewrite.
 endef
 
-CONFIGURE_ARGS += --disable-libssh
+CONFIGURE_ARGS += --disable-libssh --with-protocols=babel,bgp,mrt,pipe,static
 TARGET_LDFLAGS += -latomic
 
 define Package/bird3-babelpatch/conffiles
