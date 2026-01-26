@@ -1093,8 +1093,7 @@ r1_3_0_autoupdate_url() {
     uci commit autoupdate
 }
 
-# TODO: needs testing before release, but there will be much more to migrate
-r1_5_0_remove_unused_stuff() {
+r1_3_0_remove_unused_stuff() {
     log "remove unused stuff"
     rm -f /etc/config/openvpn
     rm -f /etc/openvpn/ffuplink.crt
@@ -1243,10 +1242,7 @@ migrate() {
     if semverLT "${OLD_VERSION}" "1.3.0"; then
         r1_3_0_autoupdate_url
         r1_3_0_update_dns
-    fi
-
-    if semverLT "${OLD_VERSION}" "1.5.0"; then
-        r1_5_0_remove_unused_stuff
+        r1_3_0_remove_unused_stuff
     fi
 
     # overwrite version with the new version
