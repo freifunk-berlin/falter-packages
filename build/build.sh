@@ -84,6 +84,7 @@ unbuf="stdbuf --output=0 --error=0"
   [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05.6/targets"
   [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03.7/targets"
   [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02.7/targets"
+  [ "$branch" == "testbuildbot" ] && dlurl="$dlmirror/releases/22.03.7/targets"
 
   # determine the sdk tarball's filename
   target=$( (grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2) < "./build/targets-$branch.txt")
@@ -103,8 +104,8 @@ unbuf="stdbuf --output=0 --error=0"
 
   owbranch="main"
   owbranch2="master"
-  [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch="$branch"
-  [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch2="$branch"
+  [ "$branch" == "main" ] || owbranch="openwrt-22.03"
+  [ "$branch" == "main" ] || owbranch2="openwrt-22.03"
   if [[ "$gitmirror" =~ "git.openwrt.org" ]]; then
     cat <<EOF >"$sdkdir/feeds.conf"
 src-git base $gitmirror/openwrt/openwrt.git;$owbranch
