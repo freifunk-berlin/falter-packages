@@ -302,7 +302,7 @@ bump_repo() {
     # adjust the opkg packagefeed to point to new version
     local FEED_LINE=$(grep "openwrt_falter" /rom/etc/opkg/customfeeds.conf)
     log "adjusting packagefeed to new version feed"
-    sed -ie "s,src\/gz.openwrt_falter.https\?:\/\/firmware\.berlin\.freifunk\.net.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
+    sed -i "s,src\/gz.openwrt_falter.https\?:\/\/firmware\.berlin\.freifunk\.net.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
 }
 
 r1_0_0_vpn03_splitconfig() {
@@ -323,7 +323,7 @@ r1_0_0_firewallzone_uplink() {
     uci set firewall.zone_ffuplink.output=ACCEPT
     uci set firewall.zone_ffuplink.network=ffuplink
     # remove ffvpn from zone freifunk
-    ffzone_new=$(uci get firewall.zone_freifunk.network | sed -e "s/ ffvpn//g")
+    ffzone_new=$(uci get firewall.zone_freifunk.network | sed "s/ ffvpn//g")
     log " zone freifunk has now interfaces: ${ffzone_new}"
     uci set firewall.zone_freifunk.network="${ffzone_new}"
     log " setting up forwarding for ffuplink"
@@ -370,7 +370,7 @@ r1_0_0_change_to_ffuplink() {
     mv /etc/openvpn/freifunk_client.key /etc/openvpn/ffuplink.key
     log " updating statistics, qos, olsr to use ffuplink"
     # replace ffvpn by ffuplink
-    ffuplink_new=$(uci get luci_statistics.collectd_interface.Interfaces | sed -e "s/ffvpn/ffuplink/g")
+    ffuplink_new=$(uci get luci_statistics.collectd_interface.Interfaces | sed "s/ffvpn/ffuplink/g")
     uci set luci_statistics.collectd_interface.Interfaces="${ffuplink_new}"
     uci rename qos.ffvpn=ffuplink
     reset_cb
@@ -619,7 +619,7 @@ r1_1_0_wifi_iface_names() {
         # determine a name for this section
         local ifname=$(uci -q get "wireless.${config}.ifname")
         [ "X${ifname}X" = "XX" ] && ifname="wifinet${count}"
-        ifname=$(echo "$ifname" | sed -e 's/-/_/g')
+        ifname=$(echo "$ifname" | sed 's/-/_/g')
         uci -q rename "wireless.$config=$ifname"
         count=$((count + 1))
     }
