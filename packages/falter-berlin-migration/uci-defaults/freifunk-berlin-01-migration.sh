@@ -1055,14 +1055,34 @@ r1_2_3_update_owm_cron() {
     /etc/init.d/cron restart
 }
 
-r1_4_1_update_dns() {
-    log "updating dns servers in network-config"
-    uci set network.loopback.dns='194.150.168.168 9.9.9.10 149.112.112.10 2620:fe::10 2620:fe::fe:10'
+r1_3_0_update_dns() {
+    reset_cb
+
+    log "updating dns servers in olsrd dyngw config"
+    r1_3_0_update_dns_olsrd_dyngw() {
+        local config=$1
+        local library=''
+        config_get library "$config" library
+        if [[ "$library" =~ olsrd_dyn_gw ]]; then
+            uci delete "olsrd.$config.Ping"
+            uci add_list "olsrd.$config.Ping=194.150.168.168"
+            uci add_list "olsrd.$config.Ping=9.9.9.10"
+            uci add_list "olsrd.$config.Ping=149.112.112.10"
+        fi
+    }
+    config_load olsrd
+    config_foreach r1_3_0_update_dns_olsrd_dyngw LoadPlugin
+    uci commit olsrd
+
+    log "updating dns servers in network config"
+    uci set network.loopback.dns='194.150.168.168 9.9.9.10 149.112.112.10'
     uci commit network
-    log "updating dns-servers in freifunk-file"
-    uci set freifunk.interface.dns='9.9.9.10 149.112.112.10'
+
+    log "updating dns servers in freifunk config"
+    uci set freifunk.interface.dns='194.150.168.168 9.9.9.10 149.112.112.10'
     uci commit freifunk
-    service network restart
+
+    reload_config
 }
 
 r1_3_0_autoupdate_url() {
@@ -1221,6 +1241,7 @@ migrate() {
 
     if semverLT "${OLD_VERSION}" "1.3.0"; then
         r1_3_0_autoupdate_url
+        r1_3_0_update_dns
     fi
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
