@@ -123,7 +123,6 @@ json_init
         json_add_object autoupdate
             json_add_boolean enabled $autoupdate_enabled
             json_add_string url "$autoupdate_url"
-        }
         json_close_object
 
 
