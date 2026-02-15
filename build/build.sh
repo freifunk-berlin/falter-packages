@@ -59,11 +59,11 @@ set -x
 if [ -z "$FALTER_MIRROR" ] ; then
   dlmirror="https://downloads.openwrt.org"
   srcmirror="https://sources.openwrt.org"
-  gitmirror="https://git.openwrt.org"
+  gitmirror="https://github.com"
 else
   dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
   srcmirror="$FALTER_MIRROR/sources.openwrt.org"
-  gitmirror="$FALTER_MIRROR/git.openwrt.org"
+  gitmirror="$FALTER_MIRROR/github.com"
 fi
 
 makeargs="V=s"
@@ -81,9 +81,9 @@ unbuf="stdbuf --output=0 --error=0"
   dlurl="$dlmirror/snapshots/targets"
   [ "$branch" == "openwrt-25.12" ] && dlurl="$dlmirror/releases/25.12-SNAPSHOT/targets"
   [ "$branch" == "openwrt-24.10" ] && dlurl="$dlmirror/releases/24.10-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05.6/targets"
+  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03.7/targets"
+  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02.7/targets"
 
   # determine the sdk tarball's filename
   target=$( (grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2) < "./build/targets-$branch.txt")
@@ -105,31 +105,22 @@ unbuf="stdbuf --output=0 --error=0"
   owbranch2="master"
   [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch="$branch"
   [ "$branch" == "main" ] || [ "$branch" == "testbuildbot" ] || owbranch2="$branch"
-  if [ "$gitmirror" == "https://git.openwrt.org" ]; then
+  if [[ "$gitmirror" =~ "git.openwrt.org" ]]; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://git.openwrt.org/openwrt/openwrt.git;$owbranch
-src-git packages https://git.openwrt.org/feed/packages.git;$owbranch2
-src-git luci https://git.openwrt.org/project/luci.git;$owbranch2
-src-git routing https://git.openwrt.org/feed/routing.git;$owbranch2
-src-git telephony https://git.openwrt.org/feed/telephony.git;$owbranch2
+src-git base $gitmirror/openwrt/openwrt.git;$owbranch
+src-git packages $gitmirror/feed/packages.git;$owbranch2
+src-git luci $gitmirror/project/luci.git;$owbranch2
+src-git routing $gitmirror/feed/routing.git;$owbranch2
+src-git telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
-  elif [ "$gitmirror" == "https://github.com" ] ; then
+  elif [[ "$gitmirror" =~ "github.com" ]] ; then
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base https://github.com/openwrt/openwrt.git;$owbranch
-src-git packages https://github.com/openwrt/packages.git;$owbranch2
-src-git luci https://github.com/openwrt/luci.git;$owbranch2
-src-git routing https://github.com/openwrt/routing.git;$owbranch2
-src-git telephony https://github.com/openwrt/telephony.git;$owbranch2
-src-link falter $(pwd)/tmp/feed
-EOF
-  else
-    cat <<EOF >"$sdkdir/feeds.conf"
-src-git-full base $gitmirror/openwrt/openwrt.git;$owbranch
-src-git-full packages $gitmirror/feed/packages.git;$owbranch2
-src-git-full luci $gitmirror/project/luci.git;$owbranch2
-src-git-full routing $gitmirror/feed/routing.git;$owbranch2
-src-git-full telephony $gitmirror/feed/telephony.git;$owbranch2
+src-git base $gitmirror/openwrt/openwrt.git;$owbranch
+src-git packages $gitmirror/openwrt/packages.git;$owbranch2
+src-git luci $gitmirror/openwrt/luci.git;$owbranch2
+src-git routing $gitmirror/openwrt/routing.git;$owbranch2
+src-git telephony $gitmirror/openwrt/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
@@ -147,8 +138,8 @@ EOF
   sed -i 's#cc -o contrib/lemon#cc -std=gnu17 -o contrib/lemon#g' feeds/luci/modules/luci-base/src/Makefile
 
   export DOWNLOAD_MIRROR="$srcmirror"
-  for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}'); do
-    cmd="make -j8 package/$p/compile $makeargs"
+  for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}' | sort); do
+    cmd="make package/$p/compile $makeargs"
     echo "-- $cmd"
     $cmd
   done

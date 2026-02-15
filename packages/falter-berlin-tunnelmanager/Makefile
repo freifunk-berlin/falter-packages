@@ -12,7 +12,7 @@ define Package/falter-berlin-tunnelmanager
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Berlin tunnelmanager
   URL:=https://github.com/freifunk-berlin/falter-packages
-  EXTRA_DEPENDS:=coreutils-timeout, ip-full, kmod-macvlan, wg-installer-client
+  EXTRA_DEPENDS:=coreutils-timeout (>=0), ip-full (>=0), kmod-macvlan (>=0), wg-installer-client (>=0)
   PKGARCH:=all
 endef
 
