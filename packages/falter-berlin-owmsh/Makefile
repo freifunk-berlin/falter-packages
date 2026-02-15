@@ -37,7 +37,6 @@ define Package/falter-berlin-owmsh/postinst
 #!/bin/sh
 if [ -z $${IPKG_INSTROOT} ] ; then
 	( . /etc/uci-defaults/owm ) && rm -f /etc/uci-defaults/owm
-	rm -f /tmp/luci-indexcache
 fi
 endef
 
