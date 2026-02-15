@@ -1,0 +1,2 @@
+# Forward Metrics to pushgw
+* * * * * curl -s http://localhost:9101/metrics |  curl --data-binary @- http://10.31.130.151:9091/metrics/job/ffnodes/instance/$(uci get system.@system[0].hostname)
