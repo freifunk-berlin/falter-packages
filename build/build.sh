@@ -42,6 +42,7 @@ function usage() {
   echo "  example: https://downloads.openwrt.org"
   echo
   echo "FALTER_MIRROR env variable:"
+<<<<<<< HEAD
   echo "  sets the base URL of a mirror which serves a copy of firmware.berlin.freifunk.net."
   echo "  default: https://firmware.berlin.freifunk.net"
   echo "  example: https://mirror.ff/firmware.berlin.freifunk.net"
@@ -55,6 +56,11 @@ function usage() {
   echo "  sets the base URL of a mirror which serves a copy of sources.openwrt.org."
   echo "  default: https://mirror.berlin.freifunk.net/sources.openwrt.org"
   echo "  example: https://sources.openwrt.org"
+=======
+  echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
+  echo "  Per default, freifunk-berlin mirrors are used. For OpenWrt standard, set to 'openwrt'. For custom, give your URL."
+  echo "  default: <empty>"
+>>>>>>> 27201e7 (feature: Use Berlin-Mirrors per default)
   echo
   echo "FALTER_DEBUG env variable:"
   echo "  set to any non-empty value (e.g. 1) to include debug symbols in binaries."
