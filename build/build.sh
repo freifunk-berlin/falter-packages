@@ -38,6 +38,7 @@ function usage() {
   echo
   echo "FALTER_MIRROR env variable:"
   echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
+  echo "  Per default, freifunk-berlin mirrors are used. For OpenWrt standard, set to 'openwrt'. For custom, give your URL."
   echo "  default: <empty>"
   echo
   echo "FALTER_DEBUG env variable:"
@@ -57,14 +58,17 @@ set -e
 set -x
 
 if [ -z "$FALTER_MIRROR" ] ; then
+  stdmirror="https://mirror.berlin.freifunk.net/"
+  dlmirror="${stdmirror}downloads.openwrt.org"
+  srcmirror="${stdmirror}sources.openwrt.org"
+elif [ "$FALTER_MIRROR" = "openwrt" ]; then
   dlmirror="https://downloads.openwrt.org"
   srcmirror="https://sources.openwrt.org"
-  gitmirror="https://github.com"
 else
   dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
   srcmirror="$FALTER_MIRROR/sources.openwrt.org"
-  gitmirror="$FALTER_MIRROR/github.com"
 fi
+gitmirror="https://github.com"
 
 makeargs="V=s"
 [ -z "$FALTER_DEBUG" ] || makeargs="$makeargs CONFIG_DEBUG=y STRIP=true"
