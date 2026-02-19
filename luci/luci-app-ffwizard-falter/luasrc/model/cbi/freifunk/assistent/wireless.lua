@@ -163,20 +163,19 @@ function main.write(self, section, value)
       tools.firewall_zone_add_interface("freifunk", calcnif(device))
 
       --WIRELESS CONFIG device
-      local hwmode = calchwmode(device)
-      local deviceSection = (hwmode:find("a")) and "wifi_device_5" or "wifi_device"
+      local band = uci:get("wireless", device, "band")
+      local deviceSection = (band == "5g") and "wifi_device_5" or "wifi_device"
+      local defaultChannel = (band == "5g") and "36" or "13"
       local devconfig = tools.getMergedConfig(mergeList, "defaults", deviceSection)
-      local devchannel = getchannel(device)
-      devconfig.channel = tostring(devchannel)
-      devconfig.hwmode = hwmode
-      devconfig.doth = calcdoth(devchannel)
+      devconfig.channel = uci:get(community, deviceSection, "channel") or defaultChannel
+      devconfig.doth = calcdoth(tonumber(devconfig.channel))
       devconfig.htmode = "HT20"
-      devconfig.chanlist = calcchanlist(devchannel)
+      devconfig.chanlist = calcchanlist(tonumber(devconfig.channel))
       uci:tset("wireless", device, devconfig)
 
       --WIRELESS CONFIG mesh
       local meshmode = wifi_tbl[device]["meshmode"]:formvalue(section)
-      local pre = calcpre(devchannel)
+      local pre = calcpre(tonumber(devconfig.channel))
       local ifaceSection
       if meshmode ~= "adhoc" then
          ifaceSection = "wifi_iface_"..meshmode
@@ -356,42 +355,6 @@ end
 function calcdoth(channel)
   -- doth activates 802.11h (radar detection)
   return (channel >= 52 and channel <= 140) and "1" or "0"
-end
-
-function get_iwinfo(device)
-  local iwinfo = require "iwinfo"
-  local backend = iwinfo.type(device)
-  return iwinfo[backend]
-end
-
-function calchwmode(device)
-  local hwmode = "11"
-  local iwinfo = get_iwinfo(device)
-
-  for k,v in pairs(iwinfo.hwmodelist(device)) do
-    if v then
-      hwmode = hwmode .. k
-    end
-  end
-
-  return hwmode
-end
-
-function getchannel(device)
-  local iwinfo = get_iwinfo(device)
-  local freqlist = iwinfo.freqlist(device)
-
-  local r_channel
-  if (freqlist[1].mhz > 2411 and freqlist[1].mhz < 2484) then
-    --this is 2.4 Ghz
-    r_channel = tonumber(uci:get(community, "wifi_device", "channel")) or 13
-  end
-  if (freqlist[1].mhz > 5179 and freqlist[1].mhz < 5701) then
-    --this is 5 Ghz
-    r_channel = tonumber(uci:get(community, "wifi_device_5", "channel")) or 36
-  end
-  tools.logger("channel for device "..device.." is "..tostring(r_channel))
-  return r_channel
 end
 
 function calcnif(device)
