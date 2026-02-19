@@ -382,11 +382,11 @@ function getchannel(device)
   local freqlist = iwinfo.freqlist(device)
 
   local r_channel
-  if (freqlist[1].mhz > 2411 and freqlist[1].mhz < 2484) then
+  if (freqlist[#freqlist].mhz > 2411 and freqlist[#freqlist].mhz < 3000) then
     --this is 2.4 Ghz
     r_channel = tonumber(uci:get(community, "wifi_device", "channel")) or 13
   end
-  if (freqlist[1].mhz > 5179 and freqlist[1].mhz < 5701) then
+  if (freqlist[#freqlist].mhz > 5179 and freqlist[#freqlist].mhz < 6000) then
     --this is 5 Ghz
     r_channel = tonumber(uci:get(community, "wifi_device_5", "channel")) or 36
   end
