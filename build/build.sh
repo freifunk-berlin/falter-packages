@@ -58,7 +58,6 @@ function usage() {
   echo "  example: https://sources.openwrt.org"
 =======
   echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
-  echo "  Per default, freifunk-berlin mirrors are used. For OpenWrt standard, set to 'openwrt'. For custom, give your URL."
   echo "  default: <empty>"
 >>>>>>> 27201e7 (feature: Use Berlin-Mirrors per default)
   echo
