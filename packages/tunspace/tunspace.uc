@@ -461,8 +461,13 @@ function uplink_maintenance(cfg) {
     shell_command("ip link add "+netnsifname+" address "+mac+" link "+ifname+" type macvlan mode bridge");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
+  } else if (mode == "passthru") {
+    // create a macvlan in passthru mode (shares parent MAC):
+    shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode passthru");
+    shell_command("ip link set dev "+netnsifname+" netns "+netns);
+    shell_command("ip -n "+netns+" link set up "+netnsifname+"");
   } else {
-    log(sprintf("uplink mode must be 'bridge' or 'direct', got '%s'", mode));
+    log(sprintf("uplink mode must be 'bridge', 'direct', or 'passthru', got '%s'", mode));
     return false;
   }
 
