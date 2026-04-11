@@ -4,6 +4,7 @@ import * as rtnl from 'rtnl';
 import * as uloop from 'uloop';
 import * as fs from 'fs';
 import * as uci from 'uci';
+import * as digest from 'digest';
 import * as mrtdump from 'bgpdisco.mrtdump';
 import * as plugin from 'bgpdisco.plugin';
 import * as birdctl from 'bgpdisco.birdctl';
@@ -16,7 +17,7 @@ let plugins;
 let monitor_interfaces = [];
 
 let cache_neighbors;
-let cache_data;
+let cache_hash = '';
 
 let timer_refresh_remote_data;
 
@@ -98,12 +99,15 @@ function sync_peers() {
 function cb_refresh_remote_data() {
   DBG('cb_refresh_remote_data()');
   let data = retrieve_data_from_bird();
-  if (sprintf('%s', data) == sprintf('%s', cache_data)) {
-    DBG('Received data matches cache - no need to trigger handler plugins');
+  let data_hash = digest.md5(sprintf('%s', data));
+
+  if (data_hash == cache_hash) {
+    DBG('Data hash unchanged - skip handler plugins');
     return;
-  };
-  INFO('Received data differs from cache - trigger handler plugins');
-  cache_data = data;
+  }
+
+  DBG('Data hash changed - triggering handler plugins');
+  cache_hash = data_hash;
   plugins.handle_data(data);
 }
 
