@@ -64,15 +64,12 @@ function retrieve_data_from_bird() {
   bird.cmd('mrt dump table "*_bgpdisco" to "' + cfg.bird_mrt_file + '"');
 
 
-  DBG('parse mrt dump');
-  let data = mrtdump.get_routes(cfg.bird_mrt_file);
-
-  DBG('processing routes');
+  DBG('parse mrt dump and process routes');
   let parsed_data = {};
-  for (let route in data) {
+  mrtdump.process_routes(cfg.bird_mrt_file, function(route) {
     if (index(keys(route.attributes), '250') == -1) {
       DBG('skip route due to missing magic attribute: %s', route);
-      continue;
+      return;
     }
     let ip = split(route.prefix, '/')[0];
     for (let darr in json(route.attributes['250'])) {
@@ -82,7 +79,7 @@ function retrieve_data_from_bird() {
         DBG('route is already parsed, do we have stale routes in the network?: %s', route);
       parsed_data[id][ip] = darr;
     }
-  }
+  });
   return parsed_data;
 }
 
