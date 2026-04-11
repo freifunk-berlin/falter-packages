@@ -2,8 +2,9 @@ import { pack, unpack } from 'struct';
 import { open } from 'fs';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
-function get_routes(filename) {
-  let _routes = [];
+function process_routes(filename, callback) {
+  let fd = open(filename, 'r');
+  
   function process_prefix(fd, address_size) {
     // Seqno, Prefix Length
     const RIB_ENTRY_SEQPFXL_FMT = '>IB';
@@ -11,7 +12,6 @@ function get_routes(filename) {
     let seqpfxl = fd.read(RIB_ENTRY_SEQPFXL_LEN);
     let _seqpfxl = unpack(RIB_ENTRY_SEQPFXL_FMT, seqpfxl);
 
-    let entry_seqno = _seqpfxl[0];
     let entry_prefix_length = _seqpfxl[1];
 
     const RIB_ENTRY_PREFIX_FMT = '>' + address_size + 'B';
@@ -71,7 +71,7 @@ function get_routes(filename) {
         __route_info.attributes[attr_type] = attr_data;
       }
 
-      push(_routes, __route_info);
+      callback(__route_info);
     }
     return false;
   }
@@ -126,9 +126,15 @@ function get_routes(filename) {
 
   DBG('Reading MRT file %s', filename);
 
-  let fd = open(filename, 'r');
   while (read_header(fd));
+}
 
+function get_routes(filename) {
+  let _routes = [];
+  process_routes(filename, function(route) {
+    push(_routes, route);
+  });
   return _routes;
 }
-export { get_routes };
+
+export { get_routes, process_routes };
