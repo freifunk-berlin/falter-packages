@@ -33,9 +33,8 @@ function get_interfaces_with_ip() {
 }
 
 function is_v4(ip) {
-  if (substr(':'))
-    return false;
-  return true;
+  let bytes = iptoarr(ip);
+  return !!(bytes && length(bytes) == 4);
 }
 
 function get_hostname() {
@@ -60,9 +59,9 @@ function get_local_hosts() {
 
     // Strip device from loopback interface first IP
     if (dev == 'lo') {
-      if (!lo_v4 && is_v4)
+      if (!lo_v4 && is_v4(ip))
         lo_v4 = ip;
-      if (!lo_v6 && !is_v4)
+      if (!lo_v6 && !is_v4(ip))
         lo_v6 = ip;
     }
 
