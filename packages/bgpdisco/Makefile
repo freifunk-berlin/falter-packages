@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bgpdisco
-PKG_VERSION:=1.2
+PKG_VERSION:=1.3
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Simon Polack <spolack+git@mailbox.org>
@@ -29,7 +29,8 @@ define Package/bgpdisco
 	$(Package/bgpdisco/default)
 	EXTRA_DEPENDS:= \
 		ucode (>=0), ucode-mod-rtnl (>=0), ucode-mod-debug (>=0), ucode-mod-fs (>=0), \
-		ucode-mod-uloop (>=0), ucode-mod-log (>=0), ucode-mod-struct (>=0)
+		ucode-mod-uloop (>=0), ucode-mod-log (>=0), ucode-mod-struct (>=0), \
+		ucode-mod-digest (>=0)
 endef
 
 define Package/bgpdisco-plugin-nameservice
