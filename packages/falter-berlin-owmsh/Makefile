@@ -33,9 +33,18 @@ endef
 define Build/Compile
 endef
 
+define Package/falter-berlin-owmsh/postinst
+#!/bin/sh
+if [ -z $${IPKG_INSTROOT} ] ; then
+	( . /etc/uci-defaults/owm ) && rm -f /etc/uci-defaults/owm
+fi
+endef
+
 define Package/falter-berlin-owmsh/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/owm.sh $(1)/usr/sbin/owm.sh
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(CP) ./files/owm-defaults $(1)/etc/uci-defaults/owm
 endef
 
 $(eval $(call BuildPackage,falter-berlin-owmsh))

@@ -33,10 +33,10 @@ define Package/falter-common
 	TITLE:=Falter common files
 	EXTRA_DEPENDS:=uci (>=0), libuci-lua (>=0), lua (>=0), ip-tiny (>=0), ethtool (>=0), iwinfo (>=0), libiwinfo-lua (>=0),
 	EXTRA_DEPENDS+= uhttpd (>=0), uhttpd-mod-ubus (>=0), luci (>=0), luci-app-package-manager (>=0), luci-i18n-base-de (>=0), luci-i18n-package-manager-de (>=0), luci-proto-ppp (>=0), luci-theme-bootstrap (>=0),
-	EXTRA_DEPENDS+= luci-mod-falter (>=0), luci-i18n-falter-de (>=0), luci-app-falter-owm (>=0), luci-app-falter-owm-ant (>=0), luci-app-falter-owm-cmd (>=0), luci-app-falter-owm-gui (>=0),
+	EXTRA_DEPENDS+= luci-mod-falter (>=0), luci-i18n-falter-de (>=0), falter-berlin-owmsh (>=0)
 	EXTRA_DEPENDS+= olsrd (>=0), olsrd-utils (>=0), olsrd-mod-arprefresh (>=0), olsrd-mod-dyn-gw (>=0), olsrd-mod-jsoninfo (>=0), olsrd-mod-txtinfo (>=0), olsrd-mod-nameservice (>=0), olsrd-mod-watchdog (>=0), kmod-ipip (>=0), luci-app-olsr (>=0), luci-app-olsr-services (>=0), luci-i18n-olsr-de (>=0),
 	EXTRA_DEPENDS+= vnstat (>=0), luci-app-statistics (>=0), luci-i18n-statistics-de (>=0), collectd (>=0), collectd-mod-dhcpleases (>=0), collectd-mod-interface (>=0), collectd-mod-iwinfo (>=0), collectd-mod-network (>=0), collectd-mod-olsrd (>=0), collectd-mod-rrdtool (>=0), collectd-mod-ping (>=0), collectd-mod-uptime (>=0), collectd-mod-memory (>=0),
-	EXTRA_DEPENDS+= tcpdump-mini (>=0), mtr (>=0), iperf3 (>=0), tmux (>=0)
+	EXTRA_DEPENDS+= tcpdump-mini (>=0), mtr (>=0), iperf3 (>=0), tmux (>=0),
 endef
 
 define Package/falter-common/description
