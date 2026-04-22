@@ -29,9 +29,8 @@ shfmt:
 .PHONY: shfmt
 
 shellcheck:
-	# The excluded cases are supported by Busybox but not POSIX.
-	# TODO update to shellcheck 0.10 for busybox sh support
-	grep -rIzl '^#![[:blank:]]*/bin/sh' ./packages ./luci | xargs shellcheck -S warning -e SC3003,SC3014,SC3018,SC3020,SC3030,SC3039,SC3043,SC3054,SC3060
+	# TODO: investigate the excluded cases, they're from tunneldigger
+	grep -rIzl '^#![[:blank:]]*/bin/sh' ./packages ./luci | xargs shellcheck -s busybox -S warning -e SC3018,SC3030,SC3039,SC3054
 .PHONY: shellcheck
 
 luacheck:
