@@ -1,1 +1,1 @@
-bird --version 2>&1 | grep "$PKG_VERSION" 
+bird --version 2>&1 | grep "$PKG_VERSION"
