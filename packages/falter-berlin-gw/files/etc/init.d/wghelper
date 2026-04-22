@@ -17,4 +17,3 @@ start_service() {
     procd_set_param command /usr/sbin/wghelper.sh
     procd_close_instance
 }
-
