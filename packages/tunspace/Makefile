@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=tunspace
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_MAINTAINER:=Packet Please <pktpls@systemli.org>
 PKG_LICENSE:=GPL-2.0-only
