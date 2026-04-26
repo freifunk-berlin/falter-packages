@@ -219,12 +219,6 @@ function wg_replace_endpoint(ifname, cfg, next) {
   let srvcfg = cfg.wireguard_servers[next];
   let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
 
-  // bring interface down
-  // it's not technically neccessary, just for aesthetics.
-  if (0 != shell_command("ip link set down "+ifname)) {
-    return false;
-  }
-
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
   let privkey = randfd.read(32);
@@ -341,24 +335,31 @@ function wg_replace_endpoint(ifname, cfg, next) {
     return false;
   }
 
-  // bring interface up, it's fully configured now
+  // Bring the interface up. On first configuration it is down; on subsequent
+  // server switches it is already up and this is a no-op. Keeping the interface
+  // up across switches means Bird never loses the Babel session and avoids the
+  // ~50-second re-convergence that would otherwise follow every server change.
   if (0 != shell_command("ip link set up "+ifname)) {
     return false;
   }
 
-  // add ipv6 address
-  // as ipv6 addresses get flushed when and interface is set down,
-  // we need to re-add it everytime we bring it up.
+  // Add the IPv6 address if not already present. IPv6 addresses survive
+  // interface-up/down cycles in this path (we no longer take the interface
+  // down), so only add on first configuration.
   if (length(ifcfg.ipv6) > 0) {
-    rtnl_request(rtnl.const.RTM_NEWADDR,
-                 rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
-      "dev": ifname,
-      "family": rtnl.const.AF_INET6,
-      "address": ifcfg.ipv6,
-    });
-    if (err = rtnl.error()) {
-      log("RTM_NEWADDR with AF_INET6 failed: "+err);
-      return false;
+    let addr = split(ifcfg.ipv6, "/")[0];
+    let already = 0 == shell_command("ip addr show dev "+ifname+" | grep -qF '"+addr+"'");
+    if (!already) {
+      rtnl_request(rtnl.const.RTM_NEWADDR,
+                   rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
+        "dev": ifname,
+        "family": rtnl.const.AF_INET6,
+        "address": ifcfg.ipv6,
+      });
+      if (err = rtnl.error()) {
+        log("RTM_NEWADDR with AF_INET6 failed: "+err);
+        return false;
+      }
     }
   }
 
@@ -429,6 +430,14 @@ function uplink_static(netns, netnsifname, ipv4, gw) {
   shell_command("ip -n "+netns+" route show default dev "+netnsifname+" | grep -F '"+gw+"' >/dev/null || ip -n "+netns+" route add default via "+gw);
 }
 
+function uplink_has_default_route(netns) {
+  let p = fs.popen("ip -j -n "+netns+" route show default", "r");
+  let out = p.read("all");
+  p.close();
+  let routes = json(out);
+  return type(routes) == "array" && length(routes) > 0;
+}
+
 // TODO: ts_uplink interface leaks into default namespace when uplink namespace is deleted
 function uplink_maintenance(cfg) {
   let netnsifname = UPLINK_NETNS_IFNAME;
@@ -477,6 +486,17 @@ function uplink_maintenance(cfg) {
     uplink_dhcp(netns, netnsifname);
   }
 
+  if (!uplink_has_default_route(netns)) {
+    log("uplink: no default route after configuration");
+    // For bridge/passthru, the macvlan may be orphaned (parent interface recreated).
+    // Delete it so the next tick recreates it against the fresh parent interface.
+    // Leave direct-mode alone: that IS the physical interface.
+    if (mode == "bridge" || mode == "passthru") {
+      shell_command("ip -n "+netns+" link del "+netnsifname+" 2>/dev/null");
+    }
+    return false;
+  }
+
   return true;
 }
 
@@ -507,8 +527,9 @@ function tick(st, cfg) {
 
   if (!uplink_maintenance(cfg)) {
     log("uplink maintenance failed");
+  } else {
+    wireguard_maintenance(st, cfg);
   }
-  wireguard_maintenance(st, cfg);
 
   uloop.timer(1000*int(cfg.maintenance_interval), () => tick(st, cfg));
 
