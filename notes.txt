@@ -1,0 +1,174 @@
+
+
+# Policy Routing
+
+tables
+110 localnets
+111 olsr
+112 olsr-default (default route from olsr mesh)
+113 olsr-tunnel (default route from olsr smartgateway)
+120 ffuplink (network.ffuplink.ip4table=ffuplink)
+
+prios
+1000 (lookup_rule olsr)
+2000 (lookup_rule localnets)
+3000 (iif lo lookup olsr-tunnel)
+3001 (iif lo lookup olsr-default)
+19989 (policyrouting)
+19990 (policyrouting)
+19999 (lookup_rule olsr-tunnel)
+20000 (lookup_rule olsr-default, olsrd RtTableDefaultOlsrPriority)
+20001 (action_rule olsr-default_unreachable)
+100000 (lookup_rule olsr-default if fallback=1, olsrd RtTableTunnelPriority)
+
+
+# uci-defaults survey
+
+luci-app-falter-owm/Makefile postinst
+admin-keys/Makefile postinst
+autoupdate/post-inst.sh
+ssid-changer/files/post-inst.sh
+
+luci-app-falter-owm/files/owm-defaults
+luci-app-ffwizard-falter/root/etc/uci-defaults/wizarddefaults
+bbbdigger/files/etc/uci-defaults/90-bbbdigger
+migration/uci-defaults/freifunk-berlin-01-migration
+uplink-notunnel/uci-defaults/freifunk-berlin-z95_notunnel
+uplink-tunnelberlin/uci-defaults/freifunk-berlin-z95_tunnelberlin-tunneldigger
+policyrouting/files/etc/uci-defaults/freifunk-policyrouting
+falter-common/files/etc/uci-defaults/freifunk-berlin-ffwizard3-json
+falter-common/files/etc/uci-defaults/freifunk-berlin-freifunk-defaults
+falter-defaults/files/etc/uci-defaults/65-falter-firewall
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-correct-nsm2-txpower
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-dhcp-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-ffuplink-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-network-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-network-ip-route
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-olsrd-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-pingcheck-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-statistics-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-system-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-uhttpd-defaults
+falter-defaults/files/etc/uci-defaults/freifunk-berlin-wireless-defaults
+
+
+# ffwizard survey
+
+- luci-mod-falter/luasrc/view/freifunk/index.htm
+  - if installed and !runbefore, redirect to admin/freifunk/assistent
+- assistant.lua click flow
+  - prepare() via /assistant route
+  - startWizard.lua
+    - do available upgrades, then changePassword
+  - changePassword.lua
+    - changes root password immediately, then generalInfo
+  - generalInfo.lua
+    - changes and commits system and freifunk uci sections, then decide
+  - decide.htm
+    - pick optionalConfig or sharedInternet
+  - shareInternet.lua
+    - takes input for sharenet and bandwidth
+    - changes ffwizard uci section without commit
+    - then optionalConfigs
+  - optionalConfigs.lua
+    - sets ffwizard.settings.enableStats without commit, then wireless
+  - wireless.lua
+    - olsr.prepareOLSR, firewall.prepareFirewall
+    - takes input for wifi mode, mesh ips, ssid name, dhcp ips
+    - change firewall, olsrd, system, wireless, network, luci_statistics uci sections without commit
+    - change dhcp, olsrd, network, ffwizard uci sections without commit
+    - has cleanup code that runs for each wifi-device beforehand
+    - then applyChanges
+  - commit() via /assistant/applyChanges route
+  - reboot.htm
+  - reset() via /assistant/cancel route
+
+userfacing wizard
+- basic info
+- public monitoring yes/no
+- dhcp ips
+- mesh ip for each radio
+- 80211s/adhoc (remove)
+- ssid (remove)
+- internet sharing yes/no
+- bandwidth limits
+
+userfacing mod-falter
+- community
+- basic info
+- autoupdate
+- index page html
+- services
+- 80211s/adhoc (remove)
+- bandwidth limits
+- bbbdigger
+- swap ports
+
+---
+
+## lua/luci
+
+ffwizard configs
+- [ ] ffwizard/luasrc/controller/assistant/assistant.lua
+- [x] ffwizard/luasrc/model/cbi/freifunk/assistant/optionalConfigs.lua
+- [x] ffwizard/luasrc/model/cbi/freifunk/assistant/shareInternet.lua
+- [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/wireless.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua
+
+actual configs
+- [ ] owm/luasrc/model/cbi/antennas.lua
+- [x] policyrouting/luasrc/model/cbi/freifunk/policyrouting.lua
+- [ ] ffwizard/luasrc/controller/assistant/assistant.lua
+- [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/generalInfo.lua
+- [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/wireless.lua
+- [x] ffwizard/luasrc/tools/freifunk/assistant/ffwizard.lua
+- [ ] ffwizard/luasrc/tools/freifunk/assistant/firewall.lua
+- [ ] ffwizard/luasrc/tools/freifunk/assistant/olsr.lua
+- [ ] ffwizard/luasrc/tools/freifunk/assistant/tools.lua
+- [x] ffwizard/root/etc/uci-defaults/wizarddefaults
+- [ ] mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/basics.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/bbbdigger.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/contact.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/profile.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/swapports.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/user_index.lua
+- [ ] mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua
+
+noop
+- [x] ffwizard/luasrc/model/cbi/freifunk/assistant/startWizard.lua
+
+misc
+- [ ] root passwd: ffwizard/luasrc/model/cbi/freifunk/assistant/changePassword.lua
+- [ ] adhoc vs 80211s: ffwizard/luasrc/model/cbi/freifunk/upgrades/005.lua
+- [ ] raw commprofile: mod-falter/luasrc/model/cbi/freifunk/profile_expert.lua
+
+---
+
+## uci defaults
+
+- [x] luci-app-ffwizard-falter/root/etc/uci-defaults/wizarddefaults
+- [ ] falter-berlin-migration/uci-defaults/freifunk-berlin-01-migration.sh
+- [ ] falter-common/files/etc/uci-defaults/freifunk-berlin-ffwizard3-json
+- [ ] falter-common/files/etc/uci-defaults/freifunk-berlin-freifunk-defaults
+
+- [x] luci-app-falter-owm/files/owm-defaults
+- [x] falter-berlin-owm-ucode/owm.defaults
+- [ ] falter-defaults/files/etc/uci-defaults/65-falter-firewall
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-correct-nsm2-txpower
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-dhcp-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-ffuplink-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-network-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-network-ip-route
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-olsrd-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-pingcheck-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-statistics-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-system-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-uhttpd-defaults
+- [ ] falter-defaults/files/etc/uci-defaults/freifunk-berlin-wireless-defaults
+- [x] falter-policyrouting/files/etc/uci-defaults/freifunk-policyrouting
+
+- [ ] falter-berlin-bbbdigger/files/etc/uci-defaults/90-bbbdigger
+- [ ] falter-berlin-uplink-notunnel/uci-defaults/freifunk-berlin-z95_notunnel
+- [ ] falter-berlin-uplink-tunnelberlin/uci-defaults/freifunk-berlin-z95_tunnelberlin-tunneldigger
