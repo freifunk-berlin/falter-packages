@@ -1,0 +1,82 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=70
+STOP=10
+
+BIRD_BIN="/usr/sbin/bird"
+BIRD_CONF="/var/etc/bird.conf"
+BIRD_PID_FILE="/var/run/bird.pid"
+
+. /lib/functions.sh
+
+write_header() {
+    local as_num r_id
+    
+    config_load bird
+    
+    # Universal IP detection: Finds first global IPv4 that isn't loopback
+    r_id=$(ip -4 addr show | grep inet | grep -v '127.0.0.1' | awk '{print $2}' | cut -d/ -f1 | head -n1)
+    [ -z "$r_id" ] && r_id="1.1.1.1"
+
+    config_get as_num global local_as "65001"
+
+    echo "log syslog all;"
+    echo "router id $r_id;"
+    echo "define MY_AS = $as_num;"
+    
+    echo "protocol kernel { ipv6 { export all; }; }"
+    echo "protocol device {}"
+}
+
+handle_peer() {
+    local section="$1"
+    local addr remote_as iface imp exp
+    
+    config_get addr "$section" address
+    config_get remote_as "$section" remote_as
+    config_get iface "$section" interface
+    config_get imp "$section" import_filter "all"
+    config_get exp "$section" export_filter "all"
+
+    [ -z "$addr" ] || [ -z "$remote_as" ] && return
+
+    echo "protocol bgp $section {"
+    echo "    local as MY_AS;"
+    echo "    neighbor $addr as $remote_as;"
+    [ -n "$iface" ] && echo "    interface \"$iface\";"
+    
+    echo "    ipv6 {"
+    echo "        import $imp;"
+    echo "        export $exp;"
+    echo "    };"
+    echo "}"
+}
+
+generate_conf() {
+    mkdir -p /var/etc
+    write_header > $BIRD_CONF
+    config_load bird
+    config_foreach handle_peer bgp_peer >> $BIRD_CONF
+}
+
+start_service() {
+    generate_conf
+    mkdir -p /var/run
+    procd_open_instance
+    procd_set_param command $BIRD_BIN -f -c $BIRD_CONF -P $BIRD_PID_FILE
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param respawn
+    procd_close_instance
+}
+
+service_triggers() {
+    procd_add_reload_trigger "bird"
+}
+
+reload_service() {
+    generate_conf
+    procd_send_signal bird
+}
+
