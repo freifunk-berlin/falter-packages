@@ -8,8 +8,8 @@ const uci = require("uci");
 // & falter-policyrouting/files/etc/uci-defaults/freifunk-policyrouting
 function initPolicyRouting(ctx) {
   ctx.set("freifunk-policyrouting", "pr", "enable", "1");
-  ctx.set("freifunk-policyrouting", "pr", "strict", "1");
-  ctx.set("freifunk-policyrouting", "pr", "fallback", "1");
+  ctx.set("freifunk-policyrouting", "pr", "strict", "0");
+  ctx.set("freifunk-policyrouting", "pr", "fallback", "0");
   ctx.set("freifunk-policyrouting", "pr", "zones", ["freifunk"]);
   ctx.add_list("ucitrack", "@freifunk-policyrouting[-1]", "exec" , "/etc/init.d/freifunk-policyrouting restart");
 }
@@ -46,19 +46,6 @@ function generalInfo(ctx, cfg) {
   // TODO: set lat+lon+alt
 }
 
-// from luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistant/shareInternet.lua
-function shareInternet(ctx, cfg) {
-  // XXX: what about sharenet=2
-  ctx.set("ffwizard", "settings", "sharenet", cfg.share ? 1 : 0);
-  ctx.set("ffwizard", "settings", "usersBandwidthUp", cfg.upload);
-  ctx.set("ffwizard", "settings", "usersBandwidthDown", cfg.download);
-}
-
-// from luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistant/optionalConfigs.lua
-function optionalConfigs(ctx, cfg) {
-  ctx.set("ffwizard", "settings", "enableStats", cfg.node.monitoring ? 1 : 0);
-}
-
 // from luci-app-falter-owm/files/owm-defaults
 // & falter-berlin-owm-ucode/owm.defaults
 // TODO: write only once
@@ -70,6 +57,7 @@ function configureOwm(ctx) {
   let cmd = "/usr/sbin/owm.sh";
   let f = fs.open("/etc/crontabs/root");
   f.write(sprintf("%d %d * * * * test -e %s && %s", hour, minute, cmd));
+  f.close();
 }
 
 // from luci-app-ffwizard-falter/luasrc/model/cbi/freifunk/assistant/wireless.lua

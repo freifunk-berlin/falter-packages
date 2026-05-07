@@ -24,10 +24,7 @@ prios
 
 # uci-defaults survey
 
-luci-app-falter-owm/Makefile postinst
-admin-keys/Makefile postinst
-autoupdate/post-inst.sh
-ssid-changer/files/post-inst.sh
+
 
 luci-app-falter-owm/files/owm-defaults
 luci-app-ffwizard-falter/root/etc/uci-defaults/wizarddefaults
@@ -110,8 +107,8 @@ userfacing mod-falter
 
 ffwizard configs
 - [ ] ffwizard/luasrc/controller/assistant/assistant.lua
-- [x] ffwizard/luasrc/model/cbi/freifunk/assistant/optionalConfigs.lua
-- [x] ffwizard/luasrc/model/cbi/freifunk/assistant/shareInternet.lua
+- [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/optionalConfigs.lua
+- [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/shareInternet.lua
 - [ ] ffwizard/luasrc/model/cbi/freifunk/assistant/wireless.lua
 - [ ] mod-falter/luasrc/model/cbi/freifunk/bandwidth.lua
 - [ ] mod-falter/luasrc/model/cbi/freifunk/wireless-mesh.lua
@@ -147,6 +144,11 @@ misc
 ---
 
 ## uci defaults
+
+- [ ] luci-app-falter-owm/Makefile postinst
+- [ ] admin-keys/Makefile postinst
+- [ ] autoupdate/post-inst.sh
+- [ ] ssid-changer/files/post-inst.sh
 
 - [x] luci-app-ffwizard-falter/root/etc/uci-defaults/wizarddefaults
 - [ ] falter-berlin-migration/uci-defaults/freifunk-berlin-01-migration.sh
