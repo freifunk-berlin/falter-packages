@@ -36,9 +36,25 @@ function usage() {
   echo "  path to a writable directory where the 'falter' feed directory will end up."
   echo "  default: ./out/<branch>/<arch>"
   echo
+  echo "OPENWRT_MIRROR env variable:"
+  echo "  sets the base URL of a mirror which serves a copy of downloads.openwrt.org."
+  echo "  default: https://mirror.berlin.freifunk.net/downloads.openwrt.org"
+  echo "  example: https://downloads.openwrt.org"
+  echo
   echo "FALTER_MIRROR env variable:"
-  echo "  sets the base URL of a mirror which serves copies of downloads.openwrt.org and firmware.berlin.freifunk.net."
-  echo "  default: <empty>"
+  echo "  sets the base URL of a mirror which serves a copy of firmware.berlin.freifunk.net."
+  echo "  default: https://firmware.berlin.freifunk.net"
+  echo "  example: https://mirror.ff/firmware.berlin.freifunk.net"
+  echo
+  echo "GIT_MIRROR env variable:"
+  echo "  sets the base URL of a Git mirror which serves the OpenWrt repositories."
+  echo "  default: https://codeberg.org/openwrt"
+  echo "  examples: https://git.openwrt.org https://github.com/openwrt https://mirror.ff/git/openwrt"
+  echo
+  echo "SOURCES_MIRROR env variable:"
+  echo "  sets the base URL of a mirror which serves a copy of sources.openwrt.org."
+  echo "  default: https://mirror.berlin.freifunk.net/sources.openwrt.org"
+  echo "  example: https://sources.openwrt.org"
   echo
   echo "FALTER_DEBUG env variable:"
   echo "  set to any non-empty value (e.g. 1) to include debug symbols in binaries."
@@ -56,15 +72,14 @@ set -o pipefail
 set -e
 set -x
 
-if [ -z "$FALTER_MIRROR" ] ; then
-  dlmirror="https://downloads.openwrt.org"
-  srcmirror="https://sources.openwrt.org"
-  gitmirror="https://github.com"
-else
-  dlmirror="$FALTER_MIRROR/downloads.openwrt.org"
-  srcmirror="$FALTER_MIRROR/sources.openwrt.org"
-  gitmirror="$FALTER_MIRROR/github.com"
-fi
+owmirror="https://mirror.berlin.freifunk.net/downloads.openwrt.org"
+[ -z "$OPENWRT_MIRROR" ] || owmirror="$OPENWRT_MIRROR"
+fmirror="https://firmware.berlin.freifunk.net"
+[ -z "$FALTER_MIRROR" ] || fmirror="$FALTER_MIRROR"
+gitmirror="https://codeberg.org/openwrt"
+[ -z "$GIT_MIRROR" ] || gitmirror="$GIT_MIRROR"
+srcmirror="https://mirror.berlin.freifunk.net/sources.openwrt.org"
+[ -z "$SRC_MIRROR" ] || srcmirror="$SRC_MIRROR"
 
 makeargs="V=s"
 [ -z "$FALTER_DEBUG" ] || makeargs="$makeargs CONFIG_DEBUG=y STRIP=true"
@@ -78,12 +93,12 @@ sdkdir="./tmp/$branch/$arch"
 unbuf="stdbuf --output=0 --error=0"
 (
   # pick the right URL
-  dlurl="$dlmirror/snapshots/targets"
-  [ "$branch" == "openwrt-25.12" ] && dlurl="$dlmirror/releases/25.12-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-24.10" ] && dlurl="$dlmirror/releases/24.10-SNAPSHOT/targets"
-  [ "$branch" == "openwrt-23.05" ] && dlurl="$dlmirror/releases/23.05.6/targets"
-  [ "$branch" == "openwrt-22.03" ] && dlurl="$dlmirror/releases/22.03.7/targets"
-  [ "$branch" == "openwrt-21.02" ] && dlurl="$dlmirror/releases/21.02.7/targets"
+  dlurl="$owmirror/snapshots/targets"
+  [ "$branch" == "openwrt-25.12" ] && dlurl="$owmirror/releases/25.12-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-24.10" ] && dlurl="$owmirror/releases/24.10-SNAPSHOT/targets"
+  [ "$branch" == "openwrt-23.05" ] && dlurl="$owmirror/releases/23.05.6/targets"
+  [ "$branch" == "openwrt-22.03" ] && dlurl="$owmirror/releases/22.03.7/targets"
+  [ "$branch" == "openwrt-21.02" ] && dlurl="$owmirror/releases/21.02.7/targets"
 
   # determine the sdk tarball's filename
   target=$( (grep -v '#' | grep -F "$arch " | cut -d ' ' -f 2) < "./build/targets-$branch.txt")
@@ -114,13 +129,13 @@ src-git routing $gitmirror/feed/routing.git;$owbranch2
 src-git telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
-  elif [[ "$gitmirror" =~ "github.com" ]] ; then
+  else
     cat <<EOF >"$sdkdir/feeds.conf"
-src-git base $gitmirror/openwrt/openwrt.git;$owbranch
-src-git packages $gitmirror/openwrt/packages.git;$owbranch2
-src-git luci $gitmirror/openwrt/luci.git;$owbranch2
-src-git routing $gitmirror/openwrt/routing.git;$owbranch2
-src-git telephony $gitmirror/openwrt/telephony.git;$owbranch2
+src-git base $gitmirror/openwrt.git;$owbranch
+src-git packages $gitmirror/packages.git;$owbranch2
+src-git luci $gitmirror/luci.git;$owbranch2
+src-git routing $gitmirror/routing.git;$owbranch2
+src-git telephony $gitmirror/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
