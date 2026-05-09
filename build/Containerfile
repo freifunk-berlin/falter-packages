@@ -1,0 +1,8 @@
+FROM alpine:3.23
+ARG rebuild=2026-05-11
+
+RUN apk add git bash wget zstd xz gzip unzip grep diffutils findutils coreutils build-base gcc abuild binutils ncurses-dev gawk bzip2 perl python3 rsync sqlite argp-standalone musl-fts-dev musl-obstack-dev musl-libintl py3-setuptools
+
+VOLUME /work
+WORKDIR /work
+ENTRYPOINT ["build/build.sh"]
