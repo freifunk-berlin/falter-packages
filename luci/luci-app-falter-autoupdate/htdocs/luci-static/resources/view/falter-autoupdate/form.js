@@ -4,7 +4,7 @@
 
 return view.extend({
   render: function () {
-    var m, s, o;
+    var m, s, o1, o2, o3;
 
     m = new form.Map('autoupdate', _('Freifunk Berlin Autoupdate'),
       _("Autoupdate will update your router automatically, once there is a new\
@@ -24,12 +24,13 @@ return view.extend({
       _('URL of the autoupdate.json metadata file. Usally: https://firmware.berlin.freifunk.net/stable/autoupdate.json'));
     o1.datatype = 'string';
 
-    s.option(form.Value, 'minimum_certs', _('Minimum Certs'),
+    o2= s.option(form.Value, 'minimum_certs', _('Minimum Certs'),
       _('Minimum amount of certificates that must be valid. Otherwise autoupdate will not perform an upgrade.'));
+    o2.datatype = 'uinteger';
 
-    o = s.option(form.Flag, 'disabled', _('Disabled'),
+    o3 = s.option(form.Flag, 'disabled', _('Disabled'),
       _('Deactivates the Autoupdater. We do not recommend this!'));
-    o.rmempty = false;
+    o3.rmempty = false;
 
     return m.render();
   }
