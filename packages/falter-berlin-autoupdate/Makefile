@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-autoupdate
-PKG_VERSION:=2022.08.29
+PKG_VERSION:=2026.06.27
 
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=LICENSE
