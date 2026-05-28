@@ -53,7 +53,7 @@ end
 
 
 function configureOLSRPlugins()
-	local suffix = uci:get_first(community, "community", "suffix") or "olsr"
+	local suffix = uci:get_first(community, "community", "suffix") or "ff"
 	updatePlugin("olsrd_nameservice", "suffix", "."..suffix)
 	updatePluginInConfig("olsrd", "olsrd_dyn_gw", "PingCmd", "ping -c 1 -q -I ffuplink %s")
 	updatePluginInConfig("olsrd", "olsrd_dyn_gw", "PingInterval", "30")
