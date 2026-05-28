@@ -1130,6 +1130,19 @@ r1_3_1_domain_suffix() {
     uci commit olsrd6
 }
 
+r1_3_1_hwmode() {
+    handle_radio() {
+      local section=${1}
+      uci -q delete "wireless.$section.hwmode"
+   }
+
+   reset_cb
+   config_load wireless
+   config_foreach handle_radio wifi-device
+
+   uci commit wireless
+}
+
 # TODO: needs testing before release, but there will be much more to migrate
 r1_5_0_remove_unused_stuff() {
     log "remove unused stuff"
@@ -1284,6 +1297,7 @@ migrate() {
 
     if semverLT "${OLD_VERSION}" "1.3.1"; then
 	r1_3_1_domain_suffix
+        r1_3_1_hwmode
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
         r1_5_0_remove_unused_stuff
