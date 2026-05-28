@@ -299,6 +299,11 @@ set_ipversion_olsrd6() {
 }
 
 bump_repo() {
+    local apk=$(which apk)
+    if [ $apk = "" ]; then # This system doesn't have opkg
+      return 0
+    fi
+
     # adjust the opkg packagefeed to point to new version
     local FEED_LINE=$(grep "openwrt_falter" /rom/etc/opkg/customfeeds.conf)
     log "adjusting packagefeed to new version feed"
