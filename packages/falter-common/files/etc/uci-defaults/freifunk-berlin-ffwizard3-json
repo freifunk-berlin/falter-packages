@@ -13,8 +13,8 @@ if [ ! -f /etc/config/ffwizard ]; then
     exit 1
 fi
 
-# create a ffwizard3-file, if there is none already
-if [ ! -f /etc/ffwizard3.json ]; then
+# create a ffwizard3-file, if there is none already or empty
+if [ ! -s /etc/ffwizard3.json ]; then
     uci2ffwizard >/etc/ffwizard3.json
     exit 0
 fi
