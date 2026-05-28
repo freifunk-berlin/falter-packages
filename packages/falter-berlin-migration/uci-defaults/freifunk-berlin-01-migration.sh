@@ -92,7 +92,7 @@ migrate_profiles() {
     COMMUNITY=$(uci show freifunk.community)
     cp /rom/etc/config/freifunk /etc/config
     OLDIFS=$IFS
-    IFS=$(printf '\n')
+    IFS=$'\n'
     for i in $CONTACT $COMMUNITY; do
         key=$(echo "$i" | cut -d = -f 1)
         val=$(echo "$i" | cut -d = -f 2)
