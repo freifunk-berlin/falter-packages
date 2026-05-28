@@ -1093,22 +1093,42 @@ r1_3_0_autoupdate_url() {
     uci commit autoupdate
 }
 
-# TODO: needs testing before release, but there will be much more to migrate
-r1_5_0_remove_unused_stuff() {
-    log "remove unused stuff"
-    rm -f /etc/config/openvpn
-    rm -f /etc/openvpn/ffuplink.crt
-    rm -f /etc/openvpn/ffuplink.key
-    rm -f /etc/luci-uploads/cbid.ffuplink.1.cert
-    rm -f /etc/luci-uploads/cbid.ffuplink.1.key
-    guard_delete tunnelberlin_openvpn
-    guard_delete vpn03_openvpn
-    [ -f /etc/init.d/olsrd2 ] && /etc/init.d/olsrd2 disable || true
-    rm -f /etc/config/olsrd2
-    guard_delete olsrd2
-    [ -f /etc/init.d/olsrd6 ] && /etc/init.d/olsrd6 disable || true
-    rm -f /etc/config/olsrd6
-    guard_delete olsrd6
+r1_3_1_domain_suffix() {
+    # determine the suffix, default to "ff"
+    local community=$(uci -q get freifunk.community.name)
+    local suffix=$(uci -q get "profile_${community}.profile.suffix")
+    if [ "$suffix" = "" ]; then
+      suffix = "ff"
+    fi
+
+    # apply to dhcp config
+    uci del_list dhcp.dhcp.dhcp_option="119,olsr"
+    if [ $? -eq 0 ]; then
+      uci add_list dhcp.dhcp.dhcp_option="119,${suffix}"
+    fi
+    uci set dhcp.@dnsmasq[0].domain=".${suffix}"
+
+    # apply to olsrd config
+    olsrd_suffix() {
+      local section=${1}
+      local config=${2}
+      local library=""
+      config_get library "$section" library
+      if [ "$library" = "olsrd_nameservice" ]; then
+        uci set "$config.$section".suffix=${suffix}
+      fi
+    }
+    reset_cb
+    config_load olsrd
+    config_foreach olsrd_suffix LoadPlugin olsrd
+
+    reset_cb
+    config_load olsrd6
+    config_foreach olsrd_suffix LoadPlugin olsrd6
+
+    uci commit dhcp
+    uci commit olsrd
+    uci commit olsrd6
 }
 
 migrate() {
@@ -1245,9 +1265,8 @@ migrate() {
         r1_3_0_update_dns
     fi
 
-    if semverLT "${OLD_VERSION}" "1.5.0"; then
-        r1_5_0_remove_unused_stuff
-    fi
+    if semverLT "${OLD_VERSION}" "1.3.1"; then
+	r1_3_1_domain_suffix
 
     # overwrite version with the new version
     log "Setting new system version to ${VERSION}."
