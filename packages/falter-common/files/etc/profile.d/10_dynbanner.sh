@@ -7,7 +7,12 @@
 
 # shellcheck shell=dash
 
-HOSTNAME=$(uci -q get system.@system[0].hostname)".olsr"
+COMMUNITY=$(uci -q get freifunk.community.name)
+SUFFIX=$(uci -q get profile_${COMMUNITY}.profile.suffix)
+if [ 1 -eq $? ]; then
+  SUFFIX="ff"
+fi
+HOSTNAME=$(uci -q get system.@system[0].hostname)".${SUFFIX}"
 IPADDR=$(uci -q get network.dhcp.ipaddr)
 UPTIME=$(uptime | cut -d ',' -f 0 | cut -d ' ' -f 4-) >/dev/null 2>&1
 FREEFL=$(df -h | grep " /overlay" | sed -E -e s/[[:space:]]+/\;/g | cut -d';' -f4) >/dev/null 2>&1
