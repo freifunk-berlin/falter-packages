@@ -151,13 +151,8 @@ json_init
     json_close_object
 
     json_add_array sshkeys
-<<<<<<< Updated upstream:packages/falter-common/files/sbin/uci2ffwizard
     {
-        while IFS= read -r line; do
-=======
-
         [ ! -f /etc/dropbear/authorized_keys ] || while IFS= read -r line; do
->>>>>>> Stashed changes:packages/falter-common/files-common/sbin/uci2ffwizard
             json_add_string "" "$line"
         done </etc/dropbear/authorized_keys
     }
