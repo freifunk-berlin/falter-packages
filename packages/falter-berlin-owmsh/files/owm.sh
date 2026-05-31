@@ -116,6 +116,75 @@ if json_is_a links array; then
 fi
 json_cleanup
 
+# collect data on Bird-Babel mesh links
+# Babel routes both IPv4 and IPv6, so we extract IPv4 links
+# Strategy: Correlate Babel IPv6 neighbors with IPv4 ARP table via MAC addresses
+babelinks=""
+BIRD_STATUS=$(birdc show status 2>/dev/null)
+if [ -n "$BIRD_STATUS" ] && echo "$BIRD_STATUS" | grep -q "Router ID"; then
+    # Build IPv4 neighbor table: MAC -> IPv4
+    ip -4 neigh show | grep -v FAILED >/tmp/babel_ip_neigh.txt
+
+    # Build IPv6 neighbor table: IPv6 -> MAC
+    ip -6 neigh show | grep -v FAILED >/tmp/babel_ip6_neigh.txt
+
+    # Parse Babel interfaces to get local IPv4 per interface
+    # Also collect all local IPs for self-link detection
+    birdc show babel interfaces 2>/dev/null | tail -n +4 >/tmp/babel_ifaces.txt
+    # Get all local IPv4s (column 7) for self-link detection
+    LOCAL_IPS=$(awk '{print $7}' /tmp/babel_ifaces.txt | tr '\n' ' ')
+
+    BABEL_OUTPUT=$(birdc show babel neighbors 2>/dev/null)
+    if [ -n "$BABEL_OUTPUT" ]; then
+        echo "$BABEL_OUTPUT" | tail -n +4 >/tmp/babel_neighbors.txt
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+
+            # Parse: IP Interface Metric Routes Hellos Expires Auth RTT
+            neighbor_ipv6=$(echo "$line" | awk '{print $1}')
+            ifName=$(echo "$line" | awk '{print $2}')
+            metric=$(echo "$line" | awk '{print $3}')
+
+            [ -z "$neighbor_ipv6" ] || [ -z "$ifName" ] || [ -z "$metric" ] && continue
+            echo "$neighbor_ipv6" | grep -qE '^fe80::' || continue
+            echo "$ifName" | grep -qE '(wg|ts)_' && continue
+
+            # Get local IPv4 for this interface (column 7)
+            local_ipv4=$(grep "^${ifName} " /tmp/babel_ifaces.txt 2>/dev/null | awk '{print $7}')
+            [ -z "$local_ipv4" ] && continue
+
+            # Look up MAC from IPv6 neighbor table
+            neighbor_mac=$(grep "^${neighbor_ipv6} " /tmp/babel_ip6_neigh.txt 2>/dev/null | awk '{print $5}')
+            [ -z "$neighbor_mac" ] && continue
+
+            # Look up IPv4 from MAC, filtering by interface name
+            neighbor_ipv4=$(grep "${ifName}" /tmp/babel_ip_neigh.txt | grep "${neighbor_mac}" | awk '{print $1}')
+            [ -z "$neighbor_ipv4" ] && continue
+
+            # Skip if remote IPv4 is any of our local IPs (self-link)
+            for local_ip in $LOCAL_IPS; do
+                [ "$neighbor_ipv4" = "$local_ip" ] && continue 2
+            done
+
+            # Convert metric to quality: quality = 256 / metric
+            if [ "$metric" -gt 0 ] && [ "$metric" -lt 65534 ]; then
+                quality=$(awk "BEGIN {printf \"%.3f\", 256 / $metric}")
+            else
+                quality="0.01"
+            fi
+
+            # Get hostname via nslookup, replace .ff with .olsr
+            remotehost="$(nslookup "$neighbor_ipv4" 2>/dev/null | grep name | sed -e 's/.*name = \(.*\)/\1/' | awk -F. '{print $(NF-1)".olsr"}')"
+            if [ -z "$remotehost" ]; then
+                remotehost="$neighbor_ipv4"
+            fi
+
+            babelinks="$babelinks$local_ipv4 $neighbor_ipv4 $remotehost $quality $ifName;"
+        done </tmp/babel_neighbors.txt
+    fi
+    rm -f /tmp/babel_ip_neigh.txt /tmp/babel_ip6_neigh.txt /tmp/babel_ifaces.txt /tmp/babel_neighbors.txt
+fi
+
 # collect board info
 json_load "$(ubus call system board)"
 json_get_var model model
@@ -256,6 +325,19 @@ json_add_array links
 {
     IFSORIG="$IFS"
     IFS=';'
+    for i in ${babelinks}; do
+        IFS="$IFSORIG"
+        set -- $i
+        json_add_object
+        {
+            json_add_string sourceAddr4 "$1"
+            json_add_string destAddr4 "$2"
+            json_add_string id "$3"
+            json_add_double quality "$4"
+        }
+        json_close_object
+        IFS=';'
+    done
     for i in ${olsr4links}; do
         IFS="$IFSORIG"
         set -- $i
@@ -308,8 +390,6 @@ fi
 #                              #
 ################################
 
-#echo $JSON_STRING
-# get message lenght for request
 LEN=${#JSON_STRING}
 
 MSG="\
@@ -321,5 +401,20 @@ Content-length: $LEN\r
 \r
 $JSON_STRING\r\n"
 
-printf "$MSG" | nc api.openwifimap.net 80
-printf "\n\n"
+server="api.openwifimap.net"
+server_ips="$(nslookup -type=AAAA $server 2>/dev/null | grep 'Address' | grep -v '127.0.0.1' | grep ':' | awk '{print $NF}')"
+server_ips="$server_ips $(nslookup -type=A $server 2>/dev/null | grep 'Address' | grep -v '127.0.0.1' | awk '{print $NF}')"
+
+if [ -n "$server_ips" ]; then
+    for server_ip in $server_ips; do
+        printf "Try Server IP: $server_ip "
+        if printf "$MSG" | nc $server_ip 80 >/tmp/owm_server_ret 2>&1; then
+            printf "OK\n"
+            break
+        else
+            printf "Fail\n"
+        fi
+    done
+else
+    printf "Fail nslookup $server\n"
+fi
