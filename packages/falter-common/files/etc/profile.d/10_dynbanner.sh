@@ -10,7 +10,7 @@
 COMMUNITY=$(uci -q get freifunk.community.name)
 SUFFIX=$(uci -q get profile_${COMMUNITY}.profile.suffix)
 if [ 1 -eq $? ]; then
-  SUFFIX="ff"
+    SUFFIX="ff"
 fi
 HOSTNAME=$(uci -q get system.@system[0].hostname)".${SUFFIX}"
 IPADDR=$(uci -q get network.dhcp.ipaddr)
