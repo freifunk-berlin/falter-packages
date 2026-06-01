@@ -300,8 +300,8 @@ set_ipversion_olsrd6() {
 }
 
 bump_repo() {
-    local apk=$(which apk)
-    if [ $apk = "" ]; then # This system doesn't have opkg
+    local opkg=$(which opkg)
+    if [ $opkg = "" ]; then # This system doesn't have opkg, uses apk
       return 0
     fi
 
