@@ -13,7 +13,7 @@
 # shellcheck disable=SC2155
 # using printf with variables and nc didn't work correctly. Thus this hack
 # shellcheck disable=SC2059
-# FW_SERVER_URL isn't mispelled, but a global variable defined in autoupdate.sh
+# FW_URL isn't mispelled, but a global variable defined in autoupdate.sh
 # shellcheck disable=SC2153
 
 # Those dependencies aren't available for CI checking.
@@ -53,7 +53,7 @@ load_overview_and_certs() {
 
     # load certificates
     local cnt=1
-    while wget -q "$fwurl.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
+    while wget -q "$fw_url.$cnt.sig" -O "$PATH_DIR/autoupdate.json.$cnt.sig"; do
         cnt=$((cnt + 1))
     done
 }
@@ -136,6 +136,7 @@ get_download_link_and_hash() {
     local _version="$1"
     local flavour="$2"
 
+    local fw_host=$(echo $FW_URL | cut -d '/' -f 1-3)
     local board="$(board_name)"
     local target=""
     local profile=""
@@ -161,7 +162,7 @@ get_download_link_and_hash() {
     json_cleanup
 
     rm -f "$PATH_DIR/profiles.json"
-    wget -O "$PATH_DIR/profiles.json" "https://${FW_SERVER_URL}$profiles_url"
+    wget -O "$PATH_DIR/profiles.json" "${fw_host}$profiles_url"
     local hash_actual="$(sha256sum "$PATH_DIR/profiles.json" | cut -d' ' -f1)"
     if [ "$hash_actual" != "$hash_expected" ]; then
         log "failed to verify profiles.json - expected=$hash_expected actual=$hash_actual"
@@ -180,7 +181,7 @@ get_download_link_and_hash() {
         exit 2
     fi
 
-    echo "https://${FW_SERVER_URL}$(dirname "$profiles_url")/$IMAGE_NAME $IMAGE_HASH"
+    echo "${fw_host}$(dirname "$profiles_url")/$IMAGE_NAME $IMAGE_HASH"
 }
 
 verify_image_hash() {
