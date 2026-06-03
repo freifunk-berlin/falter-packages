@@ -34,6 +34,7 @@ com_name="$(uci_get freifunk community name)"
 uci_load system
 longitude="$(uci_get system @system[-1] longitude)"
 latitude="$(uci_get system @system[-1] latitude)"
+altitude="$(uci_get system @system[-1] altitude)"
 
 # if contact field contains a config-wizard URL, write it into URL-field
 if case "$mail" in
@@ -112,6 +113,7 @@ json_init
         {
             json_add_double latitude $latitude
             json_add_double longitude $longitude
+            json_add_double altitude $altitude
             json_add_string description "$loc_description"
         }
         json_close_object
