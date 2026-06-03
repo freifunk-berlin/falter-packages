@@ -300,7 +300,7 @@ set_ipversion_olsrd6() {
 
 bump_repo() {
     local opkg=$(which opkg)
-    if [ $opkg = "" ]; then # This system doesn't have opkg, uses apk
+    if [ "X${opkg}X" = "XX" ]; then # This system doesn't have opkg, uses apk
       return 0
     fi
 
@@ -1102,7 +1102,7 @@ r1_3_1_domain_suffix() {
     local community=$(uci -q get freifunk.community.name)
     local suffix=$(uci -q get "profile_${community}.profile.suffix")
     if [ "$suffix" = "" ]; then
-      suffix = "ff"
+      suffix="ff"
     fi
 
     # apply to dhcp config
@@ -1301,8 +1301,9 @@ migrate() {
     fi
 
     if semverLT "${OLD_VERSION}" "1.3.1"; then
-	r1_3_1_domain_suffix
+        r1_3_1_domain_suffix
         r1_3_1_hwmode
+    fi
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
         r1_5_0_remove_unused_stuff
