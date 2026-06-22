@@ -72,11 +72,15 @@ else
     is_tunneldigger=""
 fi
 
-has_bbbdigger="$(uci_get tunneldigger bbbdigger interface)"
+bbbdigger_enabled="$(uci_get tunneldigger bbbdigger enabled)"
+if [ $bbbdigger_enabled = "1" ]; then
+    has_bbbdigger="$(uci_get tunneldigger bbbdigger interface)"
+else
+    has_bbbdigger=""
+fi
 
 # get hostname
-json_load "$(ubus call system board)"
-json_get_var hostname hostname
+hostname="$(uci_get system @system[-1] hostname)"
 
 
 #############################
