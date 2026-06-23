@@ -54,14 +54,9 @@ function _disconnect() {
 function _connect() {
   _disconnect();
   DBG('Connecting to bird control socket: %s', sock_bctl_path);
-  let s = socket.create(socket.AF_UNIX, socket.SOCK_STREAM, 0);
+  let s = socket.connect({ path: sock_bctl_path });
   if (!s) {
-    ERR('Failed to create socket');
-    return false;
-  }
-  if (!s.connect({ path: sock_bctl_path })) {
-    ERR('Failed to connect to bird control socket %s: %s', sock_bctl_path, s.error());
-    s.close();
+    ERR('Failed to connect to bird control socket %s: %s', sock_bctl_path, socket.error());
     return false;
   }
   _sock = s;
