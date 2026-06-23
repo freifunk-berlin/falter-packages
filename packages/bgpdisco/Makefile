@@ -30,7 +30,7 @@ define Package/bgpdisco
 	EXTRA_DEPENDS:= \
 		ucode (>=0), ucode-mod-rtnl (>=0), ucode-mod-debug (>=0), ucode-mod-fs (>=0), \
 		ucode-mod-uloop (>=0), ucode-mod-log (>=0), ucode-mod-struct (>=0), \
-		ucode-mod-digest (>=0)
+		ucode-mod-digest (>=0), ucode-mod-socket (>=0)
 endef
 
 define Package/bgpdisco-plugin-nameservice

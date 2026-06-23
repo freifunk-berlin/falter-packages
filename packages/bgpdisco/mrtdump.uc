@@ -51,7 +51,7 @@ function process_routes(filename, callback) {
 
         // set len to two bytes if extended attribute length flag (4) is set
         if (attr_flags & 0x01 << 4) {
-          print('  Extended attribute length!', '\n');
+          DBG('Extended attribute length flag set');
           _field_attr_len = 2;
           _field_attr_unpack_str = '>H';
         }
@@ -105,9 +105,8 @@ function process_routes(filename, callback) {
    }
 
 
-    while (process_prefix(fd, address_size)) {
-      //print("Processing Prefix..");
-    }
+    // TABLE_DUMP_V2 contains exactly one prefix per MRT record
+    process_prefix(fd, address_size);
   }
 
 
