@@ -14,11 +14,15 @@ let cfg = {
 
 let static_entries = [];
 
+let _local_ips_cache = null;
+
 function get_interfaces_with_ip() {
+  if (_local_ips_cache != null)
+    return _local_ips_cache;
+
   let nl_ips = rtnl.request(rtnl.const.RTM_GETADDR,
                rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_ROOT|rtnl.const.NLM_F_MATCH,
                {scope: rtnl.const.RT_SCOPE_UNIVERSE});
-
 
   let result = {};
   for (i in nl_ips) {
@@ -29,6 +33,7 @@ function get_interfaces_with_ip() {
 
     result[split(i.address, '/')[0]] = i.dev;
   }
+  _local_ips_cache = result;
   return result;
 }
 
@@ -167,5 +172,10 @@ return {
     uci_config();
     plug.register(plug.TYPE.DATA_PROVIDER, PLUGIN_UID, get_local_hosts);
     plug.register(plug.TYPE.DATA_HANDLER, PLUGIN_UID, write_hostnames);
+    rtnl.listener(function(ev) {
+      DBG('Address change on %s - invalidating local IP cache', ev.msg.dev);
+      _local_ips_cache = null;
+    }, [rtnl.const.RTM_NEWADDR, rtnl.const.RTM_DELADDR],
+       [rtnl.const.RTNLGRP_IPV4_IFADDR, rtnl.const.RTNLGRP_IPV6_IFADDR], {});
   }
 };
