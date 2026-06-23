@@ -23,7 +23,7 @@ function provide_data() {
         data[_ip] ??= [];
 
         let darr = [];
-        if(type(res_cb_data == 'array')) {
+        if (type(res_cb_data) == 'array') {
           darr = res_cb_data;
           unshift(res_cb_data, id); // insert id before data elements
         } else {
