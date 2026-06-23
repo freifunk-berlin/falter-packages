@@ -20,13 +20,9 @@ return view.extend({
     s = m.section(form.TypedSection, 'generic', _('Settings'));
     s.anonymous = true;
 
-    o1 = s.option(form.Value, 'selector_fqdn', _('Selector-FQDN'),
-      _('URL of the firmware-selector without protocol. Usally: selector.berlin.freifunk.net'));
-    o1.datatype = 'hostname';
-
-    o2 = s.option(form.Value, 'fw_server_fqdn', _('Firmware-Server-FQDN'),
-      _('URL of the firmware server without protocol. Usally firmware.berlin.freifunk.net'));
-    o2.datatype = 'hostname';
+    o1 = s.option(form.Value, 'url', _('URL'),
+      _('URL of the autoupdate.json metadata file. Usally: https://firmware.berlin.freifunk.net/stable/autoupdate.json'));
+    o1.datatype = 'string';
 
     o3 = s.option(form.Value, 'minimum_certs', _('Minimum Certs'),
       _('Minimum amount of certificates that must be valid. Otherwise autoupdate will not perform an upgrade.'));
