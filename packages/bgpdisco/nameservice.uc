@@ -37,8 +37,11 @@ function is_v4(ip) {
   return !!(bytes && length(bytes) == 4);
 }
 
+let _hostname_cache = null;
 function get_hostname() {
-  return replace(fs.readfile('/proc/sys/kernel/hostname'), '\n', '');
+  if (_hostname_cache == null)
+    _hostname_cache = replace(fs.readfile('/proc/sys/kernel/hostname'), '\n', '');
+  return _hostname_cache;
 }
 
 

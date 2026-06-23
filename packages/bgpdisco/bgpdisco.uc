@@ -84,10 +84,21 @@ function retrieve_data_from_bird() {
   return parsed_data;
 }
 
+function neighbors_equal(a, b) {
+  if (length(a) != length(b))
+    return false;
+  let sa = sort(map(a, n => n.ip + '/' + n.iface));
+  let sb = sort(map(b, n => n.ip + '/' + n.iface));
+  for (let i = 0; i < length(sa); i++)
+    if (sa[i] != sb[i])
+      return false;
+  return true;
+}
+
 function sync_peers() {
   DBG('sync_peers()');
   let neighbors = bird.get_babel_neighbors();
-  if (sprintf('%s', neighbors) == sprintf('%s', cache_neighbors)) {
+  if (neighbors_equal(neighbors, cache_neighbors)) {
     DBG('No change in babel neighbors - no sync required');
     return;
   }
@@ -128,9 +139,9 @@ function cb_nl_newneigh(ev) {
     return;
   }
 
-  // Ignore other interfaces
-  if (length(cfg.neighbor_sync_monitor_interfaces) > 0) {
-    if (!(ev.msg.dev in cfg.neighbor_sync_monitor_interfaces))
+  // Ignore interfaces not managed by babel
+  if (length(monitor_interfaces) > 0) {
+    if (!(ev.msg.dev in monitor_interfaces))
       return;
   }
 
