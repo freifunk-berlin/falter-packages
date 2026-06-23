@@ -20,6 +20,7 @@ let cache_neighbors;
 let cache_hash = '';
 
 let timer_refresh_remote_data;
+let timer_sync_debounce;
 
 let cfg = {
     // General
@@ -155,8 +156,11 @@ function cb_nl_newneigh(ev) {
     return;
   }
 
-  DBG('Learned new neighbor - triggering peer syncronization. IP: %s, Dev:', ev.msg.dst, ev.msg.dev);
-  sync_peers();
+  DBG('Learned new neighbor - scheduling peer sync. IP: %s, Dev: %s', ev.msg.dst, ev.msg.dev);
+  if (!timer_sync_debounce)
+    timer_sync_debounce = uloop.timer(500, sync_peers);
+  else
+    timer_sync_debounce.set(500);
 }
 
 function uci_config() {
