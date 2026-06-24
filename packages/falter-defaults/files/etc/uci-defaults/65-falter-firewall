@@ -87,7 +87,7 @@ uci commit firewall
 # add named freifunk zone section
 uci set firewall.zone_freifunk=zone
 uci set firewall.zone_freifunk.input=ACCEPT
-uci set firewall.zone_freifunk.forward=REJECT
+uci set firewall.zone_freifunk.forward=ACCEPT
 uci set firewall.zone_freifunk.name=freifunk
 uci set firewall.zone_freifunk.output=ACCEPT
 uci add_list firewall.zone_freifunk.network=tunl0
@@ -101,10 +101,6 @@ uci set firewall.zone_ffuplink.forward=ACCEPT
 uci set firewall.zone_ffuplink.output=ACCEPT
 uci add_list firewall.zone_ffuplink.network=ffuplink
 uci set firewall.zone_ffuplink.masq=1
-
-FORWARDING="$(uci add firewall forwarding)"
-uci set firewall."$FORWARDING".dest=freifunk
-uci set firewall."$FORWARDING".src=freifunk
 
 RULE="$(uci add firewall rule)"
 uci set firewall."$RULE".proto=icmp
