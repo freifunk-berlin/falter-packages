@@ -309,9 +309,9 @@ bump_repo() {
     fi
 
     # adjust the opkg packagefeed to point to new version
-    local FEED_LINE=$(grep "openwrt_falter" /rom/etc/opkg/customfeeds.conf)
+    local FEED_LINE=$(grep "falter" /rom/etc/opkg/customfeeds.conf)
     log "adjusting packagefeed to new version feed"
-    sed -i "s,src\/gz.openwrt_falter.https\?:\/\/firmware\.berlin\.freifunk\.net.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
+    sed -i "s,src\/gz.*falter.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
 }
 
 r1_0_0_vpn03_splitconfig() {
