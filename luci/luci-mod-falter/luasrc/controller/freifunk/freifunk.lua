@@ -44,15 +44,6 @@ function index()
 		assign({"freifunk", "status", "splash"}, {"splash", "publicstatus"}, _("Splash"), 40)
 	end
 
-	page = assign({"freifunk", "olsr"}, {"admin", "status", "olsr"}, _("OLSR"), 30)
-	page.setuser = false
-	page.setgroup = false
-	page.acl_depends = false
-
-	if nixio.fs.access("/etc/config/luci_statistics") then
-		assign({"freifunk", "graph"}, {"admin", "statistics", "graph"}, _("Statistics"), 40)
-	end
-
 	-- backend
 	assign({"mini", "freifunk"}, {"admin", "freifunk"}, _("Freifunk"), 5)
 
@@ -106,7 +97,5 @@ function index()
 	page.title  = _("Swap Physical Ports")
         page.order  = 41
 
-	entry({"freifunk", "map"}, template("freifunk-map/frame"), _("Map"), 50)
-	entry({"freifunk", "map", "content"}, template("freifunk-map/map"), nil, 51)
 	entry({"admin", "freifunk", "profile_error"}, template("freifunk/profile_error"))
 end
