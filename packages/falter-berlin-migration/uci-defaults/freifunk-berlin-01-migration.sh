@@ -55,15 +55,19 @@ fi
 # at least on "very old file" in /etc/config ...
 #
 FOUND_OLD_FILE=false
-# create helper to compare file ctime (1. Sep. 2014)
-touch -d "201409010000" /tmp/timestamp
+# create helper to compare file ctime (1. Sep. 2014), yet make sure it's at
+# least older than the unix epoch plus one day (2. Jan. 1970).
+touch -d "201409010000" /tmp/kathleenepoch
+touch -d "197001020000" /tmp/unixepoch
 for testfile in /etc/config/*; do
-    if [ "${testfile}" -ot /tmp/timestamp ]; then
+    if [ "${testfile}" -ot /tmp/kathleenepoch ] && [ "${testfile}" -nt /etc/unixepoch ]; then
         FOUND_OLD_FILE=true
-        echo "guessing pre-kathleen firmware as of ${testfile}"
+        KEOPCH=$(date -r /tmp/kathleenepoch)
+        log "guessing pre-kathleen firmware since ${testfile} is older than ${KEPOCH}"
     fi
 done
-rm -f /tmp/timestamp
+rm -f /tmp/kathleenepoch
+rm -f /tmp/unixepoch
 
 if [ -n "${OLD_VERSION}" ]; then
     # case 2)
