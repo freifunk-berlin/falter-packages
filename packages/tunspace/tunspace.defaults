@@ -13,6 +13,9 @@ config tunspace "tunspace"
   # - netns-macvlan-bridge: creates a macvlan child in bridge mode, useful for creating multiple uplinks from the same original uplink interface.
   # - netns-move-interface: moves the original uplink interface into the namespace directly, useful for wonky cheap USB sticks with broken drivers.
   # - netns-macvlan-passthru: creates a macvlan child in passthru mode, shares the parent's MAC (needed for some wireless uplinks).
+  # - root: no namespace/interface is created at all. Use this when the uplink is a locally owned connection (e.g. PPPoE/DSL)
+  #         that already has a working default route in the root namespace - registration and tunnel traffic use that route
+  #         directly. uplink_ifname/uplink_ipv4/uplink_gateway/uplink_mac are ignored in this topology.
   option uplink_topology "netns-macvlan-bridge"
   # Our own static uplink IPv4 address in CIDR format. Leave empty to use DHCP.
   option uplink_ipv4 ""
