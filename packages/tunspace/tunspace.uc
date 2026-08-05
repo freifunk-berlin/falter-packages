@@ -227,7 +227,7 @@ function wg_replace_endpoint(ifname, cfg, next) {
     log("failed to read 32 bytes from /dev/random");
     return false;
   }
-  let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
+  wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "privateKey": b64enc(privkey),
   });
@@ -237,7 +237,7 @@ function wg_replace_endpoint(ifname, cfg, next) {
   }
 
   // get the public key for registration
-  let reply = wg_request(wg.const.WG_CMD_GET_DEVICE,
+  let dev_reply = wg_request(wg.const.WG_CMD_GET_DEVICE,
                          rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_DUMP, {
     "ifname": ifname,
   });
@@ -245,14 +245,14 @@ function wg_replace_endpoint(ifname, cfg, next) {
     log("WG_CMD_GET_DEVICE failed: "+err);
     return false;
   }
-  if (length(reply) < 1) {
+  if (length(dev_reply) < 1) {
     log("can't replace wireguard endpoint, interface "+ifname+" not found");
     return false;
   }
-  let pubkey = reply[0].publicKey;
+  let pubkey = dev_reply[0].publicKey;
 
   // ubus login on the tunnel server
-  let msg = {
+  let login_msg = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "call",
@@ -261,24 +261,24 @@ function wg_replace_endpoint(ifname, cfg, next) {
       "session",
       "login",
       UBUS_LOGIN]};
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
-  let p = fs.popen(sprintf(cmd, msg), "r");
-  let out = p.read("all");
-  if (substr(out, 0, 1) != "{") {
-    log(sprintf(cmd+" (error=unexpected data, data=%s)", "...", out));
+  let login_cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
+  let login_p = fs.popen(sprintf(login_cmd, login_msg), "r");
+  let login_out = login_p.read("all");
+  if (substr(login_out, 0, 1) != "{") {
+    log(sprintf(login_cmd+" (error=unexpected data, data=%s)", "...", login_out));
     return false;
   } else {
-    debug(sprintf(cmd+" (error=%s)", "...", p.error()));
+    debug(sprintf(login_cmd+" (error=%s)", "...", login_p.error()));
   }
-  let reply = json(out);
-  if (reply.result[0] != 0) {
-    log(sprintf(cmd+" (error=unexpected content, data=%s)", "...", out));
+  let login_reply = json(login_out);
+  if (login_reply.result[0] != 0) {
+    log(sprintf(login_cmd+" (error=unexpected content, data=%s)", "...", login_out));
     return false;
   }
-  let sid = reply.result[1].ubus_rpc_session;
+  let sid = login_reply.result[1].ubus_rpc_session;
 
   // tunnel registration
-  let msg = {
+  let register_msg = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "call",
@@ -289,30 +289,30 @@ function wg_replace_endpoint(ifname, cfg, next) {
       { "public_key": pubkey, "mtu": ifcfg.mtu },
     ],
   };
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
-  let p = fs.popen(sprintf(cmd, msg), "r");
-  let out = p.read("all");
-  if (substr(out, 0, 1) != "{") {
-    log(sprintf(cmd+" (error=unexpected data, data=%s)", "...", out));
+  let register_cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
+  let register_p = fs.popen(sprintf(register_cmd, register_msg), "r");
+  let register_out = register_p.read("all");
+  if (substr(register_out, 0, 1) != "{") {
+    log(sprintf(register_cmd+" (error=unexpected data, data=%s)", "...", register_out));
     return false;
   } else {
-    debug(sprintf(cmd+" (error=%s)", "...", p.error()));
+    debug(sprintf(register_cmd+" (error=%s)", "...", register_p.error()));
   }
-  let reply = json(out);
-  if (!reply.result || reply.result[0] != 0 || reply.result[1].response_code != 0) {
+  let register_reply = json(register_out);
+  if (!register_reply.result || register_reply.result[0] != 0 || register_reply.result[1].response_code != 0) {
     // response_code 1 means "public key is already used"
     // see wg-installer/wg-server/lib/wg_functions.sh
-    log(sprintf(cmd+" (error=unexpected content, data=%s)", "...", out));
+    log(sprintf(register_cmd+" (error=unexpected content, data=%s)", "...", register_out));
     return false;
   }
 
   let peer = {
-    "public_key": reply.result[1].gw_pubkey,
-    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
+    "public_key": register_reply.result[1].gw_pubkey,
+    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+register_reply.result[1].gw_port),
   };
 
   // set tunnel server as our peer
-  let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
+  wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "flags": wg.const.WGDEVICE_F_REPLACE_PEERS,
     "peers": [{
