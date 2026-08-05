@@ -20,7 +20,7 @@ function load_config(name) {
     "debug": int(ts.debug) != 0,
     "uplink_netns": type(ts.uplink_netns) ? ts.uplink_netns : "",
     "uplink_ifname": type(ts.uplink_ifname) ? ts.uplink_ifname : "",
-    "uplink_mode": type(ts.uplink_mode) ? ts.uplink_mode : "",
+    "uplink_topology": type(ts.uplink_topology) ? ts.uplink_topology : "",
     "uplink_ipv4": type(ts.uplink_ipv4) ? ts.uplink_ipv4 : "",
     "uplink_gateway": type(ts.uplink_gateway) ? ts.uplink_gateway : "",
     "uplink_mac": type(ts.uplink_mac) ? ts.uplink_mac : "",
@@ -444,7 +444,7 @@ function uplink_maintenance(cfg) {
 
   let netns = cfg.uplink_netns;
   let ifname = cfg.uplink_ifname;
-  let mode = cfg.uplink_mode;
+  let topology = cfg.uplink_topology;
   let ipv4 = cfg.uplink_ipv4;
   let gw = cfg.uplink_gateway;
   let mac = cfg.uplink_mac;
@@ -460,23 +460,23 @@ function uplink_maintenance(cfg) {
   } else if (!interface_exists(ifname)) {
     log(sprintf("missing uplink interface %s", ifname));
     return false;
-  } else if (mode == "direct") {
+  } else if (topology == "netns-move-interface") {
     // move uplink interface directly:
     shell_command("ip link set dev "+ifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set "+ifname+" name "+netnsifname);
     shell_command("ip -n "+netns+" link set "+netnsifname+" up");
-  } else if (mode == "bridge") {
+  } else if (topology == "netns-macvlan-bridge") {
     // or create a macvlan bridge:
     shell_command("ip link add "+netnsifname+" address "+mac+" link "+ifname+" type macvlan mode bridge");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
-  } else if (mode == "passthru") {
+  } else if (topology == "netns-macvlan-passthru") {
     // create a macvlan in passthru mode (shares parent MAC):
     shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode passthru");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
   } else {
-    log(sprintf("uplink mode must be 'bridge', 'direct', or 'passthru', got '%s'", mode));
+    log(sprintf("uplink topology must be 'netns-macvlan-bridge', 'netns-move-interface', or 'netns-macvlan-passthru', got '%s'", topology));
     return false;
   }
 
@@ -488,10 +488,10 @@ function uplink_maintenance(cfg) {
 
   if (!uplink_has_default_route(netns)) {
     log("uplink: no default route after configuration");
-    // For bridge/passthru, the macvlan may be orphaned (parent interface recreated).
+    // For the two macvlan topologies, the macvlan may be orphaned (parent interface recreated).
     // Delete it so the next tick recreates it against the fresh parent interface.
-    // Leave direct-mode alone: that IS the physical interface.
-    if (mode == "bridge" || mode == "passthru") {
+    // Leave netns-move-interface alone: that IS the physical interface.
+    if (topology == "netns-macvlan-bridge" || topology == "netns-macvlan-passthru") {
       shell_command("ip -n "+netns+" link del "+netnsifname+" 2>/dev/null");
     }
     return false;
