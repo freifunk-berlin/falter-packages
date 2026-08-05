@@ -44,6 +44,8 @@ Optional arguments:
     -t: test-run
             this will perform everything like in automatic-mode, except
             that it won't flash the image and won't tidy up afterwards.
+    -u URL: json URL
+            overrides the URL pointing to the autoupdate.json.
     -f: force update
             CAUTION: This will ignore all checks except the certificates
             and checksums!
@@ -77,22 +79,23 @@ MIN_RAM_FREE=1536 # amount of kiB that must be free in RAM after firmware-downlo
 #########################
 #  Commandline parsing
 
-while getopts him:Nntf option; do
+while getopts him:u:Nntf option; do
     case $option in
-    h)
-        print_help
-        exit 0
-        ;;
-    i) OPT_IGNORE_CERTS=1 ;;
-    m) MIN_CERTS=$OPTARG ;;
-    N) OPT_NOW=1 ;;
-    t) OPT_TESTRUN=1 ;;
-    f) OPT_FORCE=1 ;;
-    *)
-        printf "\nUnknown argument! Please use valid arguments only.\n\n"
-        print_help
-        exit 2
-        ;;
+        h)
+            print_help
+            exit 0
+            ;;
+        i) OPT_IGNORE_CERTS=1 ;;
+        m) MIN_CERTS=$OPTARG ;;
+        N) OPT_NOW=1 ;;
+        t) OPT_TESTRUN=1 ;;
+        f) OPT_FORCE=1 ;;
+        u) FW_URL=$OPTARG ;;
+        *)
+            printf "\nUnknown argument! Please use valid arguments only.\n\n"
+            print_help
+            exit 2
+            ;;
     esac
 done
 
@@ -100,6 +103,12 @@ done
 MIN_CERTS=$(echo "$MIN_CERTS" | sed -e 's|[^0-9]||g')
 if [ -z "$MIN_CERTS" ]; then
     echo "please give numbers only for -m"
+    exit 2
+fi
+
+# sanitise URL-input
+if [ -z "$FW_URL" ]; then
+    echo "you must give an URL when using -u"
     exit 2
 fi
 
