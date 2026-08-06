@@ -1,0 +1,18 @@
+{
+  "falter": {
+    "title": "Falter",
+    "order": 5,
+    "action": {
+      "type": "view",
+      "path": "falter/index2"
+    }
+  },
+  "falter/tpl": {
+    "title": "Falter Template",
+    "order": 5,
+    "action": {
+      "type": "template",
+      "path": "falter/index"
+    }
+  }
+}

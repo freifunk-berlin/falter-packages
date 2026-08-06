@@ -1,0 +1,8 @@
+
+{% include('header') %}
+
+<h2 name="content">Hello, world!</h2>
+<pre>dispatched: {% printf("%.J", dispatched) %}</pre>
+<pre>global: {% printf("%.J", global) %}</pre>
+
+{% include('footer') %}
