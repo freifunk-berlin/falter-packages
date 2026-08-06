@@ -124,18 +124,18 @@ unbuf="stdbuf --output=0 --error=0"
     cat <<EOF >"$sdkdir/feeds.conf"
 src-git base $gitmirror/openwrt/openwrt.git;$owbranch
 src-git packages $gitmirror/feed/packages.git;$owbranch2
-src-git luci $gitmirror/project/luci.git;$owbranch2
-src-git routing $gitmirror/feed/routing.git;$owbranch2
-src-git telephony $gitmirror/feed/telephony.git;$owbranch2
+#src-git luci $gitmirror/project/luci.git;$owbranch2
+#src-git routing $gitmirror/feed/routing.git;$owbranch2
+#src-git telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   else
     cat <<EOF >"$sdkdir/feeds.conf"
 src-git base $gitmirror/openwrt.git;$owbranch
 src-git packages $gitmirror/packages.git;$owbranch2
-src-git luci $gitmirror/luci.git;$owbranch2
-src-git routing $gitmirror/routing.git;$owbranch2
-src-git telephony $gitmirror/telephony.git;$owbranch2
+#src-git luci $gitmirror/luci.git;$owbranch2
+#src-git routing $gitmirror/routing.git;$owbranch2
+#src-git telephony $gitmirror/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
@@ -150,14 +150,17 @@ EOF
   ./scripts/feeds update -a
   ./scripts/feeds install -a -p falter
 
-  sed -i 's#cc -o contrib/lemon#cc -std=gnu17 -o contrib/lemon#g' feeds/luci/modules/luci-base/src/Makefile
+  # sed -i 's#cc -o contrib/lemon#cc -std=gnu17 -o contrib/lemon#g' feeds/luci/modules/luci-base/src/Makefile
 
   export DOWNLOAD_MIRROR="$srcmirror"
-  for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}' | sort); do
-    cmd="make package/$p/compile $makeargs"
-    echo "-- $cmd"
-    $cmd
-  done
+  # for p in $(find -L feeds/falter -name Makefile | awk -F/ '{print $(NF - 1)}' | sort); do
+  #   cmd="make package/$p/compile $makeargs"
+  #   echo "-- $cmd"
+  #   $cmd
+  # done
+  cmd="make package/falter-base/compile package/falter-web/compile $makeargs"
+  echo "-- $cmd"
+  $cmd
   make package/index V=s
 
   # filter out the useless noise before printing/logging
