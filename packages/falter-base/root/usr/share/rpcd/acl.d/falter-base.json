@@ -1,0 +1,9 @@
+{
+  "unauthenticated": {
+    "read": {
+      "ubus": {
+        "falter": ["status"]
+      }
+    }
+  }
+}

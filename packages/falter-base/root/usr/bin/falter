@@ -1,0 +1,7 @@
+#!/usr/bin/env ucode
+'use strict';
+
+const ubus = require('ubus').connect();
+
+const result = ubus.call("falter", "status");
+printf("status: %s\n", result.status);
