@@ -1109,6 +1109,8 @@ r1_3_1_domain_suffix() {
       suffix="ff"
     fi
 
+    log "setting the domain suffix to ${suffix}"
+
     # apply to dhcp config
     uci del_list dhcp.dhcp.dhcp_option="119,olsr"
     if [ $? -eq 0 ]; then
@@ -1140,6 +1142,7 @@ r1_3_1_domain_suffix() {
 }
 
 r1_3_1_hwmode() {
+    log "removing deprecated hwmode setting from wireless"
     handle_radio() {
       local section=${1}
       uci -q delete "wireless.$section.hwmode"
@@ -1150,6 +1153,30 @@ r1_3_1_hwmode() {
    config_foreach handle_radio wifi-device
 
    uci commit wireless
+}
+
+r1_4_0_upstream_dhcp_config() {
+   log "adding upstream changes to dhcp config"
+   uci set dhcp.@dnsmasq[0].filter_aaaa='0'
+   uci set dhcp.@dnsmasq[0].filter_a='0'
+   uci set dhcp.@dnsmasq[0].cachesize='1000'
+
+   uci commit dhcp
+}
+
+r1_4_1_domain_suffix() {
+    # rerun the same code from 1.3.1, needed for 1.4.0->1.4.1
+    r1_3_1_domain_suffix
+}
+
+r1_4_1_wireless_remove_hwmode() {
+    # rerun the same code from 1.3.1, needed for 1.4.0->1.4.1
+    r1_3_1_hwmode
+}
+
+r1_4_1_update_dns() {
+    # rerun the same code from 1.3.0
+    r1_3_0_update_dns
 }
 
 # TODO: needs testing before release, but there will be much more to migrate
@@ -1307,6 +1334,16 @@ migrate() {
     if semverLT "${OLD_VERSION}" "1.3.1"; then
         r1_3_1_domain_suffix
         r1_3_1_hwmode
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.4.0"; then
+       r1_4_0_upstream_dhcp_config
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.4.1"; then
+       r1_4_1_domain_suffix
+       r1_4_1_wireless_remove_hwmode
+       r1_4_1_update_dns
     fi
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
