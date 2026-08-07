@@ -1,18 +1,39 @@
 {
   "falter": {
-    "title": "Falter",
+    "title": "Freifunk",
     "order": 5,
     "action": {
       "type": "view",
       "path": "falter/index2"
-    }
+    },
   },
-  "falter/tpl": {
-    "title": "Falter Template",
-    "order": 5,
+  "falter/settings": {
+    "title": "Settings",
+    "order": 10,
     "action": {
       "type": "template",
       "path": "falter/index"
+    },
+    "auth": {
+      "methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
+      "login": true
     }
-  }
+  },
+  "falter/logout": {
+    "title": "Log out",
+    "order": 999,
+    "action": {
+      "type": "function",
+      "module": "luci.controller.admin.index",
+      "function": "action_logout"
+    },
+    "auth": {
+      "methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
+      "login": true
+    },
+    "depends": {
+      "acl": [ "luci-base" ]
+    },
+    "firstchild_ineligible": true
+  },
 }

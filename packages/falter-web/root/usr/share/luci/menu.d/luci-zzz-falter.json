@@ -1,0 +1,23 @@
+{
+  "admin": {
+    "title": "Expert Mode",
+    "order": 10,
+    "action": {
+      "type": "firstchild",
+      "recurse": true
+    },
+    "auth": {
+      "methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
+      "login": true
+    }
+  },
+  "admin/falter": {
+    "title": "Back to Freifunk",
+    "order": 1099,
+    "action": {
+      "type": "function",
+      "module": "falter.luci",
+      "function": "action_back_to_falter"
+    }
+  }
+}
