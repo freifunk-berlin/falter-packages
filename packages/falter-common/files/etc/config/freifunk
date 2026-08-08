@@ -14,7 +14,7 @@ config 'public' 'community'
 config 'fw_zone' 'zone_freifunk'
 	option 'name' 'freifunk'
 	option 'input' 'REJECT'
-	option 'forward' 'ACCEPT'
+	option 'forward' 'REJECT'
 	option 'output' 'ACCEPT'
 
 config 'fw_rule' 'fficmp'
