@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# As part of firstboot, we don't want to smash an already set up config
+# As part of the install, we don't want to smash an already set up config
 # but at the same time update it if necessary.  The unique attributes are:
 #
 # network.bbbdigger_dev.macaddr
@@ -67,4 +67,8 @@ uci set olsrd.@Interface[-1].ignore=0
 uci set olsrd.@Interface[-1].interface=$IFACE
 uci set olsrd.@Interface[-1].Mode=ether
 
+#uci changes
+
 uci commit
+reload_config
+/etc/init.d/tunneldigger restart
