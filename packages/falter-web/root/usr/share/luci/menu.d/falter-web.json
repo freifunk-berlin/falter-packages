@@ -6,6 +6,7 @@
       "type": "view",
       "path": "falter/index2"
     },
+    "css": "view/falter/falter.css"
   },
   "falter/settings": {
     "title": "Settings",
@@ -17,7 +18,8 @@
     "auth": {
       "methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
       "login": true
-    }
+    },
+    "css": "view/falter/falter.css"
   },
   "falter/logout": {
     "title": "Log out",
