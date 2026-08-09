@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# shellcheck disable=SC1091
+
+. /lib/functions/guard.sh
+
+guard "luci"
+
+# add English to the list of supported languages
+uci set luci.languages.en='English'
+
+uci commit luci
+
