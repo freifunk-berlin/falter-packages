@@ -72,8 +72,9 @@ function alt.cfgvalue(self, section)
   return uci:get_first("system", "system","altitude")
 end
 
-map = f:field(DummyValue,"","")
-map.template = "freifunk/assistent/snippets/map"
+--remove broken map snippet
+--map = f:field(DummyValue,"","")
+--map.template = "freifunk/assistent/snippets/map"
 
 main = f:field(DummyValue, "config", "", "")
 main.forcewrite = true
