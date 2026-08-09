@@ -97,5 +97,7 @@ function index()
 	page.title  = _("Swap Physical Ports")
         page.order  = 41
 
+	entry({"admin", "administration"}, alias("admin", "system", "system"), _("Administration"), 10)
+
 	entry({"admin", "freifunk", "profile_error"}, template("freifunk/profile_error"))
 end
