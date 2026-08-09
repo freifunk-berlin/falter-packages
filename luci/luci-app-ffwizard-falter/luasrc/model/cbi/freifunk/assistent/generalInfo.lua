@@ -3,7 +3,7 @@ local sys = require "luci.sys"
 local fs = require "nixio.fs"
 local tools = require "luci.tools.freifunk.assistent.tools"
 
-f = SimpleForm("ffwizward", "", "")
+local f = SimpleForm("ffwizward", "", "")
 f.submit = translate("Next")
 f.reset = false
 
