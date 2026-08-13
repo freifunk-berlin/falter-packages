@@ -1113,11 +1113,9 @@ r1_3_1_domain_suffix() {
     log "setting the domain suffix to ${suffix}"
 
     # apply to dhcp config
-    uci del_list dhcp.dhcp.dhcp_option="119,olsr"
-    if [ $? -eq 0 ]; then
-      uci add_list dhcp.dhcp.dhcp_option="119,${suffix}"
-    fi
-    uci set dhcp.@dnsmasq[0].domain=".${suffix}"
+    uci delete dhcp.dhcp.dhcp_option
+    uci add_list dhcp.dhcp.dhcp_option="119,${suffix}"
+    uci set dhcp.@dnsmasq[0].domain="${suffix}"
 
     # apply to olsrd config
     olsrd_suffix() {
@@ -1126,7 +1124,7 @@ r1_3_1_domain_suffix() {
       local library=""
       config_get library "$section" library
       if [ "$library" = "olsrd_nameservice" ]; then
-        uci set "$config.$section".suffix=${suffix}
+        uci set "$config.$section".suffix=.${suffix}
       fi
     }
     reset_cb
