@@ -1,8 +1,9 @@
-import { pack, unpack } from 'struct';
+import { unpack } from 'struct';
 import { open } from 'fs';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
-function process_routes(filename, callback) {
+// wanted_attributes is an optional map of BGP attribute IDs to retain.
+function process_routes(filename, callback, wanted_attributes) {
   let fd = open(filename, 'r');
   
   function process_prefix(fd, address_size) {
@@ -42,7 +43,7 @@ function process_routes(filename, callback) {
 
       while (route_attribute_len > 0) {
         // print('--Reading atribute', '\n');
-        let ft = unpack('>cB', fd.read(2)); // [flags, type]
+        let ft = unpack('>BB', fd.read(2)); // [flags, type]
         let attr_flags = ft[0];
         let attr_type = ft[1];
 
@@ -50,8 +51,7 @@ function process_routes(filename, callback) {
         let _field_attr_unpack_str = '>B';
 
         // set len to two bytes if extended attribute length flag (4) is set
-        if (attr_flags & 0x01 << 4) {
-          DBG('Extended attribute length flag set');
+        if (attr_flags & (0x01 << 4)) {
           _field_attr_len = 2;
           _field_attr_unpack_str = '>H';
         }
@@ -59,16 +59,20 @@ function process_routes(filename, callback) {
         let attr_len = unpack(_field_attr_unpack_str, fd.read(_field_attr_len))[0];
         // print("--Processing RtAttr type:", attr_type, ", length: ", attr_len, '\n');
 
-	let attr_data;
+        let attr_data;
+        let wanted = !wanted_attributes || wanted_attributes[attr_type];
         if (attr_len > 0) {
-          let _attributes = fd.read(attr_len);
-          let attr_data_unpack_str = '>*';
-          attr_data = unpack(attr_data_unpack_str, _attributes)[0];
+          if (wanted) {
+            attr_data = fd.read(attr_len);
+          } else {
+            fd.seek(attr_len, 1);
+          }
         }
 
         route_attribute_len -= 2 + _field_attr_len + attr_len;
 
-        __route_info.attributes[attr_type] = attr_data;
+        if (wanted)
+          __route_info.attributes[attr_type] = attr_data;
       }
 
       callback(__route_info);
@@ -95,7 +99,7 @@ function process_routes(filename, callback) {
 
     if (!( type == MRT_ENTRY_TYPE_TABLE_DUMP_V2 && ( subtype == MRT_ENTRY_SUBTYPE_RIB_IPV4 || subtype == MRT_ENTRY_SUBTYPE_RIB_IPV6))) {
       //print("Skipping unsuported record", "\n");
-      fd.read(length);
+      fd.seek(length, 1);
       return;
     }
 
@@ -126,6 +130,7 @@ function process_routes(filename, callback) {
   DBG('Reading MRT file %s', filename);
 
   while (read_header(fd));
+  fd.close();
 }
 
 function get_routes(filename) {

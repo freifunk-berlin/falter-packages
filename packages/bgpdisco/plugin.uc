@@ -69,6 +69,7 @@ export function init(plugin_dir) {
 
   return {
     provide_data: provide_data,
-    handle_data: handle_data
+    handle_data: handle_data,
+    has_data_handlers: length(cb_handlers) > 0
   };
 };
