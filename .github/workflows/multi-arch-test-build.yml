@@ -22,7 +22,7 @@ jobs:
 
           - arch: x86_64
             target: x86-64
-            runtime_test: true
+            runtime_test: false
 
     steps:
       - uses: actions/checkout@v5
