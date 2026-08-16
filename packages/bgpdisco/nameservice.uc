@@ -110,19 +110,32 @@ function get_local_hosts() {
 
 // data = { ip: [hostname1, ..], }
 function write_hostnames(data) {
-  INFO('Writing hostnames to %s', cfg.hosts_file);
-  let time = localtime();
-  let fp = fs.open(cfg.hosts_file, 'w');
+  let contents = '';
   for (ip in data){
     let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
-    fp.write(ip + ' ' + join(' ', hostnames) + '\n');
+    contents += ip + ' ' + join(' ', hostnames) + '\n';
+  }
+  contents += '\n# Written by ffnameservice\n';
+
+  let tmp_file = cfg.hosts_file + '.tmp';
+  if (!fs.writefile(tmp_file, contents)) {
+    ERR('Could not write hostnames to %s', tmp_file);
+    return;
   }
 
-  fp.write('\n' + '# Written by ffnameservice on ');
-  fp.write(join('-', [time.year, time.mon, time.mday]) + ' ');
-  fp.write(join(':', [time.hour, time.min, time.sec]));
-  fp.close();
+  if (fs.readfile(cfg.hosts_file) == fs.readfile(tmp_file)) {
+    fs.unlink(tmp_file);
+    DBG('Hostnames unchanged - keeping %s', cfg.hosts_file);
+    return;
+  }
 
+  if (!fs.rename(tmp_file, cfg.hosts_file)) {
+    ERR('Could not replace %s', cfg.hosts_file);
+    fs.unlink(tmp_file);
+    return;
+  }
+
+  INFO('Writing hostnames to %s', cfg.hosts_file);
 
   if (cfg.cmd_on_update) {
     let res = system(cfg.cmd_on_update);
