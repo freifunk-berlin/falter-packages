@@ -54,6 +54,7 @@ uci set network.${IFACE}_dev.name=$IFACE
 uci set network.$IFACE=interface
 uci set network.$IFACE.proto=dhcp
 uci set network.$IFACE.device=$IFACE
+uci set network.$IFACE.disabled=0
 
 # firewall setup (first remove from the zone and add it back)
 uci -q del_list firewall.zone_freifunk.network=$IFACE
@@ -71,4 +72,4 @@ uci set olsrd.@Interface[-1].Mode=ether
 
 uci commit
 reload_config
-/etc/init.d/tunneldigger restart
+/etc/init.d/tunneldigger restart bbbdigger
