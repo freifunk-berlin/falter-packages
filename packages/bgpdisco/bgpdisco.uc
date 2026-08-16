@@ -67,21 +67,35 @@ function retrieve_data_from_bird() {
 
 
   DBG('parse mrt dump and process routes');
-  let parsed_data = {};
+  let raw_data = [];
+  let skipped_routes = 0;
   mrtdump.process_routes(cfg.bird_mrt_file, function(route) {
     if (!('250' in route.attributes)) {
-      DBG('skip route due to missing magic attribute: %s', route);
+      skipped_routes++;
       return;
     }
     let ip = split(route.prefix, '/')[0];
-    for (let darr in json(route.attributes['250'])) {
+    push(raw_data, ip, route.attributes['250']);
+  }, { '250': true });
+  if (skipped_routes > 0)
+    DBG('Skipped %d routes without the magic attribute', skipped_routes);
+
+  let data_hash = digest.md5(sprintf('%s', raw_data));
+  if (data_hash == cache_hash)
+    return null;
+
+  cache_hash = data_hash;
+  let parsed_data = {};
+  for (let i = 0; i < length(raw_data); i += 2) {
+    let ip = raw_data[i];
+    for (let darr in json(raw_data[i + 1])) {
       let id = shift(darr);
       parsed_data[id] ??= {};
       if (ip in parsed_data[id])
-        DBG('route is already parsed, do we have stale routes in the network?: %s', route);
+        DBG('route is already parsed, do we have stale routes in the network?: %s', ip);
       parsed_data[id][ip] = darr;
     }
-  });
+  }
   return parsed_data;
 }
 
@@ -111,15 +125,12 @@ function sync_peers() {
 function cb_refresh_remote_data() {
   DBG('cb_refresh_remote_data()');
   let data = retrieve_data_from_bird();
-  let data_hash = digest.md5(sprintf('%s', data));
-
-  if (data_hash == cache_hash) {
+  if (data == null) {
     DBG('Data hash unchanged - skip handler plugins');
     return;
   }
 
   DBG('Data hash changed - triggering handler plugins');
-  cache_hash = data_hash;
   plugins.handle_data(data);
 }
 
@@ -214,7 +225,10 @@ bird = birdctl.init(cfg.bird_control_socket);
 plugins = plugin.init(cfg.general_plugin_directory);
 
 // setup refresh data timer with initial timer of 5s, to let the peers get syncronized before
-timer_refresh_remote_data = uloop.timer(5000, trigger_refresh_remote_data);
+if (plugins.has_data_handlers)
+  timer_refresh_remote_data = uloop.timer(5000, trigger_refresh_remote_data);
+else
+  INFO('No data handlers registered - disabling remote data polling');
 
 monitor_interfaces = bird.get_babel_interfaces();
 INFO('Monitoring following interfaces: %s', monitor_interfaces);

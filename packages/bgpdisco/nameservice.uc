@@ -64,12 +64,13 @@ function get_local_hosts() {
   for (let ip,dev in ips) {
     result[ip] ??= [];
     let name = replace(dev, '.', '_') + '.' + hostname;
+    let v4 = is_v4(ip);
 
     // Strip device from loopback interface first IP
     if (dev == 'lo') {
-      if (!lo_v4 && is_v4(ip))
+      if (!lo_v4 && v4)
         lo_v4 = ip;
-      if (!lo_v6 && !is_v4(ip))
+      if (!lo_v6 && !v4)
         lo_v6 = ip;
     }
 
@@ -83,11 +84,11 @@ function get_local_hosts() {
       DBG('Excluding interface....');
       continue;
     }
-    if (!first_v4 && is_v4(ip)) {
+    if (!first_v4 && v4) {
       first_v4 = ip;
       DBG('Setting first IPv4: %s, Dev: %s', ip, dev);
     }
-    if (!first_v6 && !is_v4(ip)) {
+    if (!first_v6 && !v4) {
       first_v6 = ip;
       DBG('Setting first IPv6: %s, Dev: %s', ip, dev);
     }
@@ -110,22 +111,21 @@ function get_local_hosts() {
 
 // data = { ip: [hostname1, ..], }
 function write_hostnames(data) {
-  let contents = '';
+  let lines = [];
   for (ip in data){
     let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
-    contents += ip + ' ' + join(' ', hostnames) + '\n';
+    push(lines, ip + ' ' + join(' ', hostnames));
   }
-  contents += '\n# Written by ffnameservice\n';
+  let contents = join('\n', lines) + '\n\n# Written by ffnameservice\n';
+
+  if (fs.readfile(cfg.hosts_file) == contents) {
+    DBG('Hostnames unchanged - keeping %s', cfg.hosts_file);
+    return;
+  }
 
   let tmp_file = cfg.hosts_file + '.tmp';
   if (!fs.writefile(tmp_file, contents)) {
     ERR('Could not write hostnames to %s', tmp_file);
-    return;
-  }
-
-  if (fs.readfile(cfg.hosts_file) == fs.readfile(tmp_file)) {
-    fs.unlink(tmp_file);
-    DBG('Hostnames unchanged - keeping %s', cfg.hosts_file);
     return;
   }
 
