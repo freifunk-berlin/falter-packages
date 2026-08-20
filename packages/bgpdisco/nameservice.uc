@@ -1,6 +1,7 @@
 import * as rtnl from 'rtnl';
 import * as fs from 'fs';
 import * as uci from 'uci';
+import * as digest from 'digest';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
 const PLUGIN_UID = 0;
@@ -13,6 +14,8 @@ let cfg = {
 };
 
 let static_entries = [];
+
+let cache_hash = '';
 
 let _local_ips_cache = null;
 
@@ -117,8 +120,9 @@ function write_hostnames(data) {
     push(lines, ip + ' ' + join(' ', hostnames));
   }
   let contents = join('\n', lines) + '\n\n# Written by ffnameservice\n';
+  let data_hash = digest.md5(contents);
 
-  if (fs.readfile(cfg.hosts_file) == contents) {
+  if (data_hash == cache_hash) {
     DBG('Hostnames unchanged - keeping %s', cfg.hosts_file);
     return;
   }
@@ -135,6 +139,7 @@ function write_hostnames(data) {
     return;
   }
 
+  cache_hash = data_hash;
   INFO('Writing hostnames to %s', cfg.hosts_file);
 
   if (cfg.cmd_on_update) {
@@ -180,9 +185,17 @@ function uci_config() {
   ctx.foreach('bgpdisco_nameservice', null, handle_section);
 }
 
+function init_cache_hash() {
+  let existing = fs.readfile(cfg.hosts_file);
+  if (existing == null)
+    return;
+  cache_hash = digest.md5(existing);
+}
+
 return {
   init: function (plug) {
     uci_config();
+    init_cache_hash();
     plug.register(plug.TYPE.DATA_PROVIDER, PLUGIN_UID, get_local_hosts);
     plug.register(plug.TYPE.DATA_HANDLER, PLUGIN_UID, write_hostnames);
     rtnl.listener(function(ev) {
