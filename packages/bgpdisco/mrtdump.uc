@@ -1,11 +1,15 @@
 import { unpack } from 'struct';
-import { open } from 'fs';
+import { open, error as fs_error } from 'fs';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
 // wanted_attributes is an optional map of BGP attribute IDs to retain.
 function process_routes(filename, callback, wanted_attributes) {
   let fd = open(filename, 'r');
-  
+  if (!fd) {
+    WARN('Could not open MRT dump %s: %s', filename, fs_error());
+    return;
+  }
+
   function process_prefix(fd, address_size) {
     // Seqno, Prefix Length
     const RIB_ENTRY_SEQPFXL_FMT = '>IB';
