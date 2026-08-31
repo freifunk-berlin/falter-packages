@@ -115,9 +115,10 @@ function get_local_hosts() {
 // data = { ip: [hostname1, ..], }
 function write_hostnames(data) {
   let lines = [];
-  for (ip in data){
-    let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
-    push(lines, ip + ' ' + join(' ', hostnames));
+  for (ip in data) {
+    for (hostname in data[ip]) {
+      push(lines, sprintf('%s %s.%s', ip, hostname, cfg.domain));
+    }
   }
   let contents = join('\n', lines) + '\n\n# Written by ffnameservice\n';
   let data_hash = digest.md5(contents);
