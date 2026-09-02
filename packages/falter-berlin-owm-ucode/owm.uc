@@ -127,11 +127,16 @@ function send_to_server(json_str, hostname) {
 		return false;
 	};
 	
-	for (let type in [['AAAA'], ['A']]) {
-		let result = resolv.query(server, { type });
+	for (let record_type in ['AAAA', 'A']) {
+		let result = resolv.query(server, { type: [record_type] });
 		for (let d in result) {
-			let ips = type[0] === 'AAAA' ? (result[d]?.AAAA || []) : (result[d]?.A || []);
-			for (let ip in ips) if (try_ip(ip)) return true;
+			let ips = result[d]?.[record_type];
+			if (!ips) continue;
+
+			for (let ip in ips) {
+				let formatted_ip = (record_type === 'AAAA') ? `[${ip}]` : ip;
+				if (try_ip(formatted_ip)) return true;
+			}
 		}
 	}
 	
