@@ -225,10 +225,11 @@ function build_json_data() {
 		(board.release.distribution + ' ' + board.release.version);
 	let firmware_rev = ff_release.revision || board.release.revision;
 	
+	let model = match(board.model, /\w/) ? board.model : "generic";
 	let json_data = {
 		freifunk: { contact: {}, community: {} },
 		type: 'node', script: 'owm', api_rev: 1,
-		system: { sysinfo: ['system is deprecated', board.model], uptime: [info.uptime], loadavg: [info.load[1] * 1.0 / 65536] },
+		system: { sysinfo: ['system is deprecated', model], uptime: [info.uptime], loadavg: [info.load[1] * 1.0 / 65536] },
 		olsr: { ipv4Config: {} },
 		links: all_links,
 		latitude: latitude * 1, longitude: longitude * 1,
