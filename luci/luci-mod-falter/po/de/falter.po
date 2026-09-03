@@ -44,7 +44,7 @@ msgstr "Ad-Hoc"
 msgid "Ad-Hoc (outdated)"
 msgstr "Ad-Hoc (veraltet)"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:113
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:92
 msgid "BBB-VPN (bbbdigger)"
 msgstr "BBB-VPN (bbbdigger)"
 
@@ -61,7 +61,7 @@ msgstr "BSSID"
 msgid "Bad (ETX > 10)"
 msgstr "Schlecht (ETX > 10)"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:108
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:87
 msgid "Bandwidth"
 msgstr "Bandbreite"
 
@@ -70,7 +70,7 @@ msgstr "Bandbreite"
 msgid "Bandwidth Settings"
 msgstr "Bandbreiteneinstellungen"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:78
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:57
 msgid "Basic Settings"
 msgstr "Grundeinstellungen"
 
@@ -116,8 +116,8 @@ msgstr "Community-Einstellungen"
 msgid "Conntecting to the BBB-VPN"
 msgstr "Mit BBB-VPN verbinden"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:34
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:93
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:32
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:72
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:5
 #: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:29
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:23
@@ -181,10 +181,9 @@ msgstr "Fehler"
 msgid "Find your coordinates with OpenStreetMap"
 msgstr "Koordinaten mit OpenStreetMap finden"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:18
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:68
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:69
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:73
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:16
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:52
 msgid "Freifunk"
 msgstr "Freifunk"
 
@@ -249,7 +248,7 @@ msgstr ""
 "Wenn du an unserem Projekt interessiert bist, wende dich an deine lokale "
 "Community"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:98
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:77
 msgid "Index Page"
 msgstr "Hauptseite"
 
@@ -298,10 +297,6 @@ msgstr "Standort"
 msgid "Longitude"
 msgstr "Längengrad"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:121
-msgid "Map"
-msgstr "Karte"
-
 #: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:24
 msgid "Map Error"
 msgstr "Kartenfehler"
@@ -349,10 +344,6 @@ msgstr "Keine Default-Routen bekannt."
 msgid "Notice"
 msgstr "Beachte"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:51
-msgid "OLSR"
-msgstr "OLSR"
-
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:26
 msgid "Operator"
 msgstr "Betreiber"
@@ -361,7 +352,7 @@ msgstr "Betreiber"
 msgid "Orange"
 msgstr "Orange"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:28
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:26
 msgid "Overview"
 msgstr "Übersicht"
 
@@ -386,11 +377,11 @@ msgstr "Bitte trage deine Kontaktdaten ein"
 msgid "Power"
 msgstr "Strom"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:83
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:62
 msgid "Profile"
 msgstr "Profil"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:88
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:67
 msgid "Profile (Expert)"
 msgstr "Profil (Experte)"
 
@@ -470,15 +461,11 @@ msgstr ""
 "Netzwerks sein werden und Internetzugang für Freifunk bieten.</ul><br><br> "
 "Derzeit WAN:"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:44
 msgid "Splash"
 msgstr "Splash"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:64
-msgid "Statistics"
-msgstr "Statistiken"
-
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:39
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:37
 msgid "Status"
 msgstr "Status"
 
@@ -486,7 +473,7 @@ msgstr "Status"
 msgid "Still usable (4 < ETX < 10)"
 msgstr "Noch gebrauchbar (4 < ETX < 10)"
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:118
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:97
 msgid "Swap Physical Ports"
 msgstr "Physische Ports vertauschen"
 
@@ -654,7 +641,7 @@ msgstr ""
 "Wir sind eine Initiative, die ein freies, unabhängiges und offenes "
 "drahtloses Mesh-Netzwerk aufbaut."
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:103
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:82
 msgid "Wireless Mesh"
 msgstr "WLAN-Mesh"
 
@@ -674,11 +661,21 @@ msgstr "WLAN-Mesh-Einstellungen"
 msgid "Yellow"
 msgstr "Gelb"
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:14
+msgid ""
+"You can add extra contact information inserting valid XHTML in this text "
+"field.<br />Headlines should be enclosed between &lt;h2&gt; and &lt;/h2&gt;."
+msgstr ""
+"Du kannst zusätzliche Kontaktinformation hinzufügen indem du gültiges XHTML"
+"in dieses Texfeld eingeben.<br />Überschriften sollten "
+"von &lt;h2&gt; und &lt;/h2&gt; umschlossen werden."
+
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:4
 msgid ""
 "You can display additional content on the public index page by inserting "
-"valid XHTML in the form below.<br />Headlines should be enclosed between &lt;"
-"h2&gt; and &lt;/h2&gt;."
+"valid XHTML in the form below.<br />Headlines should be enclosed between "
+"&lt;h2&gt; and &lt;/h2&gt;."
 msgstr ""
 "Du kannst zusätzliche Information auf der öffentlichen Hauptseite anzeigen, "
 "indem du gültiges XHTML in das Formular einfügst.<br />Überschriften sollten "
@@ -734,6 +731,15 @@ msgstr "benutzt"
 #: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:39
 msgid "wireless settings"
 msgstr "WLAN-Einstellungen"
+
+#~ msgid "Map"
+#~ msgstr "Karte"
+
+#~ msgid "OLSR"
+#~ msgstr "OLSR"
+
+#~ msgid "Statistics"
+#~ msgstr "Statistiken"
 
 #~ msgid ""
 #~ "These are the basic settings for your local wireless community. These "
