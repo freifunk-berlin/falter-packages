@@ -1,6 +1,6 @@
 config 'community' 'profile'
 	option 'name' 'Freifunk Cottbus'
-	option 'homepage' 'https://cottbus.freifunk.net'
+	option 'homepage' 'https://freifunk-cottbus.net'
 	option 'ssid' 'cottbus.freifunk.net'
 	option 'ssid_scheme' 'ssidonly'
 	option 'mesh_network' '10.35.0.0/16'
