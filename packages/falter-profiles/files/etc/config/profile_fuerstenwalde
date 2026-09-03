@@ -1,6 +1,6 @@
 config 'community' 'profile'
 	option 'name' 'Freifunk Fürstenwalde'
-	option 'homepage' 'http://fuerstenwalde.freifunk.net'
+	option 'homepage' 'https://fuerstenwalde.freifunk.net'
 	option 'ssid' 'fuerstenwalde.freifunk.net'
 	option 'ssid_scheme' 'addchannelbefore'
 	option 'mesh_network' '10.0.0.0/8'

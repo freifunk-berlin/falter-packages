@@ -1,6 +1,6 @@
 config 'community' 'profile'
 	option 'name' 'Freifunk'
-	option 'homepage' 'http://freifunk.net'
+	option 'homepage' 'https://freifunk.net'
 	option 'ssid' 'www.freifunk.net'
 	option 'splash_network' '10.104.0.0/16'
 	option 'latitude' '52.000'

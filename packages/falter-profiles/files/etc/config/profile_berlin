@@ -1,6 +1,6 @@
 config 'community' 'profile'
 	option 'name' 'Freifunk Berlin'
-	option 'homepage' 'http://berlin.freifunk.net'
+	option 'homepage' 'https://berlin.freifunk.net'
 	option 'ssid' 'berlin.freifunk.net'
 	option 'ssid_scheme' 'addchannelbefore'
 	option 'mesh_network' '10.0.0.0/8'
