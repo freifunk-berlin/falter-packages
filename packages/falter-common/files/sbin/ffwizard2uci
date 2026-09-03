@@ -56,8 +56,21 @@ while json_is_a ${idx} object; do
     if [ -n "$name" ]; then uci_set freifunk contact name "$name"; fi
     if [ -n "$mail" ]; then uci_set freifunk contact mail "$mail"; fi
     if [ -n "$phone" ]; then uci_set freifunk contact phone "$phone"; fi
-    if [ -n "$homepage" ]; then uci_set freifunk contact homepage "$homepage"; fi
     if [ -n "$url" ]; then uci_set freifunk contact mail "$url"; fi
+
+    # handle homepage list
+    json_select "homepage"
+    uci_remove freifunk contact homepage
+    hpidx=1
+    item=""
+    while json_is_a $hpidx string; do
+        json_get_var item $hpidx
+        uci_add_list freifunk contact homepage "$item"
+        hpidx=$((hpidx + 1))
+    done
+    # leave homepage array
+    json_select ..
+
     json_select ..
     idx=$((idx + 1))
 done
