@@ -11,6 +11,6 @@ c:option(Value, "name", translate("Realname"))
 c:option(DynamicList, "homepage", translate("Homepage"))
 c:option(Value, "mail", translate("E-Mail"))
 c:option(Value, "phone", translate("Phone"))
-c:option(TextValue, "note", translate("Notice")).rows = 10
+c:option(TextValue, "note", translate("Notice"), translate("You can add extra contact information inserting valid XHTML in this text field.<br />Headlines should be enclosed between &lt;h2&gt; and &lt;/h2&gt;.")).rows = 10
 
 return m
