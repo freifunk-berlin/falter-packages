@@ -1208,6 +1208,32 @@ r1_5_0_remove_unused_stuff() {
     guard_delete olsrd6
 }
 
+r1_5_1_fix_wifi_channel() {
+    # in the special 1.5.0 release, the channel number assigned to the 
+    # 5Ghz radio is wrong.
+    handle_radio() {
+        local section=${1}
+        band=$(uci get "wireless.$section.band")
+        channel=$(uci get "wireless.$section.channel")
+        if [ "$band" = "5g" ]; then
+            if [ "$channel" -lt 36 ]; then
+                community=$(uci get freifunk.community.name)
+                channel=$(uci get profile_${community}.wifi_device_5.channel)
+                if [ $? -eq 1 ]: then
+                    channel=$(uci get freifunk.wifi_device_5.channel)
+                fi
+                log "fixing wrong 5ghz channel assignment"
+                uci set "wireless.${section}.channel=${channel}"
+            fi
+        fi
+    }
+
+    reset_cb
+    config_load wireless
+    config_foreach handle_radio wifi-device
+    uci commit wireless
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1359,6 +1385,10 @@ migrate() {
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
         r1_5_0_remove_unused_stuff
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.5.1"; then
+        r1_5_1_fix_wifi_channel
     fi
 
     # overwrite version with the new version
