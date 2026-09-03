@@ -99,10 +99,23 @@ migrate_profiles() {
     IFS=$'\n'
     for i in $CONTACT $COMMUNITY; do
         key=$(echo "$i" | cut -d = -f 1)
-        val=$(echo "$i" | cut -d = -f 2)
-        val=$(echo "$val" | sed s/\'//g)
-        if [ "$val" != "defaults" ]; then
-            uci set "$key=${val}"
+        # check for the special case for freifunk.contact.homepage, a list
+        if [ "freifunk.contact.homepage" = "$key" ]; then
+            uci -q delete "$key"
+            vallist=$(echo "$i" | cut -d = -f 2 | cut -d "\'\ \'" -f 1-)
+            TEMPIFS=$IFS
+            IFS=$OLDIFS
+            for j in $vallist; do
+                val=$(echo "$j" | sed s/\'//g)
+                uci add_list "$key=${val}"
+            done
+            IFS=$TEMPIFS
+        else
+            val=$(echo "$i" | cut -d = -f 2)
+            val=$(echo "$val" | sed s/\'//g)
+            if [ "$val" != "defaults" ]; then
+                uci set "$key=${val}"
+            fi
         fi
     done
     IFS=$OLDIFS
