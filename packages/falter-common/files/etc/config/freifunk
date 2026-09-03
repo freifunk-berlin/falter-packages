@@ -9,7 +9,7 @@ config 'public' 'contact'
 
 config 'public' 'community'
 	option 'name' 'Freifunk'
-	option 'homepage' 'http://freifunk.net'
+	option 'homepage' 'https://freifunk.net'
 
 config 'fw_zone' 'zone_freifunk'
 	option 'name' 'freifunk'
