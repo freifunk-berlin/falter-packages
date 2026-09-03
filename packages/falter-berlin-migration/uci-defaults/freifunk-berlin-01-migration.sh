@@ -1143,13 +1143,16 @@ r1_3_1_domain_suffix() {
     config_load olsrd
     config_foreach olsrd_suffix LoadPlugin olsrd
 
-    reset_cb
-    config_load olsrd6
-    config_foreach olsrd_suffix LoadPlugin olsrd6
+    uci -q get olsrd6.@LoadPlugin[0].library
+    if [ $? -eq 0 ]; then
+        reset_cb
+        config_load olsrd6
+        config_foreach olsrd_suffix LoadPlugin olsrd6
+        uci commit olsrd6
+    fi
 
     uci commit dhcp
     uci commit olsrd
-    uci commit olsrd6
 }
 
 r1_3_1_hwmode() {
@@ -1208,7 +1211,7 @@ r1_5_0_remove_unused_stuff() {
     guard_delete olsrd6
 }
 
-r1_5_1_fix_wifi_channel() {
+r1_5_1_fix_wifi() {
     # in the special 1.5.0 release, the channel number assigned to the 
     # 5Ghz radio is wrong.
     handle_radio() {
@@ -1219,7 +1222,7 @@ r1_5_1_fix_wifi_channel() {
             if [ "$channel" -lt 36 ]; then
                 community=$(uci get freifunk.community.name)
                 channel=$(uci get profile_${community}.wifi_device_5.channel)
-                if [ $? -eq 1 ]: then
+                if [ $? -eq 1 ]; then
                     channel=$(uci get freifunk.wifi_device_5.channel)
                 fi
                 log "fixing wrong 5ghz channel assignment"
@@ -1231,7 +1234,59 @@ r1_5_1_fix_wifi_channel() {
     reset_cb
     config_load wireless
     config_foreach handle_radio wifi-device
+
+    handle_iface() {
+        local section=${1}
+        radio=$(uci get "wireless.$section.device")
+        band=$(uci get "wireless.$radio.band")
+        if [ "$band" = "5g" ]; then
+            ifname=$(uci get "wireless.$section.ifname")
+            ifname="${ifname::-1}5"
+            log "fixing wrong 5ghz interface name to ${ifname}"
+            uci set "wireless.${section}.ifname=${ifname}"
+            uci -q rename "wireless.${section}=${ifname}"
+        fi
+    }
+
+    reset_cb
+    config_load wireless
+    config_foreach handle_iface wifi-iface
+
+    r1_4_1_wireless_remove_hwmode
+
     uci commit wireless
+}
+
+r1_5_1_domain_suffix() {
+    # the 1.5.0 firmware needs this.
+    r1_4_1_domain_suffix
+}
+
+r1_5_1_update_dns() {
+    r1_4_1_update_dns
+}
+
+r1_5_1_autoupdate_config() {
+    uci -q get autoupdate.cfg.fw_server_fqdn # old style
+    if [ $? = 0 ]; then
+        r1_3_0_autoupdate_url
+    fi
+}
+
+r1_5_1_bbbdigger() {
+    uci -q get network.bbbdigger.proto
+    if [ $? -eq 0 ]; then
+        uci -q get network.bbbdigger.disabled
+        if [ $? -eq 1 ]; then
+            uci -q set network.bbbdigger.disabled=0
+            uci commit network
+        fi
+    fi
+}
+
+r1_5_1_logsize() {
+    uci -q set system.@system[0].log_size=128
+    uci commit system
 }
 
 migrate() {
@@ -1388,7 +1443,12 @@ migrate() {
     fi
 
     if semverLT "${OLD_VERSION}" "1.5.1"; then
-        r1_5_1_fix_wifi_channel
+        r1_5_1_fix_wifi
+        r1_5_1_domain_suffix
+        r1_5_1_update_dns
+        r1_5_1_autoupdate_config
+        r1_5_1_bbbdigger
+        r1_5_1_logsize
     fi
 
     # overwrite version with the new version
