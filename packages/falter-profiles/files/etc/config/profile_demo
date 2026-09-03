@@ -1,6 +1,6 @@
 config 'community' 'profile'
 	option 'name' 'Freifunk Demo'
-	option 'homepage' 'https://www.freifunk.net'
+	option 'homepage' 'https://freifunk.net'
 	option 'ssid' 'demo.freifunk.net'
 	option 'mesh_network' '10.11.12.0/24'
 	option 'latitude' '51.163375'
