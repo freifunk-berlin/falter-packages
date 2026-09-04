@@ -99,10 +99,23 @@ migrate_profiles() {
     IFS=$'\n'
     for i in $CONTACT $COMMUNITY; do
         key=$(echo "$i" | cut -d = -f 1)
-        val=$(echo "$i" | cut -d = -f 2)
-        val=$(echo "$val" | sed s/\'//g)
-        if [ "$val" != "defaults" ]; then
-            uci set "$key=${val}"
+        # check for the special case for freifunk.contact.homepage, a list
+        if [ "freifunk.contact.homepage" = "$key" ]; then
+            uci -q delete "$key"
+            vallist=$(echo "$i" | cut -d = -f 2 | cut -d "\'\ \'" -f 1-)
+            TEMPIFS=$IFS
+            IFS=$OLDIFS
+            for j in $vallist; do
+                val=$(echo "$j" | sed s/\'//g)
+                uci add_list "$key=${val}"
+            done
+            IFS=$TEMPIFS
+        else
+            val=$(echo "$i" | cut -d = -f 2)
+            val=$(echo "$val" | sed s/\'//g)
+            if [ "$val" != "defaults" ]; then
+                uci set "$key=${val}"
+            fi
         fi
     done
     IFS=$OLDIFS
@@ -1130,13 +1143,16 @@ r1_3_1_domain_suffix() {
     config_load olsrd
     config_foreach olsrd_suffix LoadPlugin olsrd
 
-    reset_cb
-    config_load olsrd6
-    config_foreach olsrd_suffix LoadPlugin olsrd6
+    uci -q get olsrd6.@LoadPlugin[0].library
+    if [ $? -eq 0 ]; then
+        reset_cb
+        config_load olsrd6
+        config_foreach olsrd_suffix LoadPlugin olsrd6
+        uci commit olsrd6
+    fi
 
     uci commit dhcp
     uci commit olsrd
-    uci commit olsrd6
 }
 
 r1_3_1_hwmode() {
@@ -1193,6 +1209,84 @@ r1_5_0_remove_unused_stuff() {
     [ -f /etc/init.d/olsrd6 ] && /etc/init.d/olsrd6 disable || true
     rm -f /etc/config/olsrd6
     guard_delete olsrd6
+}
+
+r1_5_1_fix_wifi() {
+    # in the special 1.5.0 release, the channel number assigned to the 
+    # 5Ghz radio is wrong.
+    handle_radio() {
+        local section=${1}
+        band=$(uci get "wireless.$section.band")
+        channel=$(uci get "wireless.$section.channel")
+        if [ "$band" = "5g" ]; then
+            if [ "$channel" -lt 36 ]; then
+                community=$(uci get freifunk.community.name)
+                channel=$(uci get profile_${community}.wifi_device_5.channel)
+                if [ $? -eq 1 ]; then
+                    channel=$(uci get freifunk.wifi_device_5.channel)
+                fi
+                log "fixing wrong 5ghz channel assignment"
+                uci set "wireless.${section}.channel=${channel}"
+            fi
+        fi
+    }
+
+    reset_cb
+    config_load wireless
+    config_foreach handle_radio wifi-device
+
+    handle_iface() {
+        local section=${1}
+        radio=$(uci get "wireless.$section.device")
+        band=$(uci get "wireless.$radio.band")
+        if [ "$band" = "5g" ]; then
+            ifname=$(uci get "wireless.$section.ifname")
+            ifname="${ifname::-1}5"
+            log "fixing wrong 5ghz interface name to ${ifname}"
+            uci set "wireless.${section}.ifname=${ifname}"
+            uci -q rename "wireless.${section}=${ifname}"
+        fi
+    }
+
+    reset_cb
+    config_load wireless
+    config_foreach handle_iface wifi-iface
+
+    r1_4_1_wireless_remove_hwmode
+
+    uci commit wireless
+}
+
+r1_5_1_domain_suffix() {
+    # the 1.5.0 firmware needs this.
+    r1_4_1_domain_suffix
+}
+
+r1_5_1_update_dns() {
+    r1_4_1_update_dns
+}
+
+r1_5_1_autoupdate_config() {
+    uci -q get autoupdate.cfg.fw_server_fqdn # old style
+    if [ $? = 0 ]; then
+        r1_3_0_autoupdate_url
+    fi
+}
+
+r1_5_1_bbbdigger() {
+    uci -q get network.bbbdigger.proto
+    if [ $? -eq 0 ]; then
+        uci -q get network.bbbdigger.disabled
+        if [ $? -eq 1 ]; then
+            uci -q set network.bbbdigger.disabled=0
+            uci commit network
+        fi
+    fi
+}
+
+r1_5_1_logsize() {
+    uci -q set system.@system[0].log_size=128
+    uci commit system
 }
 
 migrate() {
@@ -1346,6 +1440,15 @@ migrate() {
 
     if semverLT "${OLD_VERSION}" "1.5.0"; then
         r1_5_0_remove_unused_stuff
+    fi
+
+    if semverLT "${OLD_VERSION}" "1.5.1"; then
+        r1_5_1_fix_wifi
+        r1_5_1_domain_suffix
+        r1_5_1_update_dns
+        r1_5_1_autoupdate_config
+        r1_5_1_bbbdigger
+        r1_5_1_logsize
     fi
 
     # overwrite version with the new version
