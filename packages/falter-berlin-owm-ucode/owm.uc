@@ -126,17 +126,20 @@ function send_to_server(json_str, hostname) {
 		log('debug', 'OWM upload to ' + ip + ' failed');
 		return false;
 	};
-	
-	for (let type in [['AAAA'], ['A']]) {
-		let result = resolv.query(server, { type });
+
+	for (let record_type in ['AAAA', 'A']) {
+		let result = resolv.query(server, { type: [record_type] });
 		for (let d in result) {
-			let url_formatted_ips = [];
-			for (let ipv6 in result[d]?.AAAA) push(url_formatted_ips, "[" + ipv6 + "]");
-			for (let ipv4 in result[d]?.A) push(url_formatted_ips, ipv4);
-			for (let ip in url_formatted_ips) if (try_ip(ip)) return true;
+			let ips = result[d]?.[record_type];
+			if (!ips) continue;
+
+			for (let ip in ips) {
+				let formatted_ip = (record_type === 'AAAA') ? `[${ip}]` : ip;
+				if (try_ip(formatted_ip)) return true;
+			}
 		}
 	}
-	
+
 	log('err', 'OWM update failed: could not connect to server');
 	return false;
 }
