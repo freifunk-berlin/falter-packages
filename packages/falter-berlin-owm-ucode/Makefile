@@ -23,10 +23,7 @@ endef
 define Package/falter-berlin-owm-ucode
 	$(call Package/falter-berlin-owm-ucode/default)
 	TITLE:=Freifunk Berlin owm.ucode
-  EXTRA_DEPENDS:= \
-    ucode (>=0), ucode-mod-fs (>=0), ucode-mod-ubus (>=0), \
-    ucode-mod-uci (>=0), ucode-mod-resolv (>=0), ucode-mod-uloop (>=0), \
-    uclient-fetch (>=0)
+  DEPENDS:=+ucode +ucode-mod-fs +ucode-mod-ubus +ucode-mod-uci +ucode-mod-resolv +ucode-mod-uloop +uclient-fetch
 endef
 
 define Package/falter-berlin-owm-ucode/description
