@@ -32,7 +32,7 @@ msgstr ""
 msgid "Ad-Hoc (outdated)"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:113
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:92
 msgid "BBB-VPN (bbbdigger)"
 msgstr ""
 
@@ -49,7 +49,7 @@ msgstr ""
 msgid "Bad (ETX > 10)"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:108
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:87
 msgid "Bandwidth"
 msgstr ""
 
@@ -58,7 +58,7 @@ msgstr ""
 msgid "Bandwidth Settings"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:78
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:57
 msgid "Basic Settings"
 msgstr ""
 
@@ -104,8 +104,8 @@ msgstr ""
 msgid "Conntecting to the BBB-VPN"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:34
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:93
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:32
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:72
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:5
 #: luci/luci-mod-falter/luasrc/view/freifunk/adminindex.htm:29
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:23
@@ -169,10 +169,9 @@ msgstr ""
 msgid "Find your coordinates with OpenStreetMap"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:18
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:68
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:69
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:73
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:16
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:52
 msgid "Freifunk"
 msgstr ""
 
@@ -234,7 +233,7 @@ msgstr ""
 msgid "If you are interested in our project then contact the local community"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:98
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:77
 msgid "Index Page"
 msgstr ""
 
@@ -279,10 +278,6 @@ msgstr ""
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/basics.lua:43
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/profile.lua:71
 msgid "Longitude"
-msgstr ""
-
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:121
-msgid "Map"
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/view/freifunk-map/frame.htm:24
@@ -332,10 +327,6 @@ msgstr ""
 msgid "Notice"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:51
-msgid "OLSR"
-msgstr ""
-
 #: luci/luci-mod-falter/luasrc/view/freifunk/contact.htm:26
 msgid "Operator"
 msgstr ""
@@ -344,7 +335,7 @@ msgstr ""
 msgid "Orange"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:28
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:26
 msgid "Overview"
 msgstr ""
 
@@ -369,11 +360,11 @@ msgstr ""
 msgid "Power"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:83
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:62
 msgid "Profile"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:88
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:67
 msgid "Profile (Expert)"
 msgstr ""
 
@@ -433,15 +424,11 @@ msgid ""
 "ports are:"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:48
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:44
 msgid "Splash"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:64
-msgid "Statistics"
-msgstr ""
-
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:39
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:37
 msgid "Status"
 msgstr ""
 
@@ -449,7 +436,7 @@ msgstr ""
 msgid "Still usable (4 < ETX < 10)"
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:118
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:97
 msgid "Swap Physical Ports"
 msgstr ""
 
@@ -576,7 +563,7 @@ msgid ""
 "network."
 msgstr ""
 
-#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:103
+#: luci/luci-mod-falter/luasrc/controller/freifunk/freifunk.lua:82
 msgid "Wireless Mesh"
 msgstr ""
 
@@ -596,11 +583,17 @@ msgstr ""
 msgid "Yellow"
 msgstr ""
 
+#: luci/luci-mod-falter/luasrc/model/cbi/freifunk/contact.lua:14
+msgid ""
+"You can add extra contact information inserting valid XHTML in this text "
+"field.<br />Headlines should be enclosed between &lt;h2&gt; and &lt;/h2&gt;."
+msgstr ""
+
 #: luci/luci-mod-falter/luasrc/model/cbi/freifunk/user_index.lua:4
 msgid ""
 "You can display additional content on the public index page by inserting "
-"valid XHTML in the form below.<br />Headlines should be enclosed between &lt;"
-"h2&gt; and &lt;/h2&gt;."
+"valid XHTML in the form below.<br />Headlines should be enclosed between "
+"&lt;h2&gt; and &lt;/h2&gt;."
 msgstr ""
 
 #: luci/luci-mod-falter/luasrc/view/freifunk/index.htm:72
