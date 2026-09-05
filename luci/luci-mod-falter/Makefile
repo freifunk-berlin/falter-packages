@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=Freifunk Public and Admin LuCI UI
 LUCI_EXTRA_DEPENDS:=luci-mod-admin-full (>=0), luci-lib-json (>=0), falter-profiles (>=0), luci-lib-ipkg (>=0), luci-compat (>=0)
-PKG_RELEASE:=9
+PKG_RELEASE:=10
 
 include ../include-luci.mk
 
