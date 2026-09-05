@@ -130,10 +130,8 @@ function send_to_server(json_str, hostname) {
 	for (let type in [['AAAA'], ['A']]) {
 		let result = resolv.query(server, { type });
 		for (let d in result) {
-			let url_formatted_ips = [];
-			for (let ipv6 in result[d]?.AAAA) push(url_formatted_ips, "[" + ipv6 + "]");
-			for (let ipv4 in result[d]?.A) push(url_formatted_ips, ipv4);
-			for (let ip in url_formatted_ips) if (try_ip(ip)) return true;
+			let ips = type[0] === 'AAAA' ? (result[d]?.AAAA || []) : (result[d]?.A || []);
+			for (let ip in ips) if (try_ip(ip)) return true;
 		}
 	}
 	
