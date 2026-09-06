@@ -20,7 +20,7 @@ function load_config(name) {
     "debug": int(ts.debug) != 0,
     "uplink_netns": type(ts.uplink_netns) ? ts.uplink_netns : "",
     "uplink_ifname": type(ts.uplink_ifname) ? ts.uplink_ifname : "",
-    "uplink_mode": type(ts.uplink_mode) ? ts.uplink_mode : "",
+    "uplink_topology": type(ts.uplink_topology) ? ts.uplink_topology : "",
     "uplink_ipv4": type(ts.uplink_ipv4) ? ts.uplink_ipv4 : "",
     "uplink_gateway": type(ts.uplink_gateway) ? ts.uplink_gateway : "",
     "uplink_mac": type(ts.uplink_mac) ? ts.uplink_mac : "",
@@ -132,44 +132,54 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
     return true;
   }
 
-  if (!interface_exists_netns(ifname, netns)) {
-    // TODO: use once ucode-mod-rtnl supports target_netnsid
+  // uplink_topology "root" means the uplink already has a working default
+  // route in the root namespace (e.g. a locally owned PPPoE/DSL line), so
+  // there is no separate namespace to create the interface in or move it
+  // out of - just create it directly where we already are.
+  if (length(netns) == 0) {
+    if (0 != shell_command("ip link add "+ifname+" type wireguard")) {
+      return false;
+    }
+  } else {
+    if (!interface_exists_netns(ifname, netns)) {
+      // TODO: use once ucode-mod-rtnl supports target_netnsid
+      //
+      // rtnl_request(rtnl.const.RTM_NEWLINK,
+      //              rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
+      //   "target_netnsid": nsid,
+      //   "ifname": ifname,
+      //   "linkinfo": {
+      //     "type": "wireguard",
+      //   },
+      //   "mtu": ifcfg.mtu,
+      //   // TODO: probably only supported through ioctl...
+      //   //
+      //   // "flags": rtnl.const.IFF_UP|rtnl.const.IFF_POINTOPOINT|rtnl.const.IFF_NOARP,
+      //   // "change": rtnl.const.IFF_UP,
+      // });
+      // if (rtnl.error()) {
+      //   return false;
+      // }
+      if (0 != shell_command("ip -n "+netns+" link add "+ifname+" type wireguard")) {
+        return false;
+      }
+    }
+
+    // TODO: not supported in kernel yet...
+    //       see https://lore.kernel.org/all/20191107132755.8517-7-jonas@norrbonn.se/T/
     //
-    // rtnl_request(rtnl.const.RTM_NEWLINK,
-    //              rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_CREATE|rtnl.const.NLM_F_EXCL, {
+    // let reply = rtnl_request(rtnl.const.RTM_SETLINK,
+    //                          rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_EXCL, {
     //   "target_netnsid": nsid,
     //   "ifname": ifname,
-    //   "linkinfo": {
-    //     "type": "wireguard",
-    //   },
-    //   "mtu": ifcfg.mtu,
-    //   // TODO: probably only supported through ioctl...
-    //   //
-    //   // "flags": rtnl.const.IFF_UP|rtnl.const.IFF_POINTOPOINT|rtnl.const.IFF_NOARP,
-    //   // "change": rtnl.const.IFF_UP,
+    //   "net_ns_pid": 1,
     // });
     // if (rtnl.error()) {
     //   return false;
     // }
-    if (0 != shell_command("ip -n "+netns+" link add "+ifname+" type wireguard")) {
+    if (0 != shell_command("ip -n "+netns+" link set "+ifname+" netns 1")) {
       return false;
     }
-  }
-
-  // TODO: not supported in kernel yet...
-  //       see https://lore.kernel.org/all/20191107132755.8517-7-jonas@norrbonn.se/T/
-  //
-  // let reply = rtnl_request(rtnl.const.RTM_SETLINK,
-  //                          rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_EXCL, {
-  //   "target_netnsid": nsid,
-  //   "ifname": ifname,
-  //   "net_ns_pid": 1,
-  // });
-  // if (rtnl.error()) {
-  //   return false;
-  // }
-  if (0 != shell_command("ip -n "+netns+" link set "+ifname+" netns 1")) {
-    return false;
   }
 
   // set mtu. interface will be brought up later when it's fully configured.
@@ -218,6 +228,10 @@ function wg_replace_endpoint(ifname, cfg, next) {
   let ifcfg = cfg.wireguard_interfaces[ifname];
   let srvcfg = cfg.wireguard_servers[next];
   let certopt = srvcfg.insecure_cert ? "--no-check-certificate" : "";
+  // uplink_topology "root": the registration request can be issued straight
+  // from the root namespace, since that's where the working internet
+  // route already lives.
+  let netns_exec = (cfg.uplink_topology == "root") ? "" : "ip netns exec "+cfg.uplink_netns+" ";
 
   // generate a fresh private key
   let randfd = fs.open("/dev/random");
@@ -227,7 +241,7 @@ function wg_replace_endpoint(ifname, cfg, next) {
     log("failed to read 32 bytes from /dev/random");
     return false;
   }
-  let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
+  wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "privateKey": b64enc(privkey),
   });
@@ -237,7 +251,7 @@ function wg_replace_endpoint(ifname, cfg, next) {
   }
 
   // get the public key for registration
-  let reply = wg_request(wg.const.WG_CMD_GET_DEVICE,
+  let dev_reply = wg_request(wg.const.WG_CMD_GET_DEVICE,
                          rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_DUMP, {
     "ifname": ifname,
   });
@@ -245,14 +259,14 @@ function wg_replace_endpoint(ifname, cfg, next) {
     log("WG_CMD_GET_DEVICE failed: "+err);
     return false;
   }
-  if (length(reply) < 1) {
+  if (length(dev_reply) < 1) {
     log("can't replace wireguard endpoint, interface "+ifname+" not found");
     return false;
   }
-  let pubkey = reply[0].publicKey;
+  let pubkey = dev_reply[0].publicKey;
 
   // ubus login on the tunnel server
-  let msg = {
+  let login_msg = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "call",
@@ -261,24 +275,24 @@ function wg_replace_endpoint(ifname, cfg, next) {
       "session",
       "login",
       UBUS_LOGIN]};
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
-  let p = fs.popen(sprintf(cmd, msg), "r");
-  let out = p.read("all");
-  if (substr(out, 0, 1) != "{") {
-    log(sprintf(cmd+" (error=unexpected data, data=%s)", "...", out));
+  let login_cmd = sprintf(netns_exec+"uclient-fetch -q -O - %s --post-data='%s' %s", certopt, "%s", srvcfg.url);
+  let login_p = fs.popen(sprintf(login_cmd, login_msg), "r");
+  let login_out = login_p.read("all");
+  if (substr(login_out, 0, 1) != "{") {
+    log(sprintf(login_cmd+" (error=unexpected data, data=%s)", "...", login_out));
     return false;
   } else {
-    debug(sprintf(cmd+" (error=%s)", "...", p.error()));
+    debug(sprintf(login_cmd+" (error=%s)", "...", login_p.error()));
   }
-  let reply = json(out);
-  if (reply.result[0] != 0) {
-    log(sprintf(cmd+" (error=unexpected content, data=%s)", "...", out));
+  let login_reply = json(login_out);
+  if (login_reply.result[0] != 0) {
+    log(sprintf(login_cmd+" (error=unexpected content, data=%s)", "...", login_out));
     return false;
   }
-  let sid = reply.result[1].ubus_rpc_session;
+  let sid = login_reply.result[1].ubus_rpc_session;
 
   // tunnel registration
-  let msg = {
+  let register_msg = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "call",
@@ -289,30 +303,30 @@ function wg_replace_endpoint(ifname, cfg, next) {
       { "public_key": pubkey, "mtu": ifcfg.mtu },
     ],
   };
-  let cmd = sprintf("ip netns exec %s uclient-fetch -q -O - %s --post-data='%s' %s", cfg.uplink_netns, certopt, "%s", srvcfg.url);
-  let p = fs.popen(sprintf(cmd, msg), "r");
-  let out = p.read("all");
-  if (substr(out, 0, 1) != "{") {
-    log(sprintf(cmd+" (error=unexpected data, data=%s)", "...", out));
+  let register_cmd = sprintf(netns_exec+"uclient-fetch -q -O - %s --post-data='%s' %s", certopt, "%s", srvcfg.url);
+  let register_p = fs.popen(sprintf(register_cmd, register_msg), "r");
+  let register_out = register_p.read("all");
+  if (substr(register_out, 0, 1) != "{") {
+    log(sprintf(register_cmd+" (error=unexpected data, data=%s)", "...", register_out));
     return false;
   } else {
-    debug(sprintf(cmd+" (error=%s)", "...", p.error()));
+    debug(sprintf(register_cmd+" (error=%s)", "...", register_p.error()));
   }
-  let reply = json(out);
-  if (!reply.result || reply.result[0] != 0 || reply.result[1].response_code != 0) {
+  let register_reply = json(register_out);
+  if (!register_reply.result || register_reply.result[0] != 0 || register_reply.result[1].response_code != 0) {
     // response_code 1 means "public key is already used"
     // see wg-installer/wg-server/lib/wg_functions.sh
-    log(sprintf(cmd+" (error=unexpected content, data=%s)", "...", out));
+    log(sprintf(register_cmd+" (error=unexpected content, data=%s)", "...", register_out));
     return false;
   }
 
   let peer = {
-    "public_key": reply.result[1].gw_pubkey,
-    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+reply.result[1].gw_port),
+    "public_key": register_reply.result[1].gw_pubkey,
+    "endpoint": replace(srvcfg.url, regexp('^https?://([^/]+).*$'), '$1:'+register_reply.result[1].gw_port),
   };
 
   // set tunnel server as our peer
-  let reply = wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
+  wg_request(wg.const.WG_CMD_SET_DEVICE, wg.const.NLM_F_REQUEST, {
     "ifname": ifname,
     "flags": wg.const.WGDEVICE_F_REPLACE_PEERS,
     "peers": [{
@@ -431,6 +445,25 @@ function uplink_static(netns, netnsifname, ipv4, gw) {
 }
 
 function uplink_has_default_route(netns) {
+  // For the root namespace (uplink_topology "root"), use netlink instead of forking
+  // a shell every tick, same style as interface_exists(). A default route has
+  // no 'dst' attribute at all (verified live: matches exactly what
+  // `ip route show default table all` reports as no-dst-key entries).
+  // ucode-mod-rtnl has no target_netnsid support yet (see interface_exists_netns's
+  // TODO above), so namespaced callers still have to shell out to `ip -n`.
+  if (length(netns) == 0) {
+    let reply = rtnl_request(rtnl.const.RTM_GETROUTE, rtnl.const.NLM_F_REQUEST|rtnl.const.NLM_F_DUMP, {
+      "family": rtnl.const.AF_INET,
+    });
+    rtnl.error(); // throw the error away
+    for (r in reply) {
+      if (r.table == rtnl.const.RT_TABLE_MAIN && !("dst" in r)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   let p = fs.popen("ip -j -n "+netns+" route show default", "r");
   let out = p.read("all");
   p.close();
@@ -444,10 +477,22 @@ function uplink_maintenance(cfg) {
 
   let netns = cfg.uplink_netns;
   let ifname = cfg.uplink_ifname;
-  let mode = cfg.uplink_mode;
+  let topology = cfg.uplink_topology;
   let ipv4 = cfg.uplink_ipv4;
   let gw = cfg.uplink_gateway;
   let mac = cfg.uplink_mac;
+
+  if (topology == "root") {
+    // The uplink already has a working default route in the root
+    // namespace - e.g. a locally owned PPPoE/DSL connection that is
+    // also used directly (outside of tunspace) for local NAT. There is
+    // nothing to move or configure here, just confirm it's up.
+    if (!uplink_has_default_route("")) {
+      log("uplink: no default route in root namespace");
+      return false;
+    }
+    return true;
+  }
 
   if (interface_exists(netnsifname)) {
     // the uplink interface will sometimes leak out of the namespace on shutdown.
@@ -460,23 +505,23 @@ function uplink_maintenance(cfg) {
   } else if (!interface_exists(ifname)) {
     log(sprintf("missing uplink interface %s", ifname));
     return false;
-  } else if (mode == "direct") {
+  } else if (topology == "netns-move-interface") {
     // move uplink interface directly:
     shell_command("ip link set dev "+ifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set "+ifname+" name "+netnsifname);
     shell_command("ip -n "+netns+" link set "+netnsifname+" up");
-  } else if (mode == "bridge") {
+  } else if (topology == "netns-macvlan-bridge") {
     // or create a macvlan bridge:
     shell_command("ip link add "+netnsifname+" address "+mac+" link "+ifname+" type macvlan mode bridge");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
-  } else if (mode == "passthru") {
+  } else if (topology == "netns-macvlan-passthru") {
     // create a macvlan in passthru mode (shares parent MAC):
     shell_command("ip link add "+netnsifname+" link "+ifname+" type macvlan mode passthru");
     shell_command("ip link set dev "+netnsifname+" netns "+netns);
     shell_command("ip -n "+netns+" link set up "+netnsifname+"");
   } else {
-    log(sprintf("uplink mode must be 'bridge', 'direct', or 'passthru', got '%s'", mode));
+    log(sprintf("uplink topology must be 'root', 'netns-macvlan-bridge', 'netns-move-interface', or 'netns-macvlan-passthru', got '%s'", topology));
     return false;
   }
 
@@ -488,10 +533,10 @@ function uplink_maintenance(cfg) {
 
   if (!uplink_has_default_route(netns)) {
     log("uplink: no default route after configuration");
-    // For bridge/passthru, the macvlan may be orphaned (parent interface recreated).
+    // For the two macvlan topologies, the macvlan may be orphaned (parent interface recreated).
     // Delete it so the next tick recreates it against the fresh parent interface.
-    // Leave direct-mode alone: that IS the physical interface.
-    if (mode == "bridge" || mode == "passthru") {
+    // Leave netns-move-interface alone: that IS the physical interface.
+    if (topology == "netns-macvlan-bridge" || topology == "netns-macvlan-passthru") {
       shell_command("ip -n "+netns+" link del "+netnsifname+" 2>/dev/null");
     }
     return false;
@@ -503,17 +548,19 @@ function uplink_maintenance(cfg) {
 function boot(st, cfg) {
   debug("boot");
 
-  if (!create_namespace(st, cfg.uplink_netns)) {
-    log("failed to create "+cfg.uplink_netns+" namespace");
-    exit(1);
+  if (cfg.uplink_topology != "root") {
+    if (!create_namespace(st, cfg.uplink_netns)) {
+      log("failed to create "+cfg.uplink_netns+" namespace");
+      exit(1);
+    }
+    assert(st.nsid > 0);
   }
-  assert(st.nsid > 0);
 
   for (ifname, ifcfg in cfg.wireguard_interfaces) {
     if (ifcfg.disabled) {
       continue;
     }
-    if (!create_wg_interface(st.nsid, ifname, ifcfg, cfg.uplink_netns)) {
+    if (!create_wg_interface(st.nsid, ifname, ifcfg, cfg.uplink_topology == "root" ? "" : cfg.uplink_netns)) {
       log("failed to create "+ifname+" interface");
       exit(1);
     }
