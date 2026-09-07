@@ -100,7 +100,16 @@ json_init
             if [ -n "$nick" ]; then json_add_string nickname "$nick"; fi
             if [ -n "$name" ]; then json_add_string realname "$name"; fi
             if [ -n "$mail" ]; then json_add_string email "$mail"; fi
-            if [ -n "$homepage" ]; then json_add_string homepage "$homepage"; fi
+            if [ -n "$homepage" ]; then
+                json_add_array homepage
+                # loop through each homepage in the list
+                add_homepage() {
+                    json_add_string "" "$1"
+                }
+                config_load "freifunk"
+                config_list_foreach "contact" "homepage" add_homepage
+                json_close_array
+            fi
             if [ -n "$phone" ]; then json_add_string phone "$phone"; fi
             json_add_string url "$url"
         }
