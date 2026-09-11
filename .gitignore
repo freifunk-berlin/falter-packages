@@ -1,4 +1,5 @@
 .vscode/
+.wget-hsts
 out/
 tmp/
 vmfs/
