@@ -125,8 +125,6 @@ unbuf="stdbuf --output=0 --error=0"
 src-git base $gitmirror/openwrt/openwrt.git;$owbranch
 src-git packages $gitmirror/feed/packages.git;$owbranch2
 src-git luci $gitmirror/project/luci.git;$owbranch2
-src-git routing $gitmirror/feed/routing.git;$owbranch2
-src-git telephony $gitmirror/feed/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   else
@@ -134,8 +132,6 @@ EOF
 src-git base $gitmirror/openwrt.git;$owbranch
 src-git packages $gitmirror/packages.git;$owbranch2
 src-git luci $gitmirror/luci.git;$owbranch2
-src-git routing $gitmirror/routing.git;$owbranch2
-src-git telephony $gitmirror/telephony.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   fi
