@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-monitor
-PKG_RELEASE:=0
+PKG_RELEASE:=0.1
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 
@@ -11,6 +11,7 @@ define Package/falter-berlin-monitor
   SECTION:=falter-berlin
   CATEGORY:=falter-berlin
   TITLE:=Freifunk Monitor Statistics Collector
+  URL:=https://github.com/freifunk-berlin/falter-packages
   EXTRA_DEPENDS:=prometheus-node-exporter-ucode (>=0), prometheus-node-exporter-ucode-openwrt (>=0), prometheus-node-exporter-ucode-wifi (>=0)
   PKGARCH:=all
 endef
