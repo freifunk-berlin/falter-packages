@@ -30,6 +30,7 @@ define Build/Compile
 endef
 
 define Package/falter-berlin-monitor/install
+	$(INSTALL_DIR) $(1)/usr/share/ucode/node-exporter/lib/
 	$(CP) ./files/freifunk.uc $(1)/usr/share/ucode/node-exporter/lib/
 endef
 
