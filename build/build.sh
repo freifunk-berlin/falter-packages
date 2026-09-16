@@ -76,7 +76,7 @@ owmirror="https://mirror.berlin.freifunk.net/downloads.openwrt.org"
 [ -z "$OPENWRT_MIRROR" ] || owmirror="$OPENWRT_MIRROR"
 fmirror="https://firmware.berlin.freifunk.net"
 [ -z "$FALTER_MIRROR" ] || fmirror="$FALTER_MIRROR"
-gitmirror="https://codeberg.org/openwrt"
+gitmirror="https://git.openwrt.org"
 [ -z "$GIT_MIRROR" ] || gitmirror="$GIT_MIRROR"
 srcmirror="https://mirror.berlin.freifunk.net/sources.openwrt.org"
 [ -z "$SRC_MIRROR" ] || srcmirror="$SRC_MIRROR"
@@ -123,14 +123,12 @@ unbuf="stdbuf --output=0 --error=0"
   if [[ "$gitmirror" =~ "git.openwrt.org" ]]; then
     cat <<EOF >"$sdkdir/feeds.conf"
 src-git base $gitmirror/openwrt/openwrt.git;$owbranch
-src-git packages $gitmirror/feed/packages.git;$owbranch2
 src-git luci $gitmirror/project/luci.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
   else
     cat <<EOF >"$sdkdir/feeds.conf"
 src-git base $gitmirror/openwrt.git;$owbranch
-src-git packages $gitmirror/packages.git;$owbranch2
 src-git luci $gitmirror/luci.git;$owbranch2
 src-link falter $(pwd)/tmp/feed
 EOF
