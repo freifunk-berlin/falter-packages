@@ -1,0 +1,8 @@
+FROM docker.io/library/debian:testing
+ARG rebuild=2026-09-05
+
+RUN apt update && apt install -y --no-install-recommends --no-install-suggests binutils-gold bison build-essential ca-certificates file flex g++ gawk gettext git-core libbsd-dev libelf-dev libncurses-dev libssl-dev meson mold ninja-build pbzip2 pigz pkg-config python3-dev python3-setuptools rsync sqlite3 subversion time unzip wget xxd zlib1g-dev zstd
+
+VOLUME /work
+WORKDIR /work
+ENTRYPOINT ["build/build.sh"]
