@@ -1,0 +1,24 @@
+#!/bin/sh
+
+INTERVAL=60 # How often to push metrics (in seconds)
+TMP_FILE="/tmp/metrics.txt"
+HOSTNAME=$(uci get system.@system[0].hostname)
+PUSHHOST=$(uci get prometheus-push.server.host)
+PUSHPORT=$(uci get prometheus-push.server.port)
+PUSHPATH=$(uci get prometheus-push.server.path)
+URL="http://${PUSHHOST}:${PUSHPORT}${PUSHPATH}${HOSTNAME}"
+
+while true; do
+    # 1. Execute the ucode node exporter and save to /tmp
+    prometheus-node-exporter-ucode | tail -n +4 > "$TMP_FILE"
+
+    # 2. Upload to Grafana Pushgateway using wget
+    # Includes standard Basic Auth header encoding
+    wget -q -O - \
+        --header="Content-Type: application/x-www-form-urlencoded" \
+        --post-file="$TMP_FILE" \
+        "$URL"
+
+    # 3. Wait until the next interval
+    sleep "$INTERVAL"
+done
