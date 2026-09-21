@@ -1244,7 +1244,8 @@ r1_5_1_fix_wifi() {
             ifname="${ifname::-1}5"
             log "fixing wrong 5ghz interface name to ${ifname}"
             uci set "wireless.${section}.ifname=${ifname}"
-            uci -q rename "wireless.${section}=${ifname}"
+            newsection=$(echo ${ifname} | sed "s/-/_/g")
+            uci -q rename "wireless.${section}=${newsection}"
         fi
     }
 
@@ -1264,6 +1265,11 @@ r1_5_1_domain_suffix() {
 
 r1_5_1_update_dns() {
     r1_4_1_update_dns
+
+    uci delete dhcp.@dnsmasq[0].server
+    uci add_list dhcp.@dnsmasq[0].server=9.9.9.10
+    uci add_list dhcp.@dnsmasq[0].server=194.150.168.168
+    uci commit dhcp
 }
 
 r1_5_1_autoupdate_config() {
@@ -1274,19 +1280,36 @@ r1_5_1_autoupdate_config() {
 }
 
 r1_5_1_bbbdigger() {
-    uci -q get network.bbbdigger.proto
+    uci -q get network.bbbdigger.proto > /dev/null
     if [ $? -eq 0 ]; then
-        uci -q get network.bbbdigger.disabled
+        uci -q get network.bbbdigger.disabled > /dev/null
         if [ $? -eq 1 ]; then
             uci -q set network.bbbdigger.disabled=0
             uci commit network
         fi
+        # ensure bbbdigger is in olsr
+        grep -q bbbdigger /etc/config/olsrd
+        if [ $? -eq 1 ]; then
+            section=$(uci add olsrd Interface)
+            uci set olsrd.${section}.ignore=0
+            uci set olsrd.${section}.interface=bbbdigger
+            uci commit olsrd
+            /etc/init.d/olsrd restart
+       fi
     fi
 }
 
 r1_5_1_logsize() {
     uci -q set system.@system[0].log_size=128
     uci commit system
+}
+
+r1_5_1_statistics() {
+    # ensure the right interfaces are gathering statistics
+    wifilist=$(uci show wireless | grep ifname | cut -d = -f 2 | tr '\n' ' ' | \
+                   sed "s/'//g" | sed "s/ $//g")
+    uci set luci_statistics.collectd_iwinfo.Interfaces="${wifilist}"
+    uci set luci_statistics.collectd_interface.Interfaces="ffuplink ${wifilist}"
 }
 
 migrate() {
@@ -1449,6 +1472,7 @@ migrate() {
         r1_5_1_autoupdate_config
         r1_5_1_bbbdigger
         r1_5_1_logsize
+        r1_5_1_statistics
     fi
 
     # overwrite version with the new version
