@@ -46,7 +46,11 @@ del_wg_iface() {
 
 del_uplink_netns() {
   local _value
+  local _topology
   config_get _value tunspace uplink_netns
+  config_get _topology tunspace uplink_topology
+  # topology "root" never creates a namespace, nothing to tear down.
+  [ "$_topology" = "root" ] && return
   logger -t tunspace "ip netns del $_value"
   ip netns del "$_value"
 }
