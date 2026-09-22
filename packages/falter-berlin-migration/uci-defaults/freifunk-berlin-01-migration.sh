@@ -1306,10 +1306,12 @@ r1_5_1_logsize() {
 
 r1_5_1_statistics() {
     # ensure the right interfaces are gathering statistics
-    wifilist=$(uci show wireless | grep ifname | cut -d = -f 2 | tr '\n' ' ' | \
-                   sed "s/'//g" | sed "s/ $//g")
+    wifilist=$(uci show wireless | grep ifname | \
+                   cut -d = -f 2 | tr '\n' ' ' | \ sed "s/'//g" | sed "s/ $//g")
     uci set luci_statistics.collectd_iwinfo.Interfaces="${wifilist}"
-    uci set luci_statistics.collectd_interface.Interfaces="ffuplink ${wifilist}"
+    wifilist=$(uci show wireless | grep ifname | grep -v dhcp | \
+                   cut -d = -f 2 | tr '\n' ' ' |  sed "s/'//g" | sed "s/ $//g")
+    uci set luci_statistics.collectd_interface.Interfaces="ffuplink ${wifilist} br-dhcp"
 }
 
 migrate() {
