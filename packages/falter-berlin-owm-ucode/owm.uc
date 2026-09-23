@@ -152,21 +152,21 @@ function concat(a, b) {
 }
 
 function read_freifunk_release() {
-	let fh = fs.popen('cat /etc/freifunk_release 2>/dev/null', 'r');
-	if (!fh) return {};
-	let content = trim(fh.read('all'));
-	fh.close();
-	
-	let result = {};
-	let distrib_id = match(content, /FREIFUNK_DISTRIB_ID="([^"]*)"/);
-	let release = match(content, /FREIFUNK_RELEASE='([^']*)'/);
-	let revision = match(content, /FREIFUNK_REVISION='([^']*)'/);
-	
-	if (distrib_id) result.distrib_id = distrib_id[1];
-	if (release) result.release = release[1];
-	if (revision) result.revision = revision[1];
-	
-	return result;
+	let vars = {};
+	let content = fs.readfile("/etc/freifunk_release");
+	if (!content) return {};
+
+	for (let line in split(content, "\n")) {
+		let m = match(line, /^([A-Z0-9_]+)=['"]?([^'"]+)['"]?$/);
+		if (m) vars[m[1]] = m[2];
+	}
+
+	return {
+		distrib_id: vars.FREIFUNK_DISTRIB_ID,
+		release: vars.FREIFUNK_RELEASE,
+		revision: vars.FREIFUNK_REVISION,
+		variant: vars.FREIFUNK_VARIANT,
+	}
 }
 
 function format_kernel_date(timestamp) {
