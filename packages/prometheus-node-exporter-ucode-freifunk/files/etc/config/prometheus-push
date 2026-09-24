@@ -1,0 +1,5 @@
+config server 'server'
+	option host '10.31.130.151'
+	option port '9091'
+	option path '/metrics/job/nodes/instance/'
+
