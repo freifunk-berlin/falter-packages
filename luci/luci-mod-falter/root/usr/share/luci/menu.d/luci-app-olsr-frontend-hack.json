@@ -1,0 +1,80 @@
+{
+	"freifunk/olsr": {
+		"title": "OLSR",
+		"order": 40,
+		"action": {
+			"type": "firstchild"
+		}
+	},
+
+	"freifunk/olsr/neighbours": {
+		"title": "Neighbours",
+		"order": 15,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/neighbors"
+		}
+	},
+
+	"freifunk/olsr/routes": {
+		"title": "Routes",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/routes"
+		}
+	},
+
+	"freifunk/olsr/topology": {
+		"title": "Topology",
+		"order": 25,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/topology"
+		}
+	},
+
+	"freifunk/olsr/hna": {
+		"title": "HNA",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/hna"
+		}
+	},
+
+	"freifunk/olsr/mid": {
+		"title": "MID",
+		"order": 35,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/mid"
+		}
+	},
+
+	"freifunk/olsr/interface": {
+		"title": "Interface",
+		"order": 35,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/interfaces"
+		}
+	},
+
+	"freifunk/olsr/smartgw": {
+		"title": "SmartGW",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/smartgw"
+		}
+	},
+
+	"freifunk/olsr/error_olsr": {
+		"order": 45,
+		"action": {
+			"type": "view",
+			"path": "olsr/status-olsr/error_olsr"
+		}
+	}
+}
