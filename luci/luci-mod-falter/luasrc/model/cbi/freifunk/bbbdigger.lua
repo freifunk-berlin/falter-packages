@@ -116,7 +116,7 @@ function main.write(self, section, value)
   -- don't save to ffwizard.settings.bbbdigger
   uci:revert("ffwizard")
   
-  luci.http.redirect(luci.dispatcher.build_url("olsr/neighbours"))
+  luci.http.redirect(luci.dispatcher.build_url("admin/olsr/neighbours"))
 end
 
 return f
