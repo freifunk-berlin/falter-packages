@@ -11,7 +11,6 @@ local tpl = require "luci.template"
 local fs = require "nixio.fs"
 local http = require "luci.http"
 local disp = require "luci.dispatcher"
-local ipkg = require "luci.model.ipkg"
 
 local community = uci:get("freifunk", "community", "name") or "Freifunk"
 local DefaultText = uci:get("freifunk", "community", "DefaultText") or ""
@@ -19,7 +18,7 @@ local nickname = uci:get("freifunk", "contact", "nickname") or "No Nickname set"
 
 -- only redirect if assistent is installed and no root password is set
 -- we use isfile because the view is not run as root and we can't use
--- e.g. ipkg.installed or checkpasswd
+-- e.g. checkpasswd
 local webAppRoot = http.getenv("PATH_INFO") == nil
 local notRunBefore = not uci:get("ffwizard", "settings", "runbefore")
 local notPasswordSet = true
