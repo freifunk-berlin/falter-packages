@@ -85,6 +85,9 @@ else
     exit 0
 fi
 
+##########################################
+##### Start of standanrd upgrade functions
+##########################################
 migrate_profiles() {
     # migrate to the latest /etc/config/profile_* and /etc/config/freifunk
     log "Updating Community-Profiles."
@@ -122,13 +125,29 @@ migrate_profiles() {
     uci commit freifunk
 }
 
+bump_repo() {
+    local opkg=$(which opkg)
+    if [ "X${opkg}X" = "XX" ]; then # This system doesn't have opkg, uses apk
+      return 0
+    fi
+
+    # adjust the opkg packagefeed to point to new version
+    local FEED_LINE=$(grep "falter" /rom/etc/opkg/customfeeds.conf)
+    log "adjusting packagefeed to new version feed"
+    sed -i "s,src\/gz.*falter.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
+}
+
 ensure_profiled() {
     # since the files in /etc/profile.d are carried over though upgrades,
     # make sure that the ones in /rom are the ones being used
-    log "updating /etc/profile.d"
+    log "updating /etc/profile and /etc/profile.d"
+    cp /rom/etc/profile /etc
     cp /rom/etc/profile.d/* /etc/profile.d
 }
 
+############################################
+##### Start of per-release upgrade functions
+############################################
 update_openvpn_remote_config() {
     # use dns instead of ips for vpn servers (introduced with 0.1.0)
     log "Setting openvpn.ffvpn.remote to vpn03.berlin.freifunk.net"
@@ -313,18 +332,6 @@ vpn03_udp4() {
 
 set_ipversion_olsrd6() {
     uci set olsrd6.@olsrd[0].IpVersion=6
-}
-
-bump_repo() {
-    local opkg=$(which opkg)
-    if [ "X${opkg}X" = "XX" ]; then # This system doesn't have opkg, uses apk
-      return 0
-    fi
-
-    # adjust the opkg packagefeed to point to new version
-    local FEED_LINE=$(grep "falter" /rom/etc/opkg/customfeeds.conf)
-    log "adjusting packagefeed to new version feed"
-    sed -i "s,src\/gz.*falter.*,$FEED_LINE,g" /etc/opkg/customfeeds.conf
 }
 
 r1_0_0_vpn03_splitconfig() {
@@ -1314,14 +1321,56 @@ r1_5_1_statistics() {
     uci set luci_statistics.collectd_interface.Interfaces="ffuplink ${wifilist} br-dhcp"
 }
 
+r1_6_0_remove_opkg() {
+    log "remove old opkg files"
+    rm -f /etc/opkg
+}
+
+r1_6_0_firewall() {
+    log "updating firewall forwarding"
+
+    # drop the unneeded extra forwarding section
+    handle_forwarding() {
+      local section=${1}
+      src=$(uci get "firewall.$section.src")
+      dst=$(uci get "firewall.$section.dest")
+      if [ "$src" = "freifunk" ] && [ "$dst" = "freifunk" ]; then
+        uci delete firewall.${section}
+      fi
+    }
+
+    reset_cb
+    config_load firewall
+    config_foreach handle_forwarding forwarding
+
+    # replace the forwarding section with a single zone option
+    uci set firewall.zone_freifunk.forward=ACCEPT
+    uci commit firewall
+}
+
+r1_6_0_loopback() {
+    log "updating ip config for loopback device"
+    uci -q delete network.loopback.ipaddr
+    uci -q delete network.loopback.netmask
+    uci add_list network.loopback.ipaddr='127.0.0.1/8'
+
+    uci commit network
+}
+
+r1_6_0_radius() {
+    log "updating radius config from upstream"
+    cp /rom/etc/config/radius /etc/config
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
-    # always use the most recent profiles and update repo-link
+    # standard migrations which run for every new release
     migrate_profiles
     bump_repo
     ensure_profiled
 
+    # per release upgrades
     if semverLT "${OLD_VERSION}" "0.1.0"; then
         update_openvpn_remote_config
         update_dhcp_lease_config
@@ -1477,6 +1526,12 @@ migrate() {
         r1_5_1_statistics
     fi
 
+    if semverLT "${OLD_VERSION}" "1.6.0"; then
+        r1_6_0_remove_opkg
+        r1_6_0_firewall
+        r1_6_0_loopback
+        r1_6_0_radius
+    fi
     # overwrite version with the new version
     log "Setting new system version to ${VERSION}."
     uci set "system.@system[0].version=${VERSION}"
