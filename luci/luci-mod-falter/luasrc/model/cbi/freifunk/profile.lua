@@ -2,7 +2,7 @@
 -- Licensed to the public under the Apache License 2.0.
 
 local uci = require "luci.model.uci".cursor()
-local ipkg = require "luci.model.ipkg"
+local sys = require "luci.sys"
 local community = uci:get("freifunk", "community", "name")
 
 if community == nil then
@@ -50,7 +50,7 @@ else
         local ipv6_config = c:option(ListValue, "ipv6_config", translate("IPv6 Config"))
 	ipv6_config:depends("ipv6", 1)
 	ipv6_config:value("static")
-	if ipkg.installed ("auto-ipv6-ib") then
+	if (sys.exec("apk list --installed auto-ipv6-ib | grep -q installed ; echo -n $?") == "0") then
 		ipv6_config:value("auto-ipv6-random")
 		ipv6_config:value("auto-ipv6-fromv4")
 	end
