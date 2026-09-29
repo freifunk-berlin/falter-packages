@@ -2,7 +2,7 @@ local uci = require "luci.model.uci".cursor()
 local ip = require "luci.ip"
 local util = require "luci.util"
 local tools = require "luci.tools.freifunk.assistent.tools"
-local ipkg = require "luci.model.ipkg"
+local sys = require "luci.sys"
 
 local olsr = require "luci.tools.freifunk.assistent.olsr"
 local firewall = require "luci.tools.freifunk.assistent.firewall"
@@ -132,7 +132,7 @@ function main.write(self, section, value)
     return
   end
 
-  local statistics_installed = ipkg.installed("luci-app-statistics") == true
+  local statistics_installed = sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") == "0"
   local mergeList = {"freifunk", community}
   uci:foreach("wireless", "wifi-device",
     function(sec)

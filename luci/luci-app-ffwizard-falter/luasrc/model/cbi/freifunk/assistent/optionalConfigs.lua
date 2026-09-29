@@ -4,7 +4,6 @@ local util = require "luci.util"
 local tools = require "luci.tools.freifunk.assistent.tools"
 local sys = require "luci.sys"
 local fs = require "nixio.fs"
-local ipkg = require "luci.model.ipkg"
 
 local html = require "luci.http"
 if html.formvalue("sharenet", true) == "0" then
