@@ -2,7 +2,6 @@ local uci = require "luci.model.uci".cursor()
 local sys = require "luci.sys"
 local tools = require "luci.tools.freifunk.assistent.ffwizard"
 local ip = require "luci.ip"
-local ipkg = require "luci.model.ipkg"
 local fs = require "nixio.fs"
 
 local olsr = require "luci.tools.freifunk.assistent.olsr"
@@ -132,7 +131,7 @@ function commit()
     sys.init.enable("qos")
   end
 
-  if ipkg.installed("luci-app-statistics") == true then
+  if (sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") == "0") then
     local enableStats = uci:get("ffwizard", "settings", "enableStats") or "0"
     uci:foreach("luci_statistics", "statistics",
       function(s)
@@ -159,7 +158,7 @@ function reset()
   uci:revert("network")
   uci:revert("qos")
 
-  if ipkg.installed("luci-app-statistics") == True then
+  if (sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") == "0") then
     uci:revert("luci-app-statistics")
   end
 
