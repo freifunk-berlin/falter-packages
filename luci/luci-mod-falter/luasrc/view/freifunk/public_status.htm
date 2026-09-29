@@ -56,8 +56,8 @@ local _, r, def4, def6
 
 for _, r in ipairs(ip.routes({ type = 1, dest_exact = "0.0.0.0/0" })) do
 	def4 = {
-		gateway = r.gw:string(),
-		dest = r.dest:string(),
+		gateway = r.gw and r.gw:string() or "NaN",
+		dest = r.dest and r.dest:string() or "NaN",
 		dev = r.dev,
 		metr = r.metric or 0
 	}
@@ -66,8 +66,8 @@ end
 
 for _, r in ipairs(ip.routes({ type = 1, dest_exact = "::/0" })) do
 	def6 = {
-		gateway = r.gw:string(),
-		dest = r.dest:string(),
+		gateway = r.gw and r.gw:string() or "NaN",
+		dest = r.dest and r.dest:string() or "NaN",
 		dev = r.dev,
 		metr = r.metric or 0
 	}
@@ -110,7 +110,7 @@ end
 
 <%+header%>
 
-<script type="text/javascript" src="<%=resource%>/cbi.js"></script>
+<script type="text/javascript" src="<%=resource%>/cbi.js?v=26.272.53904~c55539d"></script>
 
 <script type="text/javascript">//<![CDATA[
 	 XHR.poll(<%=interval%> , '<%=REQUEST_URI%>', { status: 1 },
@@ -246,16 +246,16 @@ end
 
 		<div class="cbi-section">
 			<div class="cbi-section-node">
-				<table class="cbi-section-table">
-					<tr class="cbi-section-table-titles">
-						<th class="cbi-section-table-cell"><%:Signal%></th>
-						<th class="cbi-section-table-cell"><%:Bitrate%></th>
-						<th class="cbi-section-table-cell"><%:SSID%></th>
-						<th class="cbi-section-table-cell"><%:BSSID%></th>
-						<th class="cbi-section-table-cell"><%:Channel%></th>
-						<th class="cbi-section-table-cell"><%:Mode%></th>
-						<th class="cbi-section-table-cell"><%:TX%>-<%:Power%></th>
-						<th class="cbi-section-table-cell"><%:Interface%></th>
+				<table class="cbi-section-table" style="width: 100%; border-collapse: collapse;">
+					<tr class="cbi-section-table-titles" style="background-color: #f4f4f4; border-bottom: 2px solid #ccc;">
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Signal%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Bitrate%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:SSID%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:BSSID%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Channel%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Mode%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:TX%>-<%:Power%></th>
+						<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Interface%></th>
 					</tr>
 	<%
 	for _, dev in ipairs(devices) do
@@ -301,15 +301,15 @@ end
 				end
 				local interface = net.iwinfo.ifname or "N/A"
 	%>
-						<tr class="cbi-section-table-row cbi-rowstyle-1">
-						<td class="cbi-value-field" id="<%=net:ifname()%>-signal"><%=signal_string%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-bitrate"><%=bitrate%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-ssid"><%=ssid%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-bssid"><%=bssid%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-channel"><%=chan%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-mode"><%=mode%></td>
-						<td class="cbi-value-field" id="<%=net:ifname()%>-txpower"><%=txpwr%></td>
-						<td class="cbi-value-field"><%=interface%></td>
+						<tr class="cbi-section-table-row cbi-rowstyle-1" style="border-bottom: 1px solid #eee;">
+						<td class="cbi-value-field" style="padding: 8px;" >Signal Quality</td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-bitrate"><%=bitrate%></td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-ssid"><%=ssid%></td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-bssid"><%=bssid%></td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-channel"><%=chan%></td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-mode"><%=mode%></td>
+						<td class="cbi-value-field" style="padding: 8px;" id="<%=net:ifname()%>-txpower"><%=txpwr%></td>
+						<td class="cbi-value-field" style="padding: 8px;"><%=interface%></td>
 					</tr>
 			<% end
 		end
@@ -328,20 +328,20 @@ end
 <% if not def4 and not def6 then %>
 	<%:No default routes known.%>
 <%else%>
-				<table class="cbi-section-table">
-						<tr class="cbi-section-table-titles">
-							<th class="cbi-section-table-cell"><%:Network%></th>
-							<th class="cbi-section-table-cell"><%:Interface%></th>
-							<th class="cbi-section-table-cell"><%:Gateway%></th>
-							<th class="cbi-section-table-cell"><%:Metric%></th>
+				<table class="cbi-section-table" style="width: 100%; border-collapse: collapse;">
+						<tr class="cbi-section-table-titles" style="background-color: #f4f4f4; border-bottom: 2px solid #ccc;">
+							<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Network%></th>
+							<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Interface%></th>
+							<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Gateway%></th>
+							<th class="cbi-section-table-cell" style="padding: 8px; text-align: left;"><%:Metric%></th>
 						</tr>
 
 	<% if def4 then %>
-						<tr class="cbi-section-table-row cbi-rowstyle-1">
-							<td class="cbi-value-field" id="v4dst"><%=def4.dest%></td>
-							<td class="cbi-value-field" id="v4dev"><%=def4.dev%></td>
-							<td class="cbi-value-field" id="v4gw"><%=def4.gateway%></td>
-							<td class="cbi-value-field" id="v4metr"><%=def4.metr%></td>
+						<tr class="cbi-section-table-row cbi-rowstyle-1" style="border-bottom: 1px solid #eee;">
+							<td class="cbi-value-field" style="padding: 8px;" id="v4dst"><%=def4.dest%></td>
+							<td class="cbi-value-field" style="padding: 8px;" id="v4dev"><%=def4.dev%></td>
+							<td class="cbi-value-field" style="padding: 8px;" id="v4gw"><%=def4.gateway%></td>
+							<td class="cbi-value-field" style="padding: 8px;" id="v4metr"><%=def4.metr%></td>
 						</tr>
 
 	<% end
