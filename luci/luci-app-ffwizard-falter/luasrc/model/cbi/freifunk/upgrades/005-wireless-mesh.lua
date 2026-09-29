@@ -168,8 +168,8 @@ end
 
 function write_luci_statistics(section)
   -- only make changes if statistics are installed
-  local ipkg = require "luci.model.ipkg"
-  if ( ipkg.installed("luci-app-statistics") ~= true ) then
+  local sys = require "luci.sys"
+  if (sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") ~= "0") then
     return
   end
 
