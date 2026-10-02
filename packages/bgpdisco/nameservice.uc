@@ -59,8 +59,6 @@ function get_local_hosts() {
   let hostname = get_hostname();
   let ips = get_interfaces_with_ip();
 
-  let lo_v4;
-  let lo_v6;
   let first_v4;
   let first_v6;
   let result = {};
@@ -69,37 +67,28 @@ function get_local_hosts() {
     let name = replace(dev, '.', '_') + '.' + hostname;
     let v4 = is_v4(ip);
 
-    // Strip device from loopback interface first IP
-    if (dev == 'lo') {
-      if (!lo_v4 && v4)
-        lo_v4 = ip;
-      if (!lo_v6 && !v4)
-        lo_v6 = ip;
-    }
-
-    push(result[ip], name);
-
-    // Save first IP if for the case we've got no loopback
-    // while ommiting interfaces which are excluded
+    // ommi interfaces which are excluded
 
     DBG('comparing dev=%s against exclude_interface_self=%s', dev, cfg.exclude_interface_self);
     if (dev in cfg.exclude_interface_self) {
       DBG('Excluding interface....');
       continue;
     }
+
+    // override the name to the basic hostname for the first IP
     if (!first_v4 && v4) {
-      first_v4 = ip;
+      first_v4 = true;
+      name = hostname;
       DBG('Setting first IPv4: %s, Dev: %s', ip, dev);
     }
     if (!first_v6 && !v4) {
-      first_v6 = ip;
+      first_v6 = true;
+      name = hostname;
       DBG('Setting first IPv6: %s, Dev: %s', ip, dev);
     }
-  }
 
-  // Add records for the hostname
-  push(result[lo_v4 || first_v4], hostname);
-  push(result[lo_v6 || first_v6], hostname);
+    push(result[ip], name);
+  }
 
   // Adding records for our static entries
   for (let e in static_entries) {
