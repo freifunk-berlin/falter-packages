@@ -27,6 +27,9 @@ filter bgpdisco_export_v6 {
 {% for (let neigh in neighbors): %}
 protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', '_') }} {
 	local as 65000;
+{% if (vrf): %}
+	vrf "{{ vrf }}";
+{% endif %}
 	debug { states };
 	interface "{{ neigh.iface }}";
 	neighbor {{ neigh.ip }} as 65000 internal;

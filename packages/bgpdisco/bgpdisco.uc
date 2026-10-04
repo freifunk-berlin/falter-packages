@@ -32,13 +32,15 @@ let cfg = {
     bird_config_target: '/dev/shm/bird_bgpdisco.conf',
     bird_config_template: '/usr/share/ucode/bgpdisco/bird_config_template.ut',
     bird_mrt_file: '/tmp/mrt_bgpdisco.dump',
+    bird_vrf: null,
 };
 
 function render_bird_config() {
   DBG('render_bird_config()');
   return render(cfg.bird_config_template, proto({
                 index: index, hexenc, replace,
-                neighbors: cache_neighbors, data: plugins.provide_data()
+                neighbors: cache_neighbors, data: plugins.provide_data(),
+                vrf: cfg.bird_vrf
                 }, {}));
 }
 
@@ -204,6 +206,7 @@ function uci_config() {
         OPT(s, 'config_target', string);
         OPT(s, 'config_template', string);
         OPT(s, 'mrt_file', string);
+        OPT(s, 'vrf', string);
         break;
       default:
         ERR('Ignoring unknown section "%s" while parsing configuration', t);
