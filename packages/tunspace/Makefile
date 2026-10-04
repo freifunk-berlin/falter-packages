@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=tunspace
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_MAINTAINER:=Packet Please <pktpls@systemli.org>
 PKG_LICENSE:=GPL-2.0-only
@@ -24,6 +24,7 @@ define Package/tunspace
 	EXTRA_DEPENDS:= \
 		ucode (>=0), ucode-mod-wireguard (>=0), ucode-mod-rtnl (>=0), \
 		ucode-mod-uloop (>=0), ucode-mod-fs (>=0), ucode-mod-math (>=0), \
+		ucode-mod-uci (>=0), \
 		kmod-macvlan (>=0), uclient-fetch (>=0)
 endef
 
