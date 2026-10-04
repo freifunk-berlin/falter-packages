@@ -81,6 +81,21 @@ function debug(msg) {
   }
 }
 
+// While the uplink is down, look for it more often than every
+// maintenance_interval, to find it soon after boot or an outage.
+const UPLINK_RETRY_INTERVAL = 5;
+
+// set while the uplink is down, to report an outage only once
+let uplink_down = false;
+
+function uplink_log(msg) {
+  if (uplink_down) {
+    debug(msg);
+  } else {
+    log(msg);
+  }
+}
+
 function rtnl_request(cmd, flags, msg) {
   let reply = rtnl.request(cmd, flags, msg);
   debug(sprintf("rtnl: cmd=%J flags=%J msg=%J error=%J reply=%s", cmd, flags, msg, err, type(reply)));
@@ -501,7 +516,7 @@ function uplink_maintenance(cfg) {
     // also used directly (outside of tunspace) for local NAT. There is
     // nothing to move or configure here, just confirm it's up.
     if (!uplink_has_default_route("")) {
-      log("uplink: no default route in root namespace");
+      uplink_log("uplink: no default route in root namespace");
       return false;
     }
     return true;
@@ -516,7 +531,7 @@ function uplink_maintenance(cfg) {
   if (interface_exists_netns(netnsifname, netns)) {
     shell_command("ip -n "+netns+" link set "+netnsifname+" up");
   } else if (!interface_exists(ifname)) {
-    log(sprintf("missing uplink interface %s", ifname));
+    uplink_log(sprintf("missing uplink interface %s", ifname));
     return false;
   } else if (topology == "netns-move-interface") {
     // move uplink interface directly:
@@ -545,7 +560,7 @@ function uplink_maintenance(cfg) {
   }
 
   if (!uplink_has_default_route(netns)) {
-    log("uplink: no default route after configuration");
+    uplink_log("uplink: no default route after configuration");
     // For the two macvlan topologies, the macvlan may be orphaned (parent interface recreated).
     // Delete it so the next tick recreates it against the fresh parent interface.
     // Leave netns-move-interface alone: that IS the physical interface.
@@ -585,13 +600,21 @@ function boot(st, cfg) {
 function tick(st, cfg) {
   debug("tick");
 
+  let interval = int(cfg.maintenance_interval);
+
   if (!uplink_maintenance(cfg)) {
-    log("uplink maintenance failed");
+    uplink_log("uplink maintenance failed");
+    uplink_down = true;
+    interval = min(interval, UPLINK_RETRY_INTERVAL);
   } else {
+    if (uplink_down) {
+      log("uplink is up");
+    }
+    uplink_down = false;
     wireguard_maintenance(st, cfg);
   }
 
-  uloop.timer(1000*int(cfg.maintenance_interval), () => tick(st, cfg));
+  uloop.timer(1000*interval, () => tick(st, cfg));
 
   debug("tick end");
 }
