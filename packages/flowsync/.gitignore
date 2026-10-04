@@ -1,0 +1,6 @@
+src/*.o
+src/flowsync
+src/test_flowsync
+src/local.mk
+test/ctquery
+__pycache__/

@@ -1,0 +1,21 @@
+[Unit]
+Description=flowsync - scoped conntrack flow announcer
+After=network-online.target nftables.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/flowsync
+ExecStart=/usr/sbin/flowsync $FLOWSYNC_OPTS run
+Restart=on-failure
+RestartSec=5
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RuntimeDirectory=flowsync
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,139 @@
+"""What a scenario works with: the topology, the gateways, flows, checks and
+timers of one run."""
+import threading
+import time
+
+from .flow import Bulk, Flow
+from .topo import Topology
+
+
+class Loop:
+    """fn() every period seconds, n times, in the background"""
+
+    def __init__(self, n, period, fn):
+        self.stopped = False
+        self.t = threading.Thread(target=self._run, args=(n, period, fn), daemon=True)
+        self.t.start()
+
+    def _run(self, n, period, fn):
+        for _ in range(n):
+            if self.stopped:
+                return
+            try:
+                fn()
+            except Exception:
+                pass
+            time.sleep(period)
+
+    def wait(self):
+        self.t.join()
+
+    def stop(self):
+        self.stopped = True
+        self.t.join()
+
+
+class Env:
+    # scaled timers: refresh interval, element_timeout, conntrack and flowtable
+    I = 3
+    E = 9
+    timers = {"udp": 10, "udp_stream": 20, "tcp_syn_sent": 12, "flowtable": 3}
+
+    def __init__(self, combo, paths, workdir, checks, topo=None):
+        self.combo = combo
+        self.flowsync = paths["flowsync"]
+        self.ctquery = paths["ctquery"]
+        self.probe_path = paths["probe"]
+        self.ptyrun = paths["ptyrun"]
+        self.python = paths["python"]
+        self.dir = workdir
+        self.c = checks
+        self.loops = []
+        if topo is not None:
+            topo.bind(self)
+            self.topo = topo
+        else:
+            self.topo = Topology(self, combo)
+        self.g = self.topo.g
+        self.cl = self.topo.cl
+        self.sv = self.topo.sv
+        self.hub = self.topo.hub
+
+    def next_id(self):
+        self.topo.next_flow += 1
+        return self.topo.next_flow
+
+    # -------------------------------------------------------- building
+    def flow(self, proto="udp", fw=None, rev=None, **kw):
+        return Flow(self, proto, fw, rev, **kw)
+
+    def bulk(self, n, **kw):
+        return Bulk(self, n, **kw)
+
+    def start(self, *opts, wait=True, debug=True):
+        """flowsync on every gateway with the same extra options"""
+        for g in self.g:
+            g.start(*opts, debug=debug)
+        if wait:
+            self.c.wait_for("daemons up", 8, lambda: all(g.up() for g in self.g))
+
+    def loop(self, n, period, fn):
+        lp = Loop(n, period, fn)
+        self.loops.append(lp)
+        return lp
+
+    def spawn(self, node, *args, out=None):
+        """a probe.py command in the background, e.g. a server"""
+        f = open(out, "w") if out else None
+        p = node.spawn(self.python, self.probe_path, *args, stdout=f)
+        if f:
+            f.close()
+        return p
+
+    def probe(self, node, *args, check=True):
+        return node.run(self.python, self.probe_path, *args, check=check)
+
+    # --------------------------------------------------------- checks
+    def check(self, *a):
+        return self.c.check(*a)
+
+    def true(self, *a):
+        return self.c.true(*a)
+
+    def ok(self, text):
+        self.c.ok(text)
+
+    def wait_for(self, desc, timeout, fn, step=0.25):
+        return self.c.wait_for(desc, timeout, fn, step)
+
+    def hold(self, desc, secs, fn, step=1.0):
+        return self.c.hold(desc, secs, fn, step)
+
+    def wait_st(self, desc, g, key, n):
+        """a status counter, which reaches the file at the daemon's next tick"""
+        return self.c.wait_for(desc, 2 * self.I + 2, lambda: (g.st(key) or 0) >= n)
+
+    @staticmethod
+    def sleep(secs):
+        time.sleep(secs)
+
+    # ------------------------------------------------ profile-aware times
+    def udp_life(self, g, replied=False):
+        """how long a UDP entry on g lives after its last packet (worst case)"""
+        t = self.timers["udp_stream" if replied else "udp"]
+        return t + (g.ft_idle if g.p.offload else 0) + 2
+
+    def any_offload(self):
+        return any(g.p.offload for g in self.g)
+
+    def close(self, keep=False):
+        """end the scenario: reset the topology for the next one (keep) or
+        tear it down"""
+        for lp in self.loops:
+            lp.stopped = True
+        for lp in self.loops:
+            lp.t.join(5)
+        if keep:
+            self.topo.reset()
+        else:
+            self.topo.close()
