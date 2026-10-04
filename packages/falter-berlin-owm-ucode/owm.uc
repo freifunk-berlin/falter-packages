@@ -20,7 +20,8 @@ function log(severity, msg) {
 	if (severity === "debug" && !cfg.debug) {
 		return;
 	}
-	system(sprintf("logger -t owm -p daemon.%s '%s'", severity, msg));
+	// no shell, msg can contain data from other nodes
+	system(["logger", "-t", "owm", "-p", "daemon." + severity, msg]);
 }
 
 function exec(cmd) {
@@ -118,10 +119,25 @@ function resolve_hostname(ip) {
 
 function send_to_server(json_str, hostname) {
 	let server = 'api.openwifimap.net';
-	
+	let body_file = '/tmp/owm-update.json';
+
+	// The command runs in a shell and the data contains names of other
+	// nodes, so pass it in a file and only accept a plain hostname.
+	if (!match(hostname, /^[A-Za-z0-9._-]+$/)) {
+		log('err', 'OWM update failed: invalid hostname');
+		return false;
+	}
+	let fh = fs.open(body_file, 'w');
+	if (!fh) {
+		log('err', 'OWM update failed: cannot write ' + body_file);
+		return false;
+	}
+	fh.write(json_str);
+	fh.close();
+
 	let try_ip = (ip) => {
 		log('debug', 'trying OWM server ' + ip);
-		let resp = exec('uclient-fetch -q --method=PUT --header="Content-Type: application/json" --body-data=\'' + json_str + '\' -O - "http://' + ip + '/update_node/' + hostname + '.olsr" 2>&1');
+		let resp = exec('uclient-fetch -q --method=PUT --header="Content-Type: application/json" --body-file=' + body_file + ' -O - "http://' + ip + '/update_node/' + hostname + '.olsr" 2>&1');
 		if (index(resp, '200') >= 0 || index(resp, 'OK') >= 0) { log('info', 'OWM update successful'); return true; }
 		log('debug', 'OWM upload to ' + ip + ' failed');
 		return false;
