@@ -6,12 +6,12 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=adblock-lean
 PKG_VERSION:=0.8.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE_TAG:=v$(PKG_VERSION)
 PKG_SOURCE_VERSION:=38131f9c153d2cbe0f462008217e379da50c7693
-PKG_SOURCE:=v$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://github.com/lynxthecat/adblock-lean/archive/refs/tags
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/lynxthecat/adblock-lean/tar.gz/v$(PKG_VERSION)?
 PKG_HASH:=84ec7aceca2cb01fc248d595819ecc60fa7b8eaca9e58acba5cb3b036aba2c9e
 
 PKG_MAINTAINER:=Freifunk Berlin <config@berlin.freifunk.net>
