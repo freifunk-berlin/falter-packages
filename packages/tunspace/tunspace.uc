@@ -58,8 +58,9 @@ function load_config(name) {
 }
 
 function log(msg) {
-  printf(msg+"\n");
-  system(sprintf("logger -t tunspace '%s'", msg));
+  print(msg, "\n");
+  // no shell, msg can contain data from the tunnel servers
+  system(["logger", "-t", "tunspace", msg]);
 }
 
 function debug(msg) {
