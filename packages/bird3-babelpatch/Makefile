@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bird3-babelpatch
 PKG_VERSION:=3.3.3
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=bird-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://bird.nic.cz/download/
@@ -26,7 +26,7 @@ define Package/bird3-babelpatch
   SUBMENU:=Routing and Redirection
   PROVIDES:=bird3
   DEPENDS:=+libpthread $(ATOMIC64_DEPENDS)
-  CONFLICTS:=bird2 bird3
+  CONFLICTS:=bird2
 endef
 
 define Package/bird3-babelpatch/Default/description
