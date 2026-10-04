@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bgpdisco
 PKG_VERSION:=1.4
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_MAINTAINER:=Simon Polack <spolack+git@mailbox.org>
 PKG_LICENSE:=GPL-2.0-only
