@@ -111,7 +111,7 @@ enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e)
 		if (cnt.inject_created)
 			cnt.inject_created--;
 		if (e) {
-			e->own = false;
+			rx_disown(e);
 			/* the create did not set the timeout: no evidence baseline */
 			e->seen_at = 0;
 		}
@@ -132,7 +132,7 @@ enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e)
 	if (cnt.inject_refreshed)
 		cnt.inject_refreshed--;
 	if (e)
-		e->own = false;
+		rx_disown(e);
 	if (err == -ENOENT) {
 		/* our copy is gone (expired, flushed, evicted): create it again */
 		cnt.inject_gone++;
@@ -269,7 +269,7 @@ static void inj_send(void)
 				continue;
 			e->seen_at = 0;
 			if (ring[i].kind == INJ_CREATE)
-				e->own = false;
+				rx_disown(e);
 		}
 	} else {
 		/* the kernel processes the batch synchronously in sendto(), the

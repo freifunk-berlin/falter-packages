@@ -92,6 +92,8 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark_mask, 16);
 	} else if (!strcmp(name, "max_copies")) {
 		return opt_uint(name, val, 0, 100000000, &cfg.max_copies, 10);
+	} else if (!strcmp(name, "max_copies_per_client")) {
+		return opt_uint(name, val, 0, 100000000, &cfg.max_copies_client, 10);
 	} else if (!strcmp(name, "proto")) {
 		p = proto_num(val);
 		if (p < 0) {
@@ -145,6 +147,8 @@ static const struct {
 	{ 'm', "ct-mark",          "ct_mark",          "HEX",   "mark set on injected entries (0x01000000)" },
 	{ 'M', "ct-mark-mask",     "ct_mark_mask",     "HEX",   "mask of that mark (0x01000000)" },
 	{ 'C', "max-copies",       "max_copies",       "N",     "most copies held, 0: nf_conntrack_max/4 (0)" },
+	{ 'c', "max-copies-per-client", "max_copies_per_client", "N",
+	  "most copies per client /64, 0: max_copies/16 (0)" },
 	{ 'P', "proto",            "proto",            "NAME",  "synced protocol, repeatable (udp tcp)" },
 	{ 'S', "skip-server-port", "skip_server_port", "N",     "server port never synced, repeatable (53)" },
 	{ 'e', "peer",             "peer",             "ADDR",  "other gateway, repeatable" },

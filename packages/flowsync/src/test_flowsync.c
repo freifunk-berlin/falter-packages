@@ -578,37 +578,57 @@ static void test_seed_sweep(void)
 	CHECK(rx_classify(e, 2100) == RX_CREATE);
 }
 
-/* copy limit: last round's count plus creates since that round started */
+/* copy limits: our copies are the slots that own one, counted in all and per
+ * client /64 as ownership changes, and recounted by the sweep */
 static void test_limit(void)
 {
-	cfg.max_copies = 100;
-	gauge.copies = 0;
-	cnt.inject_created = 0;
-	rx_round_start();
-	rx_sweep(1, 1000);				/* empty round: base 0 */
-	CHECK(copies_estimate() == 0 && !rx_limit_reached());
-	cnt.inject_created = 60;			/* created since */
-	rx_round_start();				/* round 2 starts at 60 created */
-	cnt.inject_created = 99;
-	CHECK(copies_estimate() == 99 && !rx_limit_reached());
-	cnt.inject_created = 100;
-	CHECK(rx_limit_reached());
-	gauge.copies = 70;				/* round 2 counted 70 copies ... */
-	rx_sweep(2, 1030);				/* ... base becomes 60 */
-	CHECK(copies_estimate() == 70 + 40 && rx_limit_reached());
-	cnt.copies_lost = 30;				/* 30 destroyed early (flush) */
-	CHECK(copies_estimate() == 70 + 40 - 30 && !rx_limit_reached());
-	rx_round_start();
-	gauge.copies = 20;				/* expiries show up in the next count */
-	rx_sweep(3, 1060);
-	CHECK(copies_estimate() == 20 && !rx_limit_reached());
-	rx_disown_all();				/* destroy events lost: unknown */
-	CHECK(copies_estimate() == 0);
-	cnt.inject_created = 0;
-	cnt.copies_lost = 0;
-	gauge.copies = 0;
-	cfg.max_copies = 0;
-	rx_disown_all();
+	struct flow f = mkflow(IPPROTO_UDP, 1000, 443), g = mkflow(IPPROTO_UDP, 2000, 443);
+	uint64_t lim = cnt.rx_limited, limc = cnt.rx_limited_client;
+	struct rx_ent *e;
+	unsigned int i;
+
+	CHECK(rx_init(64) == 0);
+	CHECK(gauge.owned == 0);
+	cfg.max_copies = 6;
+	cfg.max_copies_client = 4;
+	g.c = a6("2001:db8:101::1");				/* another /64 */
+	for (i = 0; i < 4; i++) {
+		f.cport = 1000 + i;
+		CHECK(rx_admit(&f));
+		e = rx_insert(&f, 1000);
+		CHECK(rx_classify(e, 1000) == RX_CREATE);
+	}
+	CHECK(gauge.owned == 4);
+	f.cport = 1004;
+	CHECK(!rx_admit(&f) && cnt.rx_limited_client == limc + 1);	/* the /64 is full */
+	CHECK(rx_admit(&g));					/* another one is not */
+	for (i = 0; i < 2; i++) {
+		g.cport = 2000 + i;
+		e = rx_insert(&g, 1000);
+		rx_classify(e, 1000);
+	}
+	CHECK(gauge.owned == 6);
+	g.cport = 2002;
+	CHECK(!rx_admit(&g) && cnt.rx_limited == lim + 1);	/* the pool is full */
+	f.cport = 1000;
+	e = rx_find(&f);
+	inj_account(INJ_CREATE, -EEXIST, e);			/* not ours after all */
+	CHECK(!e->own && gauge.owned == 5);
+	f.cport = 1004;
+	CHECK(rx_admit(&f));
+	rx_sweep(1, 2000);			/* not seen, owned since before: revoked */
+	CHECK(gauge.owned == 0 && rx_admit(&g));
+
+	/* evicting a slot that owns a copy takes it off the count */
+	CHECK(rx_init(8) == 0);
+	cfg.max_copies = cfg.max_copies_client = 100;
+	for (i = 0; i < 9; i++) {
+		f.cport = 3000 + i;
+		e = rx_insert(&f, 3000 + i);
+		rx_classify(e, 3000 + i);
+	}
+	CHECK(gauge.owned == 8);
+	cfg.max_copies = cfg.max_copies_client = 0;
 }
 
 /* kernel answers to injected messages and what they do to the bookkeeping */

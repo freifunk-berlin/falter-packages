@@ -280,7 +280,8 @@ on other hosts").
 | `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE`, falling back to `SO_RCVBUF` (bbb-configs raises `net.core.rmem_max`) |
 | `-m, --ct-mark HEX` | `ct_mark` | `0x01000000` | mark set on created entries; must be non-zero and inside the mask. Hexadecimal with or without `0x`; all other numbers are decimal |
 | `-M, --ct-mark-mask HEX` | `ct_mark_mask` | `0x01000000` | mask of that mark |
-| `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max`, at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`) |
+| `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max`, at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`). A gateway holds copies of the synced flows of all other gateways, so this bounds the fleet's flows, not this gateway's |
+| `-c, --max-copies-per-client N` | `max_copies_per_client` | `0` | most copies of one client /64's flows; `0`: `max_copies`/16. Beyond it no new copy is created for that /64 (`rx_limited_client`), so one client with thousands of flows (a scanner, P2P) cannot use up the pool for everybody. Raise it where one /64 serves many users (a public hotspot) |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp` | repeatable; `udp` and `tcp` |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | repeatable; UDP server ports never synced (TCP to these ports is synced) |
 | `-e, --peer ADDR` | `peer` (list) | - | repeatable; the other gateways (max. 32) |
@@ -325,6 +326,7 @@ slow logd, so do not leave it on.
         option ct_mark '0x01000000'
         option ct_mark_mask '0x01000000'
         option max_copies '0'
+        option max_copies_per_client '0'
         list proto 'udp'
         list proto 'tcp'
         list skip_server_port '53'
@@ -386,6 +388,7 @@ writes them to `/var/run/flowsync.status`:
 | `rx_dup` | records deduplicated |
 | `rx_evictions` | per-tuple table slots taken from a live tuple (table too small for the flow count) |
 | `rx_limited` | announcements of new flows refused because `max_copies` was reached (forged announcements, or a limit too low for the fleet) |
+| `rx_limited_client` | announcements of new flows refused because the client's /64 holds `max_copies_per_client` copies (a client with very many flows) |
 | `rx_own_lost` | copies replaced by a native entry (a packet created one after the copy was gone) |
 | `inject_created` | conntrack entries created |
 | `inject_refreshed` | timeouts of our own copies refreshed |
@@ -407,7 +410,7 @@ and these gauges:
 | `copies` | our copies in the table at the last complete round |
 | `copies_live` | of these, with a packet since the previous round |
 | `copies_offloaded` | of these, in the flowtable (fw4 flow offloading); counted as live |
-| `owned` | per-tuple table slots that own a copy |
+| `owned` | our copies: per-tuple table slots that own one, kept up to date as copies are created and destroyed (what `max_copies` limits; `max_copies` and `max_copies_per_client` follow in the status file) |
 
 and one line per peer, `peer <address> rx <datagrams> age <seconds since the
 last one>` (`age never` if nothing came yet). A peer only sends when it has

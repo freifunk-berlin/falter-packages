@@ -74,7 +74,8 @@ def flush_retry(env):
     10 s here, so a regular round cannot explain it)."""
     g0, g1 = env.g[:2]
     n = 20000
-    opts = ("-r", 5000, "-i", 10, "-t", 30)
+    # all flows come from one client address: lift the per-client limit
+    opts = ("-r", 5000, "-i", 10, "-t", 30, "-c", n)
     env.start(*opts, debug=False)
     g0.set_sysctl(udp_timeout=300)
     b = env.bulk(n, fw=g0, rev=g1)
@@ -147,7 +148,7 @@ def scale(env):
     rounds."""
     g0, g1, g2 = env.g[:3]
     n = 100000
-    env.start("-r", 5000, "-C", n + n // 5)
+    env.start("-r", 5000, "-C", n + n // 5, "-c", n)   # one client address
     g0.set_sysctl(udp_timeout=300)
     b = env.bulk(n, fw=g0, rev=g1)
     b.flood()

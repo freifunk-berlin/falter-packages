@@ -34,6 +34,26 @@ def peer_spoof(env):
               forged(), (0, 0))
 
 
+@scenario(gateways=2, once=True, tags={"abuse"})
+def client_quota(env):
+    """One client opens 500 flows (a scanner, P2P) while g1 may hold 400
+    copies, 100 per client /64. The client gets its 100, and another client's
+    new flow still gets its copy: one client cannot use up the copy pool of
+    the fleet."""
+    g0, g1 = env.g[:2]
+    env.start("-C", 400, "-c", 100, debug=False)
+    g0.set_sysctl(udp_timeout=300)
+    b = env.bulk(500, fw=g0, rev=g1)
+    b.flood()
+    env.wait_for("g1 holds the client's 100 copies", 2 * env.I + 2,
+                 lambda: g1.count("udp", "marked") == 100)
+    env.wait_st("g1 refused the rest for that client", g1, "rx_limited_client", 1)
+    f = env.flow("udp", fw=g0, rev=g1)
+    f.send()
+    env.wait_for("another client's flow gets its copy", 3, lambda: g1.ct(f).is_copy)
+    env.check("the pool was never full", g1.st("rx_limited"), 0)
+
+
 @scenario(gateways=2, tags={"abuse"})
 def garbage(env):
     """Garbage from a peer, a datagram from a non-peer and a record outside the

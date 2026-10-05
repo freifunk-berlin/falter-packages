@@ -230,6 +230,7 @@ static int cmd_check(void)
 	printf("ct_mark 0x%08lx\n", cfg.ct_mark);
 	printf("ct_mark_mask 0x%08lx\n", cfg.ct_mark_mask);
 	printf("max_copies %lu\n", cfg.max_copies);
+	printf("max_copies_per_client %lu\n", cfg.max_copies_client);
 	for (i = 0; i < 256; i++)
 		if (cfg.proto[i] && proto_name(i))
 			printf("proto %s\n", proto_name(i));

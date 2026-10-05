@@ -72,6 +72,8 @@ void write_status(void)
 	fprintf(f, "copies_live %llu\n", (unsigned long long)gauge.copies_live);
 	fprintf(f, "copies_offloaded %llu\n", (unsigned long long)gauge.copies_offloaded);
 	fprintf(f, "owned %llu\n", (unsigned long long)gauge.owned);
+	fprintf(f, "max_copies %lu\n", cfg.max_copies);
+	fprintf(f, "max_copies_per_client %lu\n", cfg.max_copies_client);
 #define X(name) fprintf(f, "%s %llu\n", #name, (unsigned long long)cnt.name);
 	COUNTERS(X)
 #undef X

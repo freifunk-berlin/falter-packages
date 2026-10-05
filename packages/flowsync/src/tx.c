@@ -227,7 +227,7 @@ static int ev_cb(const struct nlmsghdr *nlh, void *data)
 	 * Peers' announcements are then creates with EXCL again (EEXIST leaves
 	 * the native alone), not noted for a copy that does not exist. */
 	if (!is_copy(c.mark) && (e = rx_find(&c.f)) && e->own) {
-		e->own = false;
+		rx_disown(e);
 		cnt.rx_own_lost++;
 	}
 	if (!is_copy(c.mark) && announce_ok(c.status) && wanted(&c.f)) {
@@ -333,7 +333,7 @@ static int destroy_cb(const struct nlmsghdr *nlh, void *data)
 	/* one of our copies is gone, expired or not */
 	e = rx_find(&c.f);
 	if (e) {
-		e->own = false;		/* the next announcement creates it, */
+		rx_disown(e);		/* the next announcement creates it, */
 		e->t_inject = 0;	/* however soon after the last create */
 		e->gone_gen = dump_gen;
 	}
@@ -649,7 +649,6 @@ int refresh_start(void)
 	round_start_s = now_s();
 	round_no++;
 	round_entries = round_copies = round_copies_live = round_copies_offloaded = 0;
-	rx_round_start();
 	round_running = true;
 	gauge.refresh_running = true;
 	if (dump_send() < 0) {

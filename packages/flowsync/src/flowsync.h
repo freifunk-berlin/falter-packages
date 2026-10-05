@@ -113,6 +113,7 @@ struct config {
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
 	unsigned long ct_mark, ct_mark_mask;
 	unsigned long max_copies;	/* 0: derived at startup, see rx_limit_init() */
+	unsigned long max_copies_client;	/* per client /64; 0: derived */
 	bool proto[256];
 	unsigned int n_proto;
 	uint8_t skip_port[65536 / 8];
@@ -173,7 +174,7 @@ enum inj_acct { ACCT_OK, ACCT_RETRY, ACCT_ERROR };
 	X(tx_refresh_dropped) X(tx_control) X(tx_resync) X(refresh_rounds) X(refresh_overrun) X(refresh_errors) \
 	X(ev_recv) X(ev_own) X(ev_overruns) X(ds_overruns) \
 	X(rx_datagrams) X(rx_control) X(rx_resync) X(rx_records) X(rx_bad_peer) X(rx_policy) \
-	X(rx_parse) X(rx_version) X(rx_dup) X(rx_evictions) X(rx_own_lost) X(rx_limited) \
+	X(rx_parse) X(rx_version) X(rx_dup) X(rx_evictions) X(rx_own_lost) X(rx_limited) X(rx_limited_client) \
 	X(inject_created) X(inject_refreshed) X(inject_held) X(inject_exists) X(inject_replaced) X(inject_gone) X(inject_errors) \
 	X(copies_lost)
 
@@ -191,7 +192,7 @@ struct gauges {
 	uint64_t copies;		/* our copies in the table, last complete round */
 	uint64_t copies_live;		/* of these, with traffic since their last refresh */
 	uint64_t copies_offloaded;	/* of these, in the flowtable (fw4 flow offloading) */
-	uint64_t owned;			/* RX table slots that own a copy */
+	uint64_t owned;			/* our copies: slots that own one (live, the limit) */
 	bool refresh_running;
 };
 
@@ -294,12 +295,11 @@ enum refresh_do refresh_due(const struct rx_ent *e, uint32_t remaining, uint32_t
 			    uint32_t now);
 struct rx_ent *rx_seed(const struct flow *f, uint32_t round, uint32_t now);
 void rx_sweep(uint32_t round, uint32_t round_start);
-void rx_round_start(void);
 void rx_disown_all(void);
 void rx_own(struct rx_ent *e, uint32_t now);
-uint64_t copies_estimate(void);
+void rx_disown(struct rx_ent *e);
 void rx_limit_init(void);
-bool rx_limit_reached(void);
+bool rx_admit(const struct flow *f);
 
 /* resync.c */
 int destroy_open(void);

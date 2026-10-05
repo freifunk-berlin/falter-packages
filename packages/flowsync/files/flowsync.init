@@ -49,6 +49,7 @@ render_options() {
 	_opt "$add" ct_mark ct-mark
 	_opt "$add" ct_mark_mask ct-mark-mask
 	_opt "$add" max_copies max-copies
+	_opt "$add" max_copies_per_client max-copies-per-client
 	_list "$add" proto proto
 	_list "$add" skip_server_port skip-server-port
 	_list "$add" peer peer

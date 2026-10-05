@@ -28,6 +28,46 @@
 static struct rx_ent *table;
 static unsigned int mask;
 
+/*
+ * Our copies, counted: gauge.owned is the number of slots that own one, and
+ * clients[] counts them per client /64 (the copy limits). Both follow every
+ * change of own (rx_own, rx_disown) and are recounted from the table by each
+ * sweep, which also drops /64s without copies. Open addressing on the /64
+ * (0: empty, no client of a synced prefix has it); a /64 whose window is full
+ * is not counted and so not limited.
+ */
+#define CLIENTS		(1 << 16)
+#define CLIENT_PROBES	64
+static struct client {
+	uint64_t pfx;
+	uint32_t n;
+} clients[CLIENTS];
+
+static uint32_t *client_count(const struct flow *f, bool add)
+{
+	uint64_t p;
+	uint32_t h;
+	unsigned int i;
+
+	memcpy(&p, f->c.s6_addr, sizeof(p));
+	if (!p)
+		return NULL;		/* the empty mark, not a client */
+	h = (uint32_t)((p ^ (p >> 31)) * 0x9e3779b97f4a7c15ull >> 40);
+	for (i = 0; i < CLIENT_PROBES; i++) {
+		struct client *c = &clients[(h + i) & (CLIENTS - 1)];
+
+		if (c->pfx == p)
+			return &c->n;
+		if (!c->pfx) {
+			if (!add)
+				return NULL;
+			c->pfx = p;
+			return &c->n;
+		}
+	}
+	return NULL;
+}
+
 static uint32_t flow_hash(const struct flow *f)
 {
 	uint32_t h = 2166136261u;
@@ -55,6 +95,8 @@ int rx_init(unsigned int size)
 		return -1;
 	}
 	mask = size - 1;
+	gauge.owned = 0;
+	memset(clients, 0, sizeof(clients));
 	return 0;
 }
 
@@ -94,6 +136,7 @@ struct rx_ent *rx_insert(const struct flow *f, uint32_t now)
 	}
 	cnt.rx_evictions++;
 take:
+	rx_disown(best);	/* an evicted or expired slot may still own a copy */
 	memset(best, 0, sizeof(*best));
 	best->f = *f;
 	best->t_rx = now;
@@ -135,9 +178,32 @@ enum rx_class rx_classify(struct rx_ent *e, uint32_t now)
  */
 void rx_own(struct rx_ent *e, uint32_t now)
 {
-	e->own = true;
+	uint32_t *n;
+
+	if (!e->own) {
+		e->own = true;
+		gauge.owned++;
+		n = client_count(&e->f, true);
+		if (n)
+			(*n)++;
+	}
 	e->own_since = now;
 	e->gone_gen = 0;
+}
+
+/* the copy is not ours (any more), or not known to exist */
+void rx_disown(struct rx_ent *e)
+{
+	uint32_t *n;
+
+	if (!e->own)
+		return;
+	e->own = false;
+	if (gauge.owned)
+		gauge.owned--;
+	n = client_count(&e->f, false);
+	if (n && *n)
+		(*n)--;
 }
 
 /*
@@ -203,39 +269,12 @@ struct rx_ent *rx_seed(const struct flow *f, uint32_t round, uint32_t now)
 	return e;
 }
 
-/* inject_created and copies_lost when the running round started, and when
- * the last complete one did; with the copies that round counted, the base of
- * copies_estimate */
-static uint64_t created_at_start, created_base, lost_at_start, lost_base, copies_base;
-
-void rx_round_start(void)
-{
-	created_at_start = cnt.inject_created;
-	lost_at_start = cnt.copies_lost;
-}
-
-/*
- * Our copies in the table now, estimated: what the last complete dump counted
- * plus what we created since that round started, minus what was destroyed
- * early since (flush, eviction). Plain expiries are not subtracted and creates
- * during the round may be counted twice, so this errs high until the next
- * round corrects it.
- */
-uint64_t copies_estimate(void)
-{
-	uint64_t up = copies_base + (cnt.inject_created > created_base ?
-				     cnt.inject_created - created_base : 0);
-	uint64_t down = cnt.copies_lost > lost_base ? cnt.copies_lost - lost_base : 0;
-
-	return up > down ? up - down : 0;
-}
-
 /*
  * DESTROY events of our copies were lost (the socket overran: a flush or an
  * eviction storm). We no longer know which copies exist, so none is assumed:
  * every announcement becomes a create with EXCL, a copy that still exists
  * answers EEXIST and the next dump learns it again. The copy count restarts
- * from what is created from now on.
+ * from there.
  */
 void rx_disown_all(void)
 {
@@ -245,34 +284,35 @@ void rx_disown_all(void)
 		table[i].own = false;
 		table[i].t_inject = 0;
 	}
-	copies_base = 0;
-	created_base = created_at_start = cnt.inject_created;
-	lost_base = lost_at_start = cnt.copies_lost;
+	gauge.owned = 0;
+	memset(clients, 0, sizeof(clients));
 }
 
 /* after a complete round: a copy owned since before the round started that
  * the dump did not see is gone (expired, flushed, evicted); stop treating it
- * as ours, so that the next announcement creates it again */
+ * as ours, so that the next announcement creates it again. The copy counts
+ * are recounted from the table. */
 void rx_sweep(uint32_t round, uint32_t round_start)
 {
 	unsigned int i;
-	uint64_t owned = 0;
+	uint32_t *n;
 
-	created_base = created_at_start;
-	lost_base = lost_at_start;
-	copies_base = gauge.copies;
-
+	gauge.owned = 0;
+	memset(clients, 0, sizeof(clients));
 	for (i = 0; i <= mask; i++) {
 		struct rx_ent *e = &table[i];
 
 		if (!e->own)
 			continue;
-		if (e->seen_round != round && e->own_since < round_start)
+		if (e->seen_round != round && e->own_since < round_start) {
 			e->own = false;
-		else
-			owned++;
+			continue;
+		}
+		gauge.owned++;
+		n = client_count(&e->f, true);
+		if (n)
+			(*n)++;
 	}
-	gauge.owned = owned;
 }
 
 /*
@@ -282,10 +322,14 @@ void rx_sweep(uint32_t round, uint32_t round_start)
  * flows of its own clients. Beyond the limit no new copy is created and no
  * table slot is taken for it (rx_limited); refreshes of our copies and the
  * re-creates after ENOENT go on. A forger can then degrade the sync, not the
- * gateway.
+ * gateway. The same happens without any forging when one client opens flows
+ * by the thousand (a scanner, P2P): every peer would hold a copy of each, and
+ * the pool would be gone for everybody else. So each client /64 may hold only
+ * max_copies_per_client of them (rx_limited_client).
  *
  * Default: a quarter of nf_conntrack_max, and at most three quarters of the
- * per-tuple table (beyond that it evicts live tuples, see RX_PROBES).
+ * per-tuple table (beyond that it evicts live tuples, see RX_PROBES); per
+ * client a sixteenth of that.
  */
 void rx_limit_init(void)
 {
@@ -301,17 +345,44 @@ void rx_limit_init(void)
 		    ct_max / 4 < rx_max)
 			cfg.max_copies = ct_max / 4;
 	}
-	logmsg(LOG_NOTICE, "copy limit %lu", cfg.max_copies);
+	if (!cfg.max_copies_client)
+		cfg.max_copies_client = cfg.max_copies / 16 ? cfg.max_copies / 16 : 1;
+	logmsg(LOG_NOTICE, "copy limit %lu, %lu per client /64", cfg.max_copies,
+	       cfg.max_copies_client);
 }
 
-bool rx_limit_reached(void)
+/* whether a new copy of f may be created (not for our own copies: refreshes
+ * and re-creates go on beyond the limits) */
+bool rx_admit(const struct flow *f)
 {
-	return copies_estimate() >= cfg.max_copies;
+	static uint64_t last_log, last_log_client;
+	char buf[INET6_ADDRSTRLEN];
+	struct in6_addr p;
+	uint32_t *n;
+
+	if (gauge.owned >= cfg.max_copies) {
+		cnt.rx_limited++;
+		if (log_ok(&last_log))
+			logmsg(LOG_WARNING, "copy limit %lu reached, new copies refused (raise "
+			       "max_copies, or forged announcements)", cfg.max_copies);
+		return false;
+	}
+	n = client_count(f, false);
+	if (n && *n >= cfg.max_copies_client) {
+		cnt.rx_limited_client++;
+		if (log_ok(&last_log_client)) {
+			memset(&p, 0, sizeof(p));
+			memcpy(&p, &f->c, 8);
+			logmsg(LOG_WARNING, "client %s/64 holds %u copies, more refused "
+			       "(max_copies_per_client)", addr_str(&p, buf, sizeof(buf)), *n);
+		}
+		return false;
+	}
+	return true;
 }
 
 static void rx_record(const struct flow *f)
 {
-	static uint64_t last_log;
 	uint32_t now = now_s();
 	struct rx_ent *e;
 
@@ -321,14 +392,9 @@ static void rx_record(const struct flow *f)
 		return;
 	}
 	e = rx_find(f);
-	/* a create (tuple not known as our copy) beyond the limit */
-	if ((!e || !e->own) && rx_limit_reached()) {
-		cnt.rx_limited++;
-		if (log_ok(&last_log))
-			logmsg(LOG_WARNING, "copy limit %lu reached, new copies refused (forged "
-			       "announcements, or raise max_copies)", cfg.max_copies);
+	/* a create (tuple not known as our copy) beyond a limit */
+	if ((!e || !e->own) && !rx_admit(f))
 		return;
-	}
 	if (!e)
 		e = rx_insert(f, now);
 	switch (rx_classify(e, now)) {
