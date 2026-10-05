@@ -38,11 +38,13 @@ table, and fw4's existing `ct state established,related` rule accepts the reply.
 
 ### Loop prevention
 
-Copies are injected with `SEEN_REPLY` already set (never `ASSURED`). Both the
-UDP tracker (`nf_conntrack_proto_udp.c`) and the TCP tracker
-(`nf_conntrack_proto_tcp.c`) set `ASSURED` on the first packet they see in
-*either* direction once `SEEN_REPLY` is set, so the kernel itself tells us
-whether a gateway sees the flow:
+Copies are injected with `SEEN_REPLY` already set (never `ASSURED`). The UDP
+tracker (`nf_conntrack_proto_udp.c`) sets `ASSURED` on the first packet it sees
+in *either* direction once `SEEN_REPLY` is set; the TCP tracker
+(`nf_conntrack_proto_tcp.c`) on the first ACK or data segment the copy's
+`ESTABLISHED` state accepts (with `be_liberal`, any; a SYN/ACK, FIN or RST
+does not set it). So the kernel itself tells us whether a gateway sees the
+flow:
 
 | entry | status | announced |
 |---|---|---|
@@ -61,10 +63,12 @@ real traffic has stopped:
    its liveness.
 2. **A copy announces only with evidence of traffic.** A refresh sets the
    timeout to exactly `element_timeout`; a packet sets it to the protocol's
-   natural value, which is larger (UDP stream 120 s, TCP unacknowledged 300 s,
-   established days). A copy is announced when its remaining timeout exceeds
-   `element_timeout` *and* exceeds what plain decay since the last known
-   value would leave, which only a packet can cause. The last known value is
+   natural value (OpenWrt: UDP 60 s, UDP stream 180 s, TCP unacknowledged
+   300 s, established 7440 s). A copy is announced when it is `ASSURED` and its
+   remaining timeout deviates from what plain decay since the last known value
+   would leave, in either direction, which only a packet can cause (a natural
+   timeout below `element_timeout`, such as an unacknowledged segment cutting
+   an established copy, counts as well). The last known value is
    the later of what the previous dump saw and what our own create or refresh
    set. A copy without a known value (after a restart or a lost table slot)
    is not announced in that round; it can show evidence from the next one.
@@ -87,13 +91,15 @@ own expire within `element_timeout` plus one `interval`. Without these rules two
 direction of a flow would refresh each other's entries forever.
 
 A side effect worth knowing: copies without traffic stay non-`ASSURED`, so a
-full table evicts them first (`early_drop`).
+full table may evict them (`early_drop` takes a non-`ASSURED` entry from the
+buckets near the new entry's, for creates through ctnetlink only from the first
+few buckets), like any other non-`ASSURED` entry, not before them.
 
 ### Filter policy
 
 Applied identically on TX and RX, on the original tuple (client -> server):
 
-- L3 is IPv6 and L4 protocol is in `proto` (default `udp`)
+- L3 is IPv6 and L4 protocol is in `proto` (default `udp`, `tcp`)
 - client is inside at least one `prefix` and inside no `exclude`
 - server is inside no `exclude_dst` (the mesh prefix, no default)
 - for UDP, the server port is not in `skip_server_port` (default `53`)
@@ -120,8 +126,9 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   `exclude_dst` and ports are always checked in user space. Every wanted native
   entry that is announceable (see above) is sent immediately to all peers.
 - Every `interval` seconds the IPv6 table is dumped per configured protocol in
-  four kernel-filtered phases: native entries with `status & SEEN_REPLY == 0`,
-  native entries with `ASSURED`, offloaded native entries that are
+  four kernel-filtered phases: native entries with `status & SEEN_REPLY == 0`
+  (for TCP: without `ASSURED`, see below), native entries with `ASSURED`,
+  offloaded native entries that are
   `SEEN_REPLY` but not `ASSURED` (see "Flow offloading"; UDP only, and only
   while the `nf_flow_table` module is loaded or an offloaded entry was seen:
   every phase walks the whole table with softirqs off), and our marked
@@ -138,17 +145,39 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   `2 x interval` while it has room in the queue is considered stuck and
   started over (`refresh_errors`); a round held back by its own send queue is
   slow, not stuck.
+- A TCP native that is `SEEN_REPLY` but still `SYN_SENT` is promoted: its
+  client's SYN passed this gateway, the SYN/ACK took another one, and then the
+  reply path moved here. The tracker ignores the server's segments in
+  `SYN_SENT` (accepted as established, but not refreshed), so the busy
+  connection would die at the SYN_SENT timeout (120 s after the SYN) and its
+  next server segment would be reset. The entry is set to `ESTABLISHED` with
+  `be_liberal`, in place (no `NLM_F_CREATE`, mark and timeout untouched), the
+  next packet makes it `ASSURED` and the next round announces it as a
+  symmetric native (`tx_promoted`). It is the gateway changing its own native,
+  not a peer's announcement; the rest of the class, handshakes in progress, is
+  left alone.
 - UPDATE events are ignored; DESTROY events of our own copies are read for
-  ownership and resync (see "Liveness and resync"). On ENOBUFS the kernel has dropped
-  events until the socket queue is drained; what is queued is intact and is
-  processed (`ev_overruns`). The next round is then pulled forward to one
-  second from now instead of waiting up to `interval`, at most once per
-  interval. Other socket errors reopen the subscription.
+  ownership and resync (see "Liveness and resync"). On ENOBUFS the kernel drops
+  events until the socket queue has been read empty, without reporting the
+  overrun again; what is queued is intact and is processed (`ev_overruns`).
+  Once the queue is empty, the next round is pulled forward to one second from
+  then instead of waiting up to `interval`, at most once per interval; a round
+  that starts during the overrun does not count as the repair, because the
+  kernel may still drop the events of flows created after its dump walked past
+  them. Other socket errors reopen the subscription. An announcement that a
+  full send buffer could not take for some peer pulls the same round.
 
 ### RX
 
-- UDP socket on `bind_address`:`port`, bound to the `interface` device;
-  datagrams from addresses not listed as `peer` are dropped, and so are IPv6
+- UDP socket on `bind_address`:`port`, bound to the `interface` device. The
+  kernel binds a socket to the device's index, so the daemon looks every
+  `interval` whether the device still has that index and reopens the socket
+  if not (netifd deletes and re-creates a VLAN, bridge or bond device on every
+  `ifup` of its interface; the old socket would receive nothing and fail every
+  send), then asks its peers for a resync. A device that does not exist yet
+  at startup is waited for the same way, and the bind address may be missing
+  too (`IPV6_FREEBIND`). Datagrams from addresses not listed as `peer` are
+  dropped (logged with their source, rate limited), and so are IPv6
   datagrams whose source is a v4-mapped address (the IPv6 stack lets them
   through, and to a dual-stack socket they look exactly like IPv4 datagrams
   from that address; only real IPv4 datagrams carry `IP_PKTINFO`).
@@ -203,7 +232,12 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   as the server keeps sending. It is deleted by its id (the kernel refuses if
   the entry was replaced by another one meanwhile, though not if the same
   entry changed) and the copy created in the same batch
-  (`inject_replaced`). Every other existing entry stays untouched.
+  (`inject_replaced`). A server segment between the delete and the create (on
+  another CPU) makes a new pickup and the create fails with EEXIST; that is
+  looked up again at the next datagram or dump chunk, not an
+  `element_timeout` later (at tens of thousands of segments per second the
+  race is lost often). Every other existing entry stays untouched. UDP creates
+  that hit EEXIST are not looked up: there is nothing to replace.
 - There is no close propagation. When a flow ends, the announcements stop and
   the peer copies expire within `element_timeout` plus one `interval` (the
   last refresh can come from the dump after the last announcement); copies
@@ -256,9 +290,16 @@ reserved bytes are zero.
   row, then the budget refills; a round started meanwhile serves every
   request, and forged requests cannot keep a gateway in back-to-back rounds).
   A requester asks at most once per `interval`/2; a lost request (a single
-  datagram) costs the wait for the peers' next regular round. If the peer is busy
+  datagram) costs the wait for the peers' next regular round, and a request
+  that could not be sent at all (no socket while the interface is away, every
+  send failed) stays pending. If the peer is busy
   with an overrunning round when the request comes, it is served by the round
-  after that one, not dropped.
+  after that one, not dropped. A round pulled forward for a request is sent at
+  `resync_rate` (default four times `tx_rate`), still bounded by the send
+  buffer: until it is through, the requester has no copy of those flows, and
+  their replies meet the firewall. The window is about the peer's announced
+  entries / (`resync_rate` x `batch_lines`): with the defaults 60000 records/s,
+  under two seconds for 100k entries.
 - The DESTROY socket can overrun too (`ds_overruns`, a flush of many copies):
   then which copies are gone is unknown, and ownership of all of them is
   dropped, once when the overrun is reported and again when the queue has
@@ -279,17 +320,19 @@ these options.
 | option | UCI option | default | meaning |
 |---|---|---|---|
 | `-b, --bind ADDR` | `bind_address` | any | local address for receiving and sending; peers check the source address, so set it to the address the peers list. IPv4 or IPv6. |
-| `-I, --interface DEV` | `interface` | any | the uplink device: sync datagrams are accepted only when they arrive on it (`SO_BINDTODEVICE`). Peers are recognised by source address alone and the kernel accepts a datagram for any local address on any interface, so without it a host on the mesh side can send with a peer's address; the daemon warns at startup if it is unset |
+| `-I, --interface DEV` | `interface` | any | the uplink device: sync datagrams are accepted only when they arrive on it (`SO_BINDTODEVICE`). Peers are recognised by source address alone and the kernel accepts a datagram for any local address on any interface, so without it a host on the mesh side can send with a peer's address; the daemon warns at startup if it is unset. The UCI option may name the logical interface (`uplink`), the init script passes its device. A device that does not exist yet is waited for, a re-created one is followed (see "RX") |
 | `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
 | `-i, --interval SEC` | `interval` | `30` | seconds between refresh rounds and counter logs |
 | `-t, --element-timeout SEC` | `element_timeout` | `90` | timeout of injected entries; must be at least `3 x interval` (the default) and should stay below the protocols' natural timeouts (UDP stream 120 s), see "Known limits" |
-| `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34; above 30 the path between the gateways must carry 1420 byte packets |
+| `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34; above 30 the path between the gateways must carry 1412 byte IPv6 packets |
 | `-r, --tx-rate N` | `tx_rate` | `500` | refresh datagrams per second, per peer |
-| `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE`, falling back to `SO_RCVBUF` (bbb-configs raises `net.core.rmem_max`) |
+| `-R, --resync-rate N` | `resync_rate` | `0` | the same for a round that answers a peer's resync request; `0`: four times `tx_rate` |
+| `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE` (the daemon has `CAP_NET_ADMIN`), falling back to `SO_RCVBUF`, which `net.core.rmem_max` caps |
 | `-m, --ct-mark HEX` | `ct_mark` | `0x01000000` | mark set on created entries; must be non-zero and inside the mask. Hexadecimal with or without `0x`; all other numbers are decimal |
 | `-M, --ct-mark-mask HEX` | `ct_mark_mask` | `0x01000000` | mask of that mark |
-| `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max`, at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`). A gateway holds copies of the synced flows of all other gateways, so this bounds the fleet's flows, not this gateway's |
-| `-c, --max-copies-per-client N` | `max_copies_per_client` | `0` | most copies of one client /64's flows; `0`: `max_copies`/16. Beyond it no new copy is created for that /64 (`rx_limited_client`), so one client with thousands of flows (a scanner, P2P) cannot use up the pool for everybody. Raise it where one /64 serves many users (a public hotspot) |
+| `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max` (unlimited if that is 0), at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`). A gateway holds copies of the synced flows of all other gateways, so this bounds the fleet's flows, not this gateway's |
+| `-c, --max-copies-per-client N` | `max_copies_per_client` | `0` | most copies of the flows of one client prefix (`client_prefix_len`); `0`: no limit. Beyond it no new copy is created for that prefix (`rx_limited_client`), so one client with thousands of flows (a scanner, P2P) cannot use up the pool for everybody. The limit refuses in arrival order, not by need; in a Freifunk network one /64 is a whole location's client network |
+| `-L, --client-prefix-len N` | `client_prefix_len` | `64` | the prefix length a client is counted by for `max_copies_per_client`, 1..64. A host can source from every /64 of its location's delegated prefix (the gateways do not filter sources), so a per-/64 limit stops a single client, not a location: count by the delegation (`56`) for that |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp` | repeatable; `udp` and `tcp` |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | repeatable; UDP server ports never synced (TCP to these ports is synced) |
 | `-e, --peer ADDR` | `peer` (list) | - | repeatable; the other gateways (max. 32) |
@@ -306,7 +349,9 @@ Giving a repeatable option replaces its default (`--proto tcp` alone would drop
 `element_timeout < 3 x interval` is refused: one lost datagram would expire
 entries before the next refresh. At startup the daemon warns if
 `nf_conntrack_udp_timeout_stream` or `nf_conntrack_tcp_timeout_unacknowledged`
-is not above `element_timeout` (copies could then never show traffic), and
+is not above `element_timeout + interval` (a copy that carries traffic would
+then be refreshed down to `element_timeout` every round instead of living on
+its own timeout), and
 logs an error if `nf_conntrack_events` is 0 (the kernel then sends no
 conntrack events at all: new flows wait for the next round, lost copies go
 unnoticed).
@@ -336,6 +381,8 @@ slow logd, so do not leave it on.
         option ct_mark_mask '0x01000000'
         option max_copies '0'
         option max_copies_per_client '0'
+        option client_prefix_len '64'
+        option resync_rate '0'
         list proto 'udp'
         list proto 'tcp'
         list skip_server_port '53'
@@ -347,8 +394,10 @@ slow logd, so do not leave it on.
 `enabled` is evaluated by the init script; unknown options are ignored. A config
 change restarts the daemon (procd reload trigger + file watch).
 `/etc/init.d/flowsync check` prints the configuration as the daemon parses it.
-bbb-configs templates written for the text format render `batch_lines '14'`;
-that still works but wastes datagrams, raise it to 30.
+The init script starts the daemon at `START=21`, right after the network and
+long before bird (70) attracts traffic, so that the copies are in place when
+replies arrive; the daemon waits for its interface by itself. A daemon that
+cannot start (bad configuration) is respawned at most 5 times an hour.
 
 ### Privileges
 
@@ -356,8 +405,8 @@ The daemon starts as root (procd), opens its sockets and binds them, then
 drops every capability but `CAP_NET_ADMIN` (ctnetlink needs it for every
 message) and, with `--user`, switches to that user; `no_new_privs` is set.
 The UDP parser, the part exposed to the network, thus never runs with full
-root. The status file lives in `/var/run/flowsync/`, which the init script
-creates for that user.
+root. The status file lives in `/var/run/flowsync/`, which the daemon creates
+for that user before it switches (and hands over if root owns it).
 
 ### Development builds
 
@@ -380,6 +429,7 @@ writes them to `/var/run/flowsync/status`:
 | `tx_scanned` | entries returned by the refresh dumps (natives of other protocols and natives that are `SEEN_REPLY` but not `ASSURED` are filtered in the kernel and not counted) |
 | `tx_refresh` | records announced from the refresh dumps, natives and copies |
 | `tx_copies` | of these, copies announced because they saw a packet since the previous round |
+| `tx_promoted` | TCP natives stuck in `SYN_SENT` although replies pass them, set to `ESTABLISHED` (see "TX") |
 | `tx_datagrams` / `tx_errors` | datagrams with records sent / send errors (per peer, also in the peer lines). Sends never block: a refresh datagram that a full send buffer cannot take waits and the refresh with it (a slower round); an announcement of a new flow is lost then, counted, and a round is pulled forward to repair it |
 | `tx_control` / `tx_resync` | heartbeats and resync requests sent (per peer) / resync requests made |
 | `tx_refresh_dropped` | refresh entries dropped because the queue was full (should stay 0) |
@@ -388,18 +438,18 @@ writes them to `/var/run/flowsync/status`:
 | `refresh_errors` | dump socket or request errors; the round is aborted |
 | `ev_recv` | messages read from the event socket (after the kernel filter) |
 | `ev_own` | NEW events of our own injections that got past the kernel filter, ignored (0 while the filter is attached) |
-| `ev_overruns` | event socket overruns (ENOBUFS); events were lost, an early round repairs |
+| `ev_overruns` | event socket overruns (ENOBUFS); events were lost, an early round after the overrun repairs |
 | `ds_overruns` | DESTROY event socket overruns (or reopens); ownership of all copies dropped, a resync request follows |
 | `rx_datagrams` | datagrams with records received |
 | `rx_control` / `rx_resync` | heartbeats and resync requests received / resync requests received |
 | `rx_records` | records accepted for injection |
-| `rx_bad_peer` | datagrams from a non-peer source |
+| `rx_bad_peer` | datagrams from a non-peer source (the source is logged, rate limited: a peer whose source address is not the configured one shows up here) |
 | `rx_policy` | records rejected by the policy |
 | `rx_parse` / `rx_version` | malformed datagrams or records / unknown format version |
 | `rx_dup` | records deduplicated |
 | `rx_evictions` | per-tuple table slots taken from a live tuple (table too small for the flow count) |
 | `rx_limited` | announcements of new flows refused because `max_copies` was reached (forged announcements, or a limit too low for the fleet) |
-| `rx_limited_client` | announcements of new flows refused because the client's /64 holds `max_copies_per_client` copies (a client with very many flows) |
+| `rx_limited_client` | announcements of new flows refused because the client's prefix holds `max_copies_per_client` copies (a client with very many flows) |
 | `rx_own_lost` | copies replaced by a native entry (a packet created one after the copy was gone) |
 | `inject_created` | conntrack entries created |
 | `inject_refreshed` | timeouts of our own copies refreshed |
@@ -441,11 +491,12 @@ so counters lag by up to that.
    `/etc/init.d/flowsync announce 2001:bf7:750:3f00::1 50000 2a00:1450:4001:81a::200e 443`.
    On gw B: `conntrack -L -f ipv6 -p udp --mark 0x01000000/0x01000000` shows the
    entry with about 90 s left, neither `[UNREPLIED]` nor `[ASSURED]`; B's
-   `inject_created` went up by one. Repeat after 60 s: the remaining time is back
-   to 90 s and `inject_refreshed` went up by one. (Confirm the `--mark
-   value/mask` syntax of conntrack 1.4.8 on the device.)
-   Note that `announce` sends a single record: the entry is only refreshed if a
-   real flow on A keeps it in A's table; re-run `announce` to refresh by hand.
+   `inject_created` went up by one. Re-run `announce` after 60 s: the entry is
+   refreshed by B's next dump round after that announcement (not when it
+   arrives), back to 90 s, and `inject_refreshed` went up by one. Without a
+   new announcement B does not refresh it and it expires. (Confirm the `--mark
+   value/mask` syntax of conntrack 1.4.8 on the device; the `conntrack` tool is
+   not in the gateway image by default.)
    For TCP (with `list proto 'tcp'` on both gateways): `announce ... tcp` and
    `conntrack -L -f ipv6 -p tcp --mark 0x01000000/0x01000000` on B shows the
    entry `ESTABLISHED` with about 90 s left and no `[ASSURED]` until B forwards
@@ -476,8 +527,37 @@ so counters lag by up to that.
 7. Kill the daemon (procd respawns it); the copies on this gateway survive, the
    restarted daemon re-learns them within one round (`owned` comes back,
    `inject_exists` stays small, the peers' `rx_resync` counts the restart).
-   `conntrack -F` on one gateway: `copies_lost` counts, the peers serve the
-   resync request and the entries are back within a second.
+   Do not test recovery with `conntrack -F` on a gateway that carries traffic:
+   it deletes the gateway's own entries too, and with the gateways' forward
+   policy REJECT every server segment of a connection without an entry is
+   answered with a TCP reset once the stateless budget is used up (see
+   "Known limits"). On a gateway drained of traffic (BGP down), `conntrack -F`:
+   `copies_lost` counts, the peers serve the resync request and the entries are
+   back within about (the peers' announced entries) / (`resync_rate` x
+   `batch_lines`) seconds.
+
+## Migration from conntrackd
+
+flowsync and conntrackd (with samplicator) both use UDP port 3780 and cannot
+read each other's datagrams (conntrackd counts flowsync's as bad size,
+flowsync counts conntrackd's as `rx_version`). While the fleet is mixed, every
+asymmetric flow whose forward and reply gateway run different daemons has no
+entry on the reply gateway: UDP replies are rejected, TCP lives on the
+stateless budget. With k of n gateways migrated that is 2k(n-k)/(n(n-1)) of
+those flows, 33 % for one of six, 60 % for three of six. So never run a
+canary or a rollout over days:
+
+- **One window:** build all images in one change and flash the gateways back
+  to back (`sysupgrade` reboots, so there is no conntrack state to clean up),
+  or in two halves within minutes.
+- **Or a scripted flip:** ship an image with both packages, conntrackd active
+  and flowsync configured with `enabled '0'`; then stop and disable conntrackd
+  and samplicator and start flowsync on all gateways within seconds. Rollback
+  is the reverse. A later image drops conntrackd.
+
+Render all peers from the start; a peer still running conntrackd shows as
+`age never` in `flowsync status`. Keep the stateless ACK/RST accept and the
+sync firewall rule.
 
 ## Known limits
 
@@ -500,6 +580,23 @@ so counters lag by up to that.
   (`rx_limited`) while refreshes of existing copies go on, so a forger can
   degrade the sync but not the gateway. The GRE mesh between the gateways
   shares the trust model (GRE is accepted from any source).
+- **`interface` does not keep the mesh out where the gateways masquerade.**
+  A gateway that masquerades mesh traffic to its uplink (bbb-configs does,
+  for IPv4) rewrites the source of a mesh host's datagram to its uplink
+  address, which is exactly the peer address the other gateways accept, and
+  forwards it out of the uplink: it arrives on the receivers' sync device from
+  a valid peer. Any IPv4 client on the mesh can thus send announcements and
+  resync requests to every gateway but its own exit, without spoofing. The
+  daemon cannot tell such a datagram from its peer's. Only the firewall can:
+  drop forwarded traffic towards the peers' sync port (or exclude the peers'
+  addresses from masquerading) on every gateway.
+- **The copy limits do not tell need from abuse.** `max_copies` and
+  `max_copies_per_client` refuse new copies in arrival order. A host that opens
+  unanswered flows by the hundred per second (each lives the SYN_SENT or UDP
+  timeout plus `element_timeout` as a copy) can keep the pool full, and then
+  legitimate flows get no copy on the gateways that hold it; set
+  `max_copies_per_client` with `client_prefix_len` at the delegation size
+  (`56`) to confine that to the host's own location.
 - Adding or removing a gateway requires re-rendering all gateways (peer lists).
 - ct mark bit `0x01000000` is free on the gateways today (qosify is not installed
   there). It is configurable; it marks the entries created by flowsync and is
@@ -508,11 +605,14 @@ so counters lag by up to that.
 - Loop prevention relies on the UDP and TCP trackers setting `ASSURED`
   regardless of direction once `SEEN_REPLY` is set (kernel 6.12; for UDP only
   with 64-bit jiffies, so 64-bit kernels only: on 32-bit the stream check
-  against a zero timestamp fails for half of each jiffies wrap), and on the
-  natural timeouts being larger than `element_timeout` so that a packet is
-  visible in the remaining timeout. With the defaults (90 s against 120 s UDP
-  stream and 300 s TCP unacknowledged) that holds; raising `element_timeout` to
-  120 s or above silences copies.
+  against a zero timestamp fails for half of each jiffies wrap), and on a
+  packet changing the remaining timeout visibly. A natural timeout that equals
+  what a refresh would leave at that moment (`element_timeout` minus the time
+  since, e.g. TCP CLOSE_WAIT 60 s under continuous traffic with the defaults)
+  is invisible while the copy is refreshed every round. Natural timeouts above
+  `element_timeout + interval` keep a copy with traffic held rather than cut;
+  with the OpenWrt values (UDP stream 180 s, TCP unacknowledged 300 s) and the
+  defaults that holds.
 - A flow is announced by every gateway that sees its packets, so with an
   asymmetric path two gateways announce it. Dedup on the receiver absorbs this;
   refresh traffic is at most twice that of a single announcer.
@@ -530,13 +630,37 @@ so counters lag by up to that.
 - A reply that is accepted on a gateway *without* a copy, by any stateless
   rule (today's TCP accept for asymmetric replies, or an open port), creates a
   native entry in the reverse direction there (with `tcp_loose`, server data
-  is picked up as `ESTABLISHED` with the server as the original side). The
-  kernel refuses the copy for that flow with EEXIST as long as that entry lives
-  (`nf_conntrack_hash_check_insert` checks both tuples), which is up to 300 s
-  after the last unacknowledged data for TCP. Harmless while the stateless rule
-  is in place; when the rule is removed, connections that were being carried by
-  such entries lose their replies until they expire. Run `conntrack -F` on the
-  gateway right after removing the rule, or remove it at a quiet time.
+  is picked up as `ESTABLISHED` with the server as the original side). For
+  TCP the next announcement replaces it with the copy (see "RX"); for UDP the
+  kernel refuses the copy with EEXIST as long as that entry lives
+  (`nf_conntrack_hash_check_insert` checks both tuples). Such a pickup never
+  gets `SEEN_REPLY`, so every one of its packets is `ct state new` and needs
+  the stateless rule until the copy has replaced it.
+- **The stateless ACK/RST accept is a hard budget, and the gateways reject.**
+  Every window in which a gateway has no copy for a flow whose replies it
+  carries (the first reply racing the announcement, a reboot or flush until the
+  resync is through, a sync outage) puts that flow's server segments on the
+  rate-limited stateless rule (5000 segments/s with a burst of 2500, for all
+  flows of the gateway together, about 60 Mbit/s). Beyond it they fall through
+  to the forward policy, which on the gateways is REJECT: the server gets a TCP
+  reset whose sequence number it accepts, and the download dies. A window of
+  T seconds with R uncovered segments/s rejects about
+  (R - 5000)^2 x T / (2R) - 2500 segments. Measured after a flush at 20000
+  server segments/s: 12000 copies were back in 0.9 s with about 1800 resets,
+  40000 copies in 3 s with about 16000 resets (before `resync_rate`). Making the
+  over-budget rules drop instead of falling through to REJECT turns that into
+  retransmissions; that is a firewall change (bbb-configs).
+- UDP replies in such a window get an ICMPv6 port unreachable (the only
+  stateless UDP rule is for DNS, which flowsync does not sync). QUIC and
+  WireGuard mostly ignore it, connected UDP sockets see ECONNREFUSED.
+- An idle asymmetric TCP connection keeps its state on the reply gateway for
+  `nf_conntrack_tcp_timeout_unacknowledged` (300 s) after the server's last
+  data, not for the established timeout: the copy never sees the client's
+  ACKs, so after two server segments the tracker caps it at the
+  unacknowledged timeout. A server that pushes after a longer silence (IMAP
+  IDLE, SSH, push notifications) relies on the stateless rule; raising
+  `nf_conntrack_tcp_timeout_unacknowledged` on the gateways extends it, for
+  natives too.
 - The `element_timeout >= 3 x interval` check is local. Every gateway's
   `element_timeout` must cover every *peer's* `interval`; render the same values
   everywhere. A copy that received a RST is in state
@@ -573,8 +697,9 @@ bypass conntrack. The entry keeps `IPS_OFFLOAD` (and `IPS_HW_OFFLOAD`) while
 the flow is in the flowtable, the kernel keeps it alive (about a day for UDP
 and established TCP), and a dump shows no timeout for it. The flowtable lets a
 flow go after `nf_flowtable_udp_timeout` / `nf_flowtable_tcp_timeout` (30 s)
-without a packet, and hands the entry back with about the protocol's timeout
-(6.12: minus the flowtable timeout).
+without a packet, and hands the entry back with the protocol's timeout minus
+the flowtable timeout (6.12 and 6.18; 6.18 gives the full timeout only to a
+flow torn down for another reason, and CLOSE to a closing TCP flow).
 
 - **Copies:** an offloaded copy carries traffic, so it is announced every
   round while it is offloaded, and it is not refreshed (the kernel keeps it
@@ -614,16 +739,26 @@ What conntrack makes of an asymmetric TCP connection, and why it still works:
   `ASSURED` and is announced from its traffic. If the forward gateway has lost
   its native entry in between, it receives the flow back as a copy and the
   client's packets keep that copy alive.
-- A SYN/ACK that arrives before the copy exists is `INVALID` and dropped (the
-  inherent race); the retransmission passes.
+- A SYN/ACK that arrives before the copy exists passes the gateways'
+  stateless ACK accept (within its budget) and is picked up like any server
+  segment (below); beyond the budget it is rejected with a reset to the
+  server, and the client's SYN retransmission starts over. Without such a
+  rule it is dropped and retransmitted.
 - A server segment with ACK that arrives before the copy exists passes the
   gateways' stateless ACK accept (below) and is picked up by the kernel as a
   connection server -> client. The copy replaces it at the next announcement
   (see "RX"), and the server's segments are established from then on.
 - An idle connection keeps its state on the reply gateway: once the copy saw
   the server's traffic it is not cut back to `element_timeout` by refreshes.
-  The forward gateway's entry still ends after `tcp_timeout_unacknowledged`
-  (300 s) without packets; the client's next packet is picked up again.
+  It lives on the timeout the tracker gives it: established, as long as the
+  server sent no data the reply gateway saw unacknowledged, otherwise
+  `tcp_timeout_unacknowledged` (300 s, see "Known limits"). The forward
+  gateway's entry ends after `tcp_timeout_unacknowledged` without packets;
+  the client's next packet is picked up again.
+- If the reply path moves onto the forward gateway while its entry is still
+  `SYN_SENT` (the SYN/ACK took another gateway), the entry is promoted to
+  `ESTABLISHED` by the next round instead of dying 120 s after the SYN (see
+  "TX").
 
 There is deliberately no close propagation. A closed connection's peer copies
 expire within `element_timeout` plus one `interval` once nothing announces
@@ -638,8 +773,9 @@ Keep the gateways' rate-limited stateless accept for IPv6 TCP segments with
 ACK or RST. It covers the gaps flowsync cannot close: the reply that beats
 the first announcement, and the moments between a lost table and the
 peers' resync round. Without it every such segment is rejected and the server
-gets a reset. With it those segments pass, and the copy takes over at the next
-announcement.
+gets a reset. With it those segments pass within its budget, and the copy
+takes over at the next announcement; beyond the budget they are rejected
+just the same (see "Known limits").
 
 ## Source layout and tests
 
@@ -655,7 +791,7 @@ used only to build the BPF filter for the event socket.
 | `ctnl.c` | ctnetlink message parsing and building |
 | `wire.c` | the binary record format |
 | `udp.c` | UDP socket, peers, datagram assembly and fan-out |
-| `tx.c` | conntrack NEW and DESTROY events (with the kernel filter) and the four-phase streaming refresh |
+| `tx.c` | conntrack NEW and DESTROY events (with the kernel filter), the four-phase streaming refresh, promotion of stuck TCP natives |
 | `resync.c` | heartbeats, resync requests, peer liveness |
 | `inject.c` | conntrack injection: batches, error attribution, re-create after ENOENT, replacement of reversed entries |
 | `rx.c` | datagram handling, the per-tuple table (dedup, ownership, held refreshes) and the copy limit |

@@ -146,6 +146,17 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
 - **tcp_idle** (g2): an idle asymmetric connection keeps its state on the
   reply gateway: the copy that saw server traffic is not cut back by
   refreshes, and the server may speak first after g0's entry expired.
+- **tcp_idle_unacked** (g2): the documented limit: after two server segments
+  the copy is capped at the unacknowledged timeout, and after a longer silence
+  the server's next segment needs the stateless rule (rejected without it).
+- **syn_sent_reroute** (g2): SYN via g0, SYN/ACK and data via g1, then the
+  reply path moves onto g0, whose native is still SYN_SENT: g0 promotes it to
+  ESTABLISHED, and it outlives the SYN_SENT timeout with no segment needing
+  the stateless rule.
+- **reversed_race** (g2, heavy, once, ACK rule on g1): eight flushes of g1
+  while two servers send 40000 segments/s each: a replacement that loses the
+  race against a new pickup is looked up again at once, every copy is back
+  within two rounds.
 - **reversed** (g2, needs the ACK rule on g1): a server segment that reaches g1
   before the copy is picked up as a connection server -> client; the next
   announcement replaces it with the copy.
@@ -162,9 +173,11 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   in the kernel, ownership is re-learned from the mark, refreshes resume.
 - **flush** (g2): `conntrack -F` on g1; the DESTROY events trigger a resync
   request and the copy is back at once.
-- **expiry_resume** (g2, once, interval 5 s): a flow idles until g1's copy
-  has expired, then resumes on the same 5-tuple; g0's announcement from the
-  NEW event must create the copy at once, not a round or two later.
+- **expiry_resume** (g2, once, interval 5 s, element_timeout 17 s): a flow
+  idles until g1's copy has expired, then resumes on the same 5-tuple; g0's
+  announcement from the NEW event must create the copy at once, not a round or
+  two later. element_timeout is no multiple of the interval, so the copy
+  expires between two dumps and only the DESTROY can tell g1.
 - **restart_idle_copy** (g3): after a restart a copy seen for the first time
   is no evidence: an idle copy is not announced again.
 - **stale_own** (g2): g1's copy is flushed and g1 then forwards the flow
@@ -200,6 +213,9 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
 - **stuck_dump**: a round held back by its own send queue is slow, not stuck.
 - **flush_retry**: `conntrack -F` on g1 with 10000 copies: all back within 3 s
   (resync), not at g0's next round.
+- **resync_bulk**: `conntrack -F` on g1 with 6000 copies and a slow refresh
+  (tx_rate 50): the resync answer comes at `resync_rate`, all back within
+  2.5 s.
 - **flush_stale_chunk**: `conntrack -F` on g1 while its copies phase is held
   back by its own send queue (3000 copies with traffic, tx_rate 6): the dump
   chunk generated before the flush is read after the DESTROY events and must
@@ -218,6 +234,21 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
 - **noise** (g2, once): IPv4, unconfigured protocols and foreign clients never
   reach user space; with more than 20 prefixes the check moves to user space.
 - **default_tcp** (g1, once): the default configuration syncs UDP and TCP.
+- **client_spread** (g2, once): one location floods from 17 of its /64s;
+  counted per /56 (`--client-prefix-len 56`) it gets its 50 copies and
+  another location's flow still gets its copy.
+
+### Sync device (`scenarios/netdev.py`)
+
+- **uplink_recreate** (g2, once): g1's sync device is deleted and created
+  again (new ifindex, as netifd does to a VLAN uplink): sync goes on in both
+  directions without a restart, sends stop failing.
+- **uplink_late** (g2, once): g1's daemon starts before its sync device (and
+  bind address) exists: it keeps running and syncs once the device is there.
+
+Scenarios tagged `repro` reproduce a defect whose fix has not landed; they
+are left out of the default run (name them to run them) and lose the tag
+with the fix.
 
 ## Known issues
 
