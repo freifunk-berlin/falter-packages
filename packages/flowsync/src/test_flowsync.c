@@ -10,6 +10,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -646,6 +647,29 @@ static void test_account(void)
 	}
 }
 
+/* numbers on the command line: decimal, the marks hexadecimal with or
+ * without 0x (written as nft and conntrack print them); no octal */
+static void test_config(void)
+{
+	char *a1[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-m", "01000000",
+		       "-M", "0x01000000", "-i", "010", "-p", "03780", "check", NULL };
+	char *a2[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-m", "1000000",
+		       "-M", "1000000", "check", NULL };
+	char *a3[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-i", "0x10",
+		       "check", NULL };
+
+	optind = 1;
+	CHECK(parse_args(14, a1) == 13);
+	CHECK(cfg.ct_mark == 0x01000000 && cfg.ct_mark_mask == 0x01000000);
+	CHECK(cfg.interval == 10 && cfg.port == 3780);
+	optind = 1;
+	CHECK(parse_args(10, a2) == 9);
+	CHECK(cfg.ct_mark == 0x01000000 && cfg.ct_mark_mask == 0x01000000);
+	optind = 1;
+	CHECK(parse_args(8, a3) < 0);				/* not a decimal number */
+	setup_cfg();
+}
+
 int main(void)
 {
 	setup_cfg();
@@ -660,6 +684,7 @@ int main(void)
 	test_classify();
 	test_seed_sweep();
 	test_account();
+	test_config();
 	printf("%s: %u checks, %u failures\n", failures ? "FAIL" : "ok", checks, failures);
 	return failures ? 1 : 0;
 }

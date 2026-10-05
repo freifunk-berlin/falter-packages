@@ -20,15 +20,15 @@ _opt() {
 	[ -n "$val" ] && "$1" "--$3" "$val"
 }
 
-# config_list_foreach passes the value first, the option name goes via globals
-_list_item() {
-	"$_LIST_ADD" "$_LIST_OPT" "$1"
-}
-
+# a list option; config_get also returns one written as a plain option (which
+# config_list_foreach would skip silently), list values joined by spaces. None
+# of the values (addresses, prefixes, ports, protocol names) contains a space.
 _list() {
-	_LIST_ADD="$1"
-	_LIST_OPT="--$3"
-	config_list_foreach main "$2" _list_item
+	local vals v
+	config_get vals main "$2"
+	for v in $vals; do
+		"$1" "--$3" "$v"
+	done
 }
 
 render_options() {

@@ -18,14 +18,16 @@
 
 struct config cfg;
 
+/* decimal (base 10), or hexadecimal with or without 0x (base 16) for the
+ * marks: base 0 would read "01000000" as octal and "010" as 8 */
 static int opt_uint(const char *name, const char *val, unsigned long min,
-		    unsigned long max, unsigned long *out)
+		    unsigned long max, unsigned long *out, int base)
 {
 	unsigned long v;
 	char *end;
 
 	errno = 0;
-	v = strtoul(val, &end, 0);
+	v = strtoul(val, &end, base);
 	if (errno || end == val || *end || val[0] == '-' || v < min || v > max) {
 		logmsg(LOG_ERR, "option %s: invalid value '%s' (allowed %lu..%lu)",
 		       name, val, min, max);
@@ -67,23 +69,23 @@ static int apply_option(const char *name, const char *val)
 		}
 		cfg.bind_set = true;
 	} else if (!strcmp(name, "port")) {
-		return opt_uint(name, val, 1, 65535, &cfg.port);
+		return opt_uint(name, val, 1, 65535, &cfg.port, 10);
 	} else if (!strcmp(name, "interval")) {
-		return opt_uint(name, val, 1, 3600, &cfg.interval);
+		return opt_uint(name, val, 1, 3600, &cfg.interval, 10);
 	} else if (!strcmp(name, "element_timeout")) {
-		return opt_uint(name, val, 1, 86400, &cfg.element_timeout);
+		return opt_uint(name, val, 1, 86400, &cfg.element_timeout, 10);
 	} else if (!strcmp(name, "batch_lines")) {
-		return opt_uint(name, val, 1, WIRE_MAX_RECORDS, &cfg.batch_lines);
+		return opt_uint(name, val, 1, WIRE_MAX_RECORDS, &cfg.batch_lines, 10);
 	} else if (!strcmp(name, "tx_rate")) {
-		return opt_uint(name, val, 1, 1000000, &cfg.tx_rate);
+		return opt_uint(name, val, 1, 1000000, &cfg.tx_rate, 10);
 	} else if (!strcmp(name, "rcvbuf")) {
-		return opt_uint(name, val, 4096, INT_MAX / 2, &cfg.rcvbuf);
+		return opt_uint(name, val, 4096, INT_MAX / 2, &cfg.rcvbuf, 10);
 	} else if (!strcmp(name, "ct_mark")) {
-		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark);
+		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark, 16);
 	} else if (!strcmp(name, "ct_mark_mask")) {
-		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark_mask);
+		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark_mask, 16);
 	} else if (!strcmp(name, "max_copies")) {
-		return opt_uint(name, val, 0, 100000000, &cfg.max_copies);
+		return opt_uint(name, val, 0, 100000000, &cfg.max_copies, 10);
 	} else if (!strcmp(name, "proto")) {
 		p = proto_num(val);
 		if (p < 0) {
@@ -94,7 +96,7 @@ static int apply_option(const char *name, const char *val)
 			cfg.n_proto++;
 		}
 	} else if (!strcmp(name, "skip_server_port")) {
-		if (opt_uint(name, val, 1, 65535, &v))
+		if (opt_uint(name, val, 1, 65535, &v, 10))
 			return -1;
 		cfg.skip_port[v / 8] |= 1 << (v % 8);
 		cfg.n_skip_port++;

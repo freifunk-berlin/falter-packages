@@ -80,6 +80,13 @@ def child(args):
             res, reason = "SKIP", str(e)
         except Exception:
             checks.fail("exception: " + traceback.format_exc().strip().replace("\n", " | "))
+        # a daemon the scenario did not stop must still be running (ptyrun
+        # passes on its exit status: 128 + n for signal n)
+        if env and res != "SKIP":
+            for g in env.g:
+                if g.proc is not None and g.proc.poll() is not None:
+                    checks.fail("%s: flowsync exited during the scenario (status %s)"
+                                % (g, g.proc.returncode))
         if lock:
             lock.close()
         if res != "SKIP" and checks.fails:

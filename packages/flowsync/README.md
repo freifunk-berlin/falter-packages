@@ -263,7 +263,7 @@ on other hosts").
 | `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34; above 30 the path between the gateways must carry 1420 byte packets |
 | `-r, --tx-rate N` | `tx_rate` | `500` | refresh datagrams per second, per peer |
 | `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE`, falling back to `SO_RCVBUF` (bbb-configs raises `net.core.rmem_max`) |
-| `-m, --ct-mark HEX` | `ct_mark` | `0x01000000` | mark set on created entries; must be non-zero and inside the mask |
+| `-m, --ct-mark HEX` | `ct_mark` | `0x01000000` | mark set on created entries; must be non-zero and inside the mask. Hexadecimal with or without `0x`; all other numbers are decimal |
 | `-M, --ct-mark-mask HEX` | `ct_mark_mask` | `0x01000000` | mask of that mark |
 | `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max`, at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`) |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp` | repeatable; `udp` and `tcp` |

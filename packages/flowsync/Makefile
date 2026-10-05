@@ -42,6 +42,14 @@ define Package/flowsync/conffiles
 /etc/config/flowsync
 endef
 
+# only the sources: src/ may also hold a host build from development (objects,
+# the binary, local.mk) that the default cp -fpR would carry along, newer than
+# the sources, so that make would not rebuild them for the target
+define Build/Prepare
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)
+	$(CP) ./src/*.c ./src/*.h ./src/Makefile $(PKG_BUILD_DIR)/
+endef
+
 define Build/Configure
 endef
 

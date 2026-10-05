@@ -156,12 +156,14 @@ static int cmd_get(char **argv)
 	f.proto = p;
 	put_tuple(nlh, &f);
 	rc = xact(nlh, get_cb, &g);
-	if (rc == -ENOENT || !g.found) {
+	/* "none" only when the kernel says so: any other failure must not pass
+	 * a check that an entry is gone */
+	if (rc == -ENOENT) {
 		printf("none\n");
 		return 1;
 	}
-	if (rc) {
-		printf("error: %s\n", strerror(-rc));
+	if (rc || !g.found) {
+		printf("error: %s\n", rc ? strerror(-rc) : "no entry in the answer");
 		return 2;
 	}
 	printf("timeout=%us %s%s%s mark=0x%x", g.e.timeout,
@@ -170,6 +172,10 @@ static int cmd_get(char **argv)
 	       g.e.status & IPS_OFFLOAD ? " OFFLOAD" : "", g.e.mark);
 	if (f.proto == IPPROTO_TCP)
 		printf(" tcp_state=%d", g.tcp_state);
+	/* the kernel finds the entry by either tuple: the one asked for may be
+	 * its reply direction */
+	if (!flow_eq(&g.e.f, &f))
+		printf(" reversed");
 	printf("\n");
 	return 0;
 }

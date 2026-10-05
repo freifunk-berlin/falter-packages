@@ -75,16 +75,19 @@ class Checks:
 
     def wait_for(self, desc, timeout, fn, step=0.25):
         t0 = time.monotonic()
+        last = None
         self.note("%s (up to %ss)" % (desc, timeout))
         while True:
             try:
                 if fn():
                     self.ok("%s (after %.0fs)" % (desc, time.monotonic() - t0))
                     return True
+                last = None
             except Exception as e:      # a query failing counts as "not yet"
                 last = e
             if time.monotonic() - t0 >= timeout:
-                self.fail("%s (not within %ss)" % (desc, timeout))
+                self.fail("%s (not within %ss%s)" % (desc, timeout,
+                                                     "; last error: %s" % last if last else ""))
                 return False
             time.sleep(step)
 

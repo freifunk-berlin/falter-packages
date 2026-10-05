@@ -165,7 +165,7 @@ def reversed(env):
     env.sleep(1)
     f.tcp("rev", "PA", 7000, 2010, 10)
     env.check("g1 picked the server segment up as a reversed entry", g1.ct(f),
-              lambda e: native_unreplied(e) and e.tcp_state == EST)
+              lambda e: native_unreplied(e) and e.reversed and e.tcp_state == EST)
     g1.unblock_sync()
     est0 = g1.fwc("est")
     for i in (1, 2, 3):
@@ -192,7 +192,8 @@ def reversed_real(env):
     out = os.path.join(env.dir, "cli.out")
     cli = env.spawn(env.cl, "tcptalk", f.c, f.cport, f.s, f.sport, 40, 0.5, 10, out=out)
     env.sleep(3)
-    env.check("g1 picked the connection up reversed", g1.ct(f), native_unreplied)
+    env.check("g1 picked the connection up reversed", g1.ct(f),
+              lambda e: native_unreplied(e) and e.reversed)
     g1.unblock_sync()
     env.sleep(2 * env.I + 1)
     est0 = g1.fwc("est")

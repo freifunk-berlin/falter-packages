@@ -16,8 +16,10 @@ PKG_CONFIG ?= pkg-config
 PREFIX ?= /usr/local
 SBINDIR ?= $(PREFIX)/sbin
 
-# "override" so that CFLAGS given on the command line (OpenWrt does that) are
+# optimized unless the caller says otherwise; "override" so that CFLAGS given
+# in the environment (OpenWrt's MAKE_VARS) or on the command line are
 # extended, not replaced
+CFLAGS ?= -O2 -g
 override CFLAGS += -std=gnu99 -Wall -Wextra \
 	$(shell $(PKG_CONFIG) --cflags libnetfilter_conntrack libmnl 2>/dev/null)
 LDLIBS ?= $(shell $(PKG_CONFIG) --libs libnetfilter_conntrack libmnl 2>/dev/null || \

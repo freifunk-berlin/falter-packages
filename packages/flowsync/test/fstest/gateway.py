@@ -39,6 +39,11 @@ class Entry:
         self.raw = text.strip()
         m = self.RE.search(self.raw)
         self.alive = m is not None
+        # the original tuple is the reverse of the one asked for
+        self.reversed = self.alive and self.raw.endswith(" reversed")
+        if not m and self.raw != "none":
+            # a failed query is not an absent entry (wait_for retries it)
+            raise RuntimeError("ctquery: %s" % (self.raw or "no output"))
         if not m:
             self.timeout, self.seen_reply, self.assured, self.offloaded = 0, False, False, False
             self.mark, self.tcp_state = 0, None
