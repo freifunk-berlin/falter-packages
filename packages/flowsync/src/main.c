@@ -113,6 +113,7 @@ static int cmd_run(void)
 				events_reopened();	/* nothing was received meanwhile */
 			if (destroy_fd() < 0)
 				destroy_open();
+			rx_local_refresh();	/* addresses may have come or gone */
 			switch (refresh_start()) {
 			case 1:
 				owed = false;

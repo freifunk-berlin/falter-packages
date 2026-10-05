@@ -205,8 +205,11 @@ static void note_entry(const struct nlmsghdr *nlh)
 	if (ct_parse(nlh, &c) != 0 || !c.id)
 		return;
 	flow_reverse(&rev, &ring[i].f);
-	if (!flow_eq(&c.f, &rev) || (c.status & IPS_SEEN_REPLY) || is_copy(c.mark) ||
-	    n_replace == INJ_RETRY)
+	/* TCP only: the pickup comes from the stateless accept for TCP segments
+	 * with ACK; an unreplied inbound UDP entry is something else (an open
+	 * port) and no business of ours */
+	if (ring[i].f.proto != IPPROTO_TCP || !flow_eq(&c.f, &rev) ||
+	    (c.status & IPS_SEEN_REPLY) || is_copy(c.mark) || n_replace == INJ_RETRY)
 		return;
 	replace[n_replace].f = ring[i].f;
 	replace[n_replace].orig = c.f;

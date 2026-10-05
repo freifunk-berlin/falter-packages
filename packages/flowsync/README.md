@@ -99,6 +99,12 @@ Applied identically on TX and RX, on the original tuple (client -> server):
 - for UDP, the server port is not in `skip_server_port` (default `53`)
 - both ports are 1..65535
 
+Both addresses must be routable (not unspecified, loopback, multicast,
+link-local or v4-mapped), and on RX the server must not be one of the
+receiving gateway's own addresses (a flow to the gateway itself is never
+asymmetric, and a copy would let it in as established on any interface; put
+networks behind the gateways into `exclude_dst`).
+
 A spoofed sender can therefore at most create entries for (client inside our
 prefixes) x (server outside the mesh), each living `element_timeout` seconds.
 
@@ -189,7 +195,7 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   silent. Deciding this when an announcement arrives would not work: a packet
   may have raised the timeout since the last dump, and the refresh would cut
   it.
-- A create that hits EEXIST is looked up (once per tuple and
+- A TCP create that hits EEXIST is looked up (once per tuple and
   `element_timeout`). If the existing entry is the flow in reverse
   (server -> client), unreplied and unmarked, it is a reply packet that came
   before the copy and was let through by a stateless rule; the kernel picked

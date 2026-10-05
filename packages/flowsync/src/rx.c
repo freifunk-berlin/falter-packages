@@ -18,6 +18,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
+#include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -381,12 +382,46 @@ bool rx_admit(const struct flow *f)
 	return true;
 }
 
+/*
+ * This gateway's own IPv6 addresses, re-read every interval. A flow to one
+ * of them is never on an asymmetric path through another gateway, and a copy
+ * of it would make that traffic established here, whatever interface it
+ * comes in on and whatever the zone rules say: such a record is refused.
+ * (Networks behind the gateway are not known here: exclude_dst covers them.)
+ */
+#define MAX_LOCAL 128
+static struct in6_addr local_addr[MAX_LOCAL];
+static unsigned int n_local;
+
+void rx_local_refresh(void)
+{
+	struct ifaddrs *ifa, *i;
+
+	if (getifaddrs(&ifa))
+		return;
+	n_local = 0;
+	for (i = ifa; i && n_local < MAX_LOCAL; i = i->ifa_next)
+		if (i->ifa_addr && i->ifa_addr->sa_family == AF_INET6)
+			local_addr[n_local++] = ((struct sockaddr_in6 *)i->ifa_addr)->sin6_addr;
+	freeifaddrs(ifa);
+}
+
+static bool is_local(const struct in6_addr *a)
+{
+	unsigned int i;
+
+	for (i = 0; i < n_local; i++)
+		if (IN6_ARE_ADDR_EQUAL(a, &local_addr[i]))
+			return true;
+	return false;
+}
+
 static void rx_record(const struct flow *f)
 {
 	uint32_t now = now_s();
 	struct rx_ent *e;
 
-	if (!wanted(f)) {
+	if (!wanted(f) || is_local(&f->s)) {
 		cnt.rx_policy++;
 		flow_dbg("rx: rejected by policy", f);
 		return;

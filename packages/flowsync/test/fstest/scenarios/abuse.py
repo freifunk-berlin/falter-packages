@@ -74,6 +74,14 @@ def garbage(env):
     env.wait_st("g1 rejected the out-of-policy record", g1, "rx_policy", 1)
     env.check("g1 has no entry for it",
               g1.ct_tuple("udp", "2001:db8:200::1", 50000, "2a00:1450:4001:ff::e", 443).alive, False)
+    # a flow to g1 itself: never asymmetric through another gateway, and a copy
+    # would let that traffic in as established on any interface
+    p0 = g1.st("rx_policy") or 0
+    g0.node.run(env.flowsync, "-e", g1.addr, "-x", PREFIX, "-D", XDST, "announce",
+                "2001:db8:100:ff::1", 50000, "fd00:1:2::1", 443, check=False)
+    env.wait_st("g1 refused a copy of a flow to its own address", g1, "rx_policy", p0 + 1)
+    env.check("g1 has no entry for it",
+              g1.ct_tuple("udp", "2001:db8:100:ff::1", 50000, "fd00:1:2::1", 443).alive, False)
     r0 = g0.st("refresh_rounds") or 0
     f = env.flow("udp", fw=g0, rev=g1)
     f.send()

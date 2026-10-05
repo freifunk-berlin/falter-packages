@@ -305,6 +305,7 @@ void rx_own(struct rx_ent *e, uint32_t now);
 void rx_disown(struct rx_ent *e);
 void rx_limit_init(void);
 bool rx_admit(const struct flow *f);
+void rx_local_refresh(void);
 
 /* resync.c */
 int destroy_open(void);
