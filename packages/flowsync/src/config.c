@@ -242,11 +242,32 @@ int parse_args(int argc, char **argv)
 		       "non-zero and inside the mask", cfg.ct_mark, cfg.ct_mark_mask);
 		ret = -1;
 	}
-	if (cfg.element_timeout < 2 * cfg.interval) {
-		logmsg(LOG_ERR, "element_timeout %lu must be at least 2 x interval %lu: one "
-		       "lost datagram would expire entries before the next refresh",
+	if (cfg.ct_mark_mask & ~cfg.ct_mark)
+		logmsg(LOG_WARNING, "ct_mark_mask 0x%08lx has bits outside ct_mark 0x%08lx: "
+		       "native entries carrying them are left out of the refresh dumps",
+		       cfg.ct_mark_mask, cfg.ct_mark);
+	/* a copy is refreshed by our own dump once per interval and only after an
+	 * announcement since the last look, and a copy created or refreshed less
+	 * than interval/2 ago waits for the next round: with 2 x interval a single
+	 * lost datagram expires it */
+	if (cfg.element_timeout < 3 * cfg.interval) {
+		logmsg(LOG_ERR, "element_timeout %lu must be at least 3 x interval %lu: with "
+		       "less, one lost datagram expires copies before the next refresh",
 		       cfg.element_timeout, cfg.interval);
 		ret = -1;
+	}
+	for (i = 0; i < cfg.n_peer; i++) {
+		unsigned int k;
+
+		if (cfg.bind_set && IN6_ARE_ADDR_EQUAL(&cfg.peer[i], &cfg.bind)) {
+			logmsg(LOG_ERR, "peer %u is our own bind_address", i + 1);
+			ret = -1;
+		}
+		for (k = 0; k < i; k++)
+			if (IN6_ARE_ADDR_EQUAL(&cfg.peer[i], &cfg.peer[k])) {
+				logmsg(LOG_ERR, "peer %u is listed twice", k + 1);
+				ret = -1;
+			}
 	}
 	if (!cfg.prefix.n)
 		logmsg(LOG_WARNING, "no prefix configured, nothing will be synced");

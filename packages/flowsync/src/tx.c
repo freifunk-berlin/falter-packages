@@ -266,6 +266,7 @@ void handle_events(void)
 			}
 			logmsg(LOG_WARNING, "conntrack events: %s, resubscribing",
 			       strerror(errno));
+			ev_lost = true;		/* the queue goes with the socket */
 			ev_open();
 			break;
 		}
@@ -523,6 +524,12 @@ bool events_lost(void)
 	return ev_lost;
 }
 
+/* the subscription was down and is back: its events are lost */
+void events_reopened(void)
+{
+	ev_lost = true;
+}
+
 /* first configured protocol after "from", or -1 */
 static int next_proto(int from)
 {
@@ -644,7 +651,6 @@ int refresh_start(void)
 	if (cur_proto < 0)
 		return -1;
 	cur_phase = 0;
-	ev_lost = false;	/* this round covers what the events missed */
 	round_start = round_progress = now;
 	round_start_s = now_s();
 	round_no++;
@@ -655,6 +661,7 @@ int refresh_start(void)
 		refresh_fail("dump request");
 		return -1;
 	}
+	ev_lost = false;	/* this round covers what the events missed */
 	return 1;
 }
 
@@ -662,7 +669,7 @@ void handle_refresh(void)
 {
 	static char buf[NL_BUF_SIZE] __attribute__((aligned(8)));
 	ssize_t n;
-	int ret;
+	int ret, err;
 
 	if (!round_running || !dump_nl)
 		return;
@@ -685,11 +692,14 @@ void handle_refresh(void)
 	chunk_gen = dump_gen;
 	dump_gen++;		/* this recv generated the next chunk */
 	ret = mnl_cb_run(buf, n, dump_seq, dump_portid, dump_cb, NULL);
+	err = errno;
 	inj_flush();	/* the refreshes this chunk decided */
 	if (ret < 0) {
-		/* NLM_F_DUMP_INTR: the table changed during the dump; harmless */
-		if (errno != EINTR)
-			refresh_fail("dump");
+		/* an error message, or NLM_F_DUMP_INTR (ctnetlink does not set it
+		 * today), where libmnl stops before the rest of the chunk and its
+		 * NLMSG_DONE: either way the round is started over */
+		errno = err;
+		refresh_fail("dump");
 		return;
 	}
 	if (ret > 0)

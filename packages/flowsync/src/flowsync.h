@@ -274,6 +274,7 @@ void handle_refresh(void);
 void refresh_tick(void);
 size_t refresh_pending(void);
 bool events_lost(void);
+void events_reopened(void);
 int refresh_pace_ms(void);
 
 /* inject.c */

@@ -70,12 +70,23 @@ bool copy_live(uint32_t status, uint32_t remaining, uint32_t prev_remaining, uin
 	return remaining > decayed + 2 || remaining + 2 < decayed;
 }
 
+/* an address a flow to the outside can have: not unspecified, loopback,
+ * multicast, link-local or v4-mapped */
+static bool routable(const struct in6_addr *a)
+{
+	return !IN6_IS_ADDR_UNSPECIFIED(a) && !IN6_IS_ADDR_LOOPBACK(a) &&
+	       !IN6_IS_ADDR_MULTICAST(a) && !IN6_IS_ADDR_LINKLOCAL(a) &&
+	       !IN6_IS_ADDR_V4MAPPED(a);
+}
+
 /* the filter policy, applied identically on TX and RX */
 bool wanted(const struct flow *f)
 {
 	if (!cfg.proto[f->proto])
 		return false;
 	if (!f->cport || !f->sport)
+		return false;
+	if (!routable(&f->c) || !routable(&f->s))
 		return false;
 	if (!in_list(&f->c, &cfg.prefix) || in_list(&f->c, &cfg.exclude))
 		return false;

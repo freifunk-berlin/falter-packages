@@ -29,8 +29,8 @@ table, and fw4's existing `ct state established,related` rule accepts the reply.
   the last round, and ownership of copies is re-learned from the kernel every
   round. See "Loop prevention".
 - **Filter in the kernel.** A BPF filter on the event socket and status, mark and
-  protocol filters on the table dumps keep IPv4, TCP-when-not-wanted and
-  foreign-prefix entries from ever reaching user space.
+  protocol filters on the table dumps keep IPv4 and TCP-when-not-wanted entries
+  from reaching user space; on the event socket also foreign-prefix entries.
 - **One thread, no blocking.** Events, datagrams, injection replies and the
   refresh dump are all driven from one `poll()` loop; the dump is read one chunk
   at a time, paced by `tx_rate`.
@@ -193,7 +193,8 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   before the copy and was let through by a stateless rule; the kernel picked
   it up as a connection of its own, and it would block the copy for as long
   as the server keeps sending. It is deleted by its id (the kernel refuses if
-  it changed meanwhile) and the copy created in the same batch
+  the entry was replaced by another one meanwhile, though not if the same
+  entry changed) and the copy created in the same batch
   (`inject_replaced`). Every other existing entry stays untouched.
 - There is no close propagation. When a flow ends, the announcements stop and
   the peer copies expire within `element_timeout` plus one `interval` (the
@@ -274,7 +275,7 @@ on other hosts").
 | `-I, --interface DEV` | `interface` | any | the uplink device: sync datagrams are accepted only when they arrive on it (`SO_BINDTODEVICE`). Peers are recognised by source address alone and the kernel accepts a datagram for any local address on any interface, so without it a host on the mesh side can send with a peer's address; the daemon warns at startup if it is unset |
 | `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
 | `-i, --interval SEC` | `interval` | `30` | seconds between refresh rounds and counter logs |
-| `-t, --element-timeout SEC` | `element_timeout` | `90` | timeout of injected entries; must be at least `2 x interval` (3 x is the default) and should stay below the protocols' natural timeouts (UDP stream 120 s), see "Known limits" |
+| `-t, --element-timeout SEC` | `element_timeout` | `90` | timeout of injected entries; must be at least `3 x interval` (the default) and should stay below the protocols' natural timeouts (UDP stream 120 s), see "Known limits" |
 | `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34; above 30 the path between the gateways must carry 1420 byte packets |
 | `-r, --tx-rate N` | `tx_rate` | `500` | refresh datagrams per second, per peer |
 | `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE`, falling back to `SO_RCVBUF` (bbb-configs raises `net.core.rmem_max`) |
@@ -294,7 +295,7 @@ on other hosts").
 Giving a repeatable option replaces its default (`--proto tcp` alone would drop
 `udp`). There is no default for `exclude_dst`; the mesh prefix must be configured
 (`2001:bf7::/32` for Freifunk Berlin), otherwise mesh-internal flows are synced too.
-`element_timeout < 2 x interval` is refused: one lost datagram would expire
+`element_timeout < 3 x interval` is refused: one lost datagram would expire
 entries before the next refresh. At startup the daemon warns if
 `nf_conntrack_udp_timeout_stream` or `nf_conntrack_tcp_timeout_unacknowledged`
 is not above `element_timeout` (copies could then never show traffic), and
@@ -413,8 +414,9 @@ and these gauges:
 | `owned` | our copies: per-tuple table slots that own one, kept up to date as copies are created and destroyed (what `max_copies` limits; `max_copies` and `max_copies_per_client` follow in the status file) |
 
 and one line per peer, `peer <address> rx <datagrams> age <seconds since the
-last one>` (`age never` if nothing came yet). A peer only sends when it has
-flows to announce, so a growing `age` is a hint, not proof, that it is gone.
+last one>` (`age never` if nothing came yet). Every peer sends a heartbeat
+each `interval`, so an `age` of more than a few intervals means the peer or
+the path to it is down.
 
 `flowsync status` (also part of `/etc/init.d/flowsync status`) replaces the old
 `conntrackd -s` health check. The status file is written once per `interval`,
@@ -493,7 +495,9 @@ so counters lag by up to that.
   what tells copies from native entries, so nothing else may set or clear it on
   synced flows.
 - Loop prevention relies on the UDP and TCP trackers setting `ASSURED`
-  regardless of direction once `SEEN_REPLY` is set (kernel 6.12), and on the
+  regardless of direction once `SEEN_REPLY` is set (kernel 6.12; for UDP only
+  with 64-bit jiffies, so 64-bit kernels only: on 32-bit the stream check
+  against a zero timestamp fails for half of each jiffies wrap), and on the
   natural timeouts being larger than `element_timeout` so that a packet is
   visible in the remaining timeout. With the defaults (90 s against 120 s UDP
   stream and 300 s TCP unacknowledged) that holds; raising `element_timeout` to
@@ -522,7 +526,7 @@ so counters lag by up to that.
   is in place; when the rule is removed, connections that were being carried by
   such entries lose their replies until they expire. Run `conntrack -F` on the
   gateway right after removing the rule, or remove it at a quiet time.
-- The `element_timeout >= 2 x interval` check is local. Every gateway's
+- The `element_timeout >= 3 x interval` check is local. Every gateway's
   `element_timeout` must cover every *peer's* `interval`; render the same values
   everywhere. A copy that received a RST is in state
   CLOSE but is kept at `element_timeout` by refreshes until its origin stops
@@ -555,10 +559,11 @@ so counters lag by up to that.
 fw4 `flow_offloading` (software) and `flow_offloading_hw` (hardware) move a
 flow into the nf_flowtable after a few packets; from then on its packets
 bypass conntrack. The entry keeps `IPS_OFFLOAD` (and `IPS_HW_OFFLOAD`) while
-the flow is in the flowtable, the kernel keeps its timeout at about a day,
-and a dump shows no timeout for it. The flowtable lets a flow go after
-`nf_flowtable_udp_timeout` / `nf_flowtable_tcp_timeout` (30 s) without a
-packet, and hands the entry back with the protocol's timeout.
+the flow is in the flowtable, the kernel keeps it alive (about a day for UDP
+and established TCP), and a dump shows no timeout for it. The flowtable lets a
+flow go after `nf_flowtable_udp_timeout` / `nf_flowtable_tcp_timeout` (30 s)
+without a packet, and hands the entry back with about the protocol's timeout
+(6.12: minus the flowtable timeout).
 
 - **Copies:** an offloaded copy carries traffic, so it is announced every
   round while it is offloaded, and it is not refreshed (the kernel keeps it

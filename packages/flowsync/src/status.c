@@ -3,7 +3,9 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <string.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -46,15 +48,27 @@ void write_status(void)
 	unsigned int i;
 	uint32_t now;
 	FILE *f;
+	int fd;
 
 	snprintf(tmp, sizeof(tmp), "%s.tmp", status_path);
-	f = fopen(tmp, "w");
-	if (!f)
+	/* created anew, never through whatever is at that name (a symlink in a
+	 * writable directory would have root write anywhere) */
+	unlink(tmp);
+	fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+	f = fd < 0 ? NULL : fdopen(fd, "w");
+	if (!f) {
+		static uint64_t last_log;
+
+		if (fd >= 0)
+			close(fd);
+		if (log_ok(&last_log))
+			logmsg(LOG_WARNING, "status file %s: %s", tmp, strerror(errno));
 		return;
+	}
 	fprintf(f, "pid %d\n", (int)getpid());
 	/* peer <addr> rx <datagrams> age <seconds since the last one | never>.
-	 * A peer without flows to announce sends nothing, so a large age is a
-	 * hint, not proof, that the peer is gone. */
+	 * Every peer sends a heartbeat each interval: an age of several
+	 * intervals means the peer or the path is down. */
 	now = now_s();
 	for (i = 0; i < cfg.n_peer; i++) {
 		fprintf(f, "peer %s rx %llu age ", addr_str(&cfg.peer[i], abuf, sizeof(abuf)),

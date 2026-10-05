@@ -171,6 +171,16 @@ static void test_policy(void)
 	CHECK(!wanted(&g));
 	g = f; g.c = a6("2001:db8:10e:ffff::1");		/* inside prefix, not excluded */
 	CHECK(wanted(&g));
+	g = f; g.s = a6("fe80::1");				/* no flow to the outside */
+	CHECK(!wanted(&g));
+	g = f; g.s = a6("ff02::1");
+	CHECK(!wanted(&g));
+	g = f; g.s = a6("::1");
+	CHECK(!wanted(&g));
+	g = f; g.s = a6("::ffff:192.0.2.1");
+	CHECK(!wanted(&g));
+	g = f; g.s = a6("::");
+	CHECK(!wanted(&g));
 
 	/* mark and traffic evidence */
 	CHECK(!is_copy(0));
@@ -250,6 +260,17 @@ static void test_wire(void)
 	buf[0] = WIRE_VERSION;
 	buf[WIRE_HDR_LEN] = 1;	/* ICMPv6 is not a known protocol */
 	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_ERR);
+	buf[WIRE_HDR_LEN] = 17;
+	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_OK);
+	buf[WIRE_HDR_LEN + 1] = 1;	/* record flags: zero in version 1 */
+	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_ERR);
+	buf[WIRE_HDR_LEN + 1] = 0;
+	buf[WIRE_HDR_LEN + 7] = 1;	/* reserved */
+	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_ERR);
+	buf[WIRE_HDR_LEN + 7] = 0;
+	buf[3] = 1;			/* header reserved byte */
+	CHECK(wire_check(buf, WIRE_HDR_LEN + 2 * WIRE_REC_LEN, &count, &fl) == PARSE_ERR);
+	buf[3] = 0;
 
 	/* a full datagram: 34 records are still accepted (older senders, batch_lines 34) */
 	wire_put_hdr(buf, WIRE_MAX_RECORDS, 0);
@@ -649,12 +670,13 @@ static void test_account(void)
 	CHECK(inj_account(INJ_CREATE, -EEXIST, NULL) == ACCT_OK);	/* unattributed is fine */
 	CHECK(cnt.inject_exists == 2);
 
-	cnt.inject_refreshed = 2;
+	cnt.inject_refreshed = 3;
 	e.own = true;
-	CHECK(inj_account(INJ_REFRESH, -EBUSY, &e) == ACCT_OK);	/* ASSURED copy, still ours */
-	CHECK(cnt.inject_refreshed == 2 && e.own);
+	CHECK(inj_account(INJ_REFRESH, -ETIME, &e) == ACCT_RETRY);	/* being destroyed */
+	CHECK(cnt.inject_refreshed == 2 && cnt.inject_gone == 1 && !e.own);
+	e.own = true;
 	CHECK(inj_account(INJ_REFRESH, -ENOENT, &e) == ACCT_RETRY);	/* gone: re-create now */
-	CHECK(cnt.inject_refreshed == 1 && cnt.inject_gone == 1 && !e.own);
+	CHECK(cnt.inject_refreshed == 1 && cnt.inject_gone == 2 && !e.own);
 	e.own = true;
 	CHECK(inj_account(INJ_REFRESH, -EINVAL, &e) == ACCT_ERROR);
 	CHECK(cnt.inject_refreshed == 0 && cnt.inject_errors == 2 && !e.own);

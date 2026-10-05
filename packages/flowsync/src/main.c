@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "flowsync.h"
@@ -62,6 +63,8 @@ static void check_kernel_timeouts(void)
 static int cmd_run(void)
 {
 	struct sigaction sa = { .sa_handler = on_signal };
+	sigset_t stopset, waitset;
+	struct timespec ts;
 	struct pollfd fds[5];
 	uint64_t now, next_tick, busy_since = 0, busy, loop_max = 0, last_early = 0;
 	char abuf[INET6_ADDRSTRLEN];
@@ -71,6 +74,13 @@ static int cmd_run(void)
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGINT, &sa, NULL);
 	signal(SIGPIPE, SIG_IGN);
+	/* the stop signals are delivered only while the loop waits in ppoll: one
+	 * that comes while it works ends that wait at once, instead of being
+	 * noticed after a full poll timeout */
+	sigemptyset(&stopset);
+	sigaddset(&stopset, SIGTERM);
+	sigaddset(&stopset, SIGINT);
+	sigprocmask(SIG_BLOCK, &stopset, &waitset);
 
 	if (rx_init(RX_TABLE_SIZE))
 		return 1;
@@ -99,8 +109,8 @@ static int cmd_run(void)
 			if (!first)
 				log_counters();
 			first = false;
-			if (events_fd() < 0)
-				ev_open();
+			if (events_fd() < 0 && !ev_open())
+				events_reopened();	/* nothing was received meanwhile */
 			if (destroy_fd() < 0)
 				destroy_open();
 			switch (refresh_start()) {
@@ -177,7 +187,9 @@ static int cmd_run(void)
 			if (busy > loop_max)
 				loop_max = busy;
 		}
-		if (poll(fds, nfds, timeout) < 0) {
+		ts.tv_sec = timeout / 1000;
+		ts.tv_nsec = (long)(timeout % 1000) * 1000000;
+		if (ppoll(fds, nfds, &ts, &waitset) < 0) {
 			if (errno == EINTR)
 				continue;
 			logmsg(LOG_ERR, "poll: %s", strerror(errno));

@@ -446,9 +446,13 @@ void handle_rx(void)
 			    addr_str(&from.sin6_addr, abuf, sizeof(abuf)));
 			continue;
 		}
-		peer_rx[p]++;
-		peer_last[p] = now_s();
 		rc = wire_check(buf, n, &count, &flags);
+		/* liveness from well-formed datagrams only: garbage with a peer's
+		 * address must not hide that the peer is gone */
+		if (rc == PARSE_OK) {
+			peer_rx[p]++;
+			peer_last[p] = now_s();
+		}
 		if (rc == PARSE_OK && (flags & WIRE_F_RESYNC))
 			resync_from(p);
 		if (rc == PARSE_OK && !count) {

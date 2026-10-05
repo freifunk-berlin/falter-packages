@@ -6,7 +6,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/default/flowsync
-ExecStart=/usr/sbin/flowsync $FLOWSYNC_OPTS run
+# the status file in RuntimeDirectory: ProtectSystem=strict makes /var/run
+# read-only (read it with: flowsync -s /run/flowsync/status status)
+ExecStart=/usr/sbin/flowsync --status-file /run/flowsync/status $FLOWSYNC_OPTS run
 Restart=on-failure
 RestartSec=5
 AmbientCapabilities=CAP_NET_ADMIN

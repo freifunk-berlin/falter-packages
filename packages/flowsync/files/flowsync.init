@@ -104,6 +104,12 @@ check() {
 }
 
 announce() {
+	local opts
+
 	render_options append_arg
-	eval "$PROG" "$ARGS" announce "$@"
+	opts="$ARGS"
+	# the flow is quoted like the options, so eval sees it as plain words
+	ARGS=""
+	append_arg "$@"
+	eval "$PROG" "$opts" announce "$ARGS"
 }

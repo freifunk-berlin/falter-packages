@@ -52,6 +52,9 @@ int wire_check(const uint8_t *buf, size_t len, unsigned int *count, uint8_t *fla
 		return PARSE_VERSION;
 	*count = buf[1];
 	*flags = buf[2];
+	/* reserved for later versions: a sender that sets it speaks another one */
+	if (buf[3])
+		return PARSE_ERR;
 	if (*count > WIRE_MAX_RECORDS ||
 	    len != WIRE_HDR_LEN + (size_t)*count * WIRE_REC_LEN)
 		return PARSE_ERR;
@@ -64,7 +67,8 @@ int wire_get(const uint8_t *src, struct flow *f)
 
 	memset(f, 0, sizeof(*f));
 	f->proto = src[0];
-	if (!proto_name(f->proto))
+	/* record flags and reserved bytes are zero in version 1 */
+	if (!proto_name(f->proto) || src[1] || src[6] || src[7])
 		return PARSE_ERR;
 	memcpy(&be, src + 2, 2);
 	f->cport = ntohs(be);

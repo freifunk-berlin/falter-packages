@@ -17,7 +17,8 @@
  * sending, and every one of its packets is "ct state new". So after an
  * EEXIST the entry is looked up (once per element_timeout and tuple); if it
  * is exactly that reversed, unreplied, unmarked entry, it is deleted by its
- * id (the kernel refuses if it changed meanwhile) and the copy is created in
+ * id (the kernel refuses if another entry took its place meanwhile; the id
+ * does not change with the entry's state) and the copy is created in
  * the same batch (inject_replaced). Its packets were only passing a stateless
  * rule; on the copy they are established.
  */
@@ -124,17 +125,16 @@ enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e)
 		cnt.inject_errors++;
 		return ACCT_ERROR;
 	}
-	/* refresh of our own copy */
-	if (err == -EBUSY) {
-		/* the copy is ASSURED: timeout refreshed, status left alone */
-		return ACCT_OK;
-	}
+	/* refresh of our own copy: the kernel applies only the timeout, which
+	 * fails with ENOENT (gone), ETIME (being destroyed) or EPERM (fixed
+	 * timeout, never set by us) */
 	if (cnt.inject_refreshed)
 		cnt.inject_refreshed--;
 	if (e)
 		rx_disown(e);
-	if (err == -ENOENT) {
-		/* our copy is gone (expired, flushed, evicted): create it again */
+	if (err == -ENOENT || err == -ETIME) {
+		/* our copy is gone (expired, flushed, evicted) or going: create
+		 * it again */
 		cnt.inject_gone++;
 		return ACCT_RETRY;
 	}
@@ -151,15 +151,20 @@ static void note_error(uint32_t seq, int err)
 	unsigned int i = seq & (INJ_RING - 1);
 	uint32_t now;
 
-	if (ring[i].seq == seq) {
-		e = ring[i].e;
-		f = &ring[i].f;
-		kind = ring[i].kind;
-		ring[i].seq = 0;
-		/* the slot may have been taken by another tuple meanwhile */
-		if (e && !flow_eq(&e->f, f))
-			e = NULL;
+	if (ring[i].seq != seq) {
+		/* not ours to attribute (the ring wrapped): what it was is
+		 * unknown, so no counter but the error count is touched */
+		if (err != -EEXIST)
+			cnt.inject_errors++;
+		return;
 	}
+	e = ring[i].e;
+	f = &ring[i].f;
+	kind = ring[i].kind;
+	ring[i].seq = 0;
+	/* the slot may have been taken by another tuple meanwhile */
+	if (e && !flow_eq(&e->f, f))
+		e = NULL;
 	/* a lookup found nothing or a delete found the entry changed: nothing to do */
 	if (kind == INJ_CHECK || kind == INJ_DELETE)
 		return;
