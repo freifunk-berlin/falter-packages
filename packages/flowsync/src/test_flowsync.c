@@ -446,6 +446,23 @@ static void test_ctnl(void)
 		CHECK(((IPS_OFFLOAD) & mask) != st);					/* phase 1 */
 	}
 
+	/* CTA_ID goes back to the kernel exactly as it came (network order) */
+	nlh = mnl_nlmsg_put_header(buf);
+	ct_build_new(nlh, &f, true);
+	mnl_attr_put_u32(nlh, CTA_ID, htonl(0x0a0b0c0d));
+	CHECK(ct_parse(nlh, &c) == 0 && c.id == htonl(0x0a0b0c0d));
+	nlh = mnl_nlmsg_put_header(buf);
+	ct_build_delete(nlh, &f, c.id);
+	{
+		const struct nlattr *a;
+		uint32_t id = 0;
+
+		mnl_attr_for_each(a, nlh, sizeof(struct nfgenmsg))
+			if (mnl_attr_get_type(a) == CTA_ID)
+				id = mnl_attr_get_u32(a);
+		CHECK(id == htonl(0x0a0b0c0d));
+	}
+
 	/* the lookup after EEXIST compares the entry it got with the reversed
 	 * flow byte for byte (note_entry): flow_reverse must leave no byte
 	 * undefined, whatever the target held before */
@@ -521,6 +538,9 @@ static void test_classify(void)
 	CHECK(e->t_inject == 1000 && e->t_rx == 1010 && e->t_ann == 1010);
 	e->own = false;						/* the kernel said EEXIST */
 	CHECK(rx_classify(e, 1012) == RX_DUP);			/* within interval/2: once */
+	CHECK(rx_classify(e, 1014) == RX_DUP);
+	CHECK(rx_classify(e, 1015) == RX_CREATE);		/* interval/2 exactly */
+	e->own = false;
 	CHECK(rx_classify(e, 1050) == RX_CREATE);
 	CHECK(e->own && e->t_ann == 1050);
 
@@ -557,6 +577,28 @@ static void test_resync(void)
 	resync_round_started();				/* a regular round serves it */
 	CHECK(!resync_round_wanted());
 	cfg.n_peer = 0;
+
+	/* our own request: not before the first round, not while DESTROY
+	 * events are queued, at most once per interval/2 */
+	{
+		uint64_t t0 = cnt.tx_resync, r0 = cnt.refresh_rounds;
+
+		cnt.refresh_rounds = 0;
+		resync_request();
+		resync_tick();
+		CHECK(cnt.tx_resync == t0);
+		cnt.refresh_rounds = 1;
+		resync_destroys_pending(true);
+		resync_tick();
+		CHECK(cnt.tx_resync == t0);
+		resync_destroys_pending(false);
+		resync_tick();
+		CHECK(cnt.tx_resync == t0 + 1);
+		resync_request();
+		resync_tick();
+		CHECK(cnt.tx_resync == t0 + 1);
+		cnt.refresh_rounds = r0;
+	}
 }
 
 /* ownership learned from the dump and revoked when the copy is gone */

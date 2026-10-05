@@ -26,20 +26,23 @@ def restart(env):
 @scenario(gateways=2, tags={"restart"})
 def flush(env):
     """conntrack -F on g1: the copy vanishes and comes back at once (the
-    DESTROY events trigger a resync request)."""
+    DESTROY events trigger a resync request). Interval 10 s here, so that
+    neither gateway's regular round can explain it."""
     g0, g1 = env.g[:2]
-    env.start()
+    env.start("-i", 10, "-t", 30)
     f = env.flow("udp", fw=g0, rev=g1)
     lp = env.loop(10, 2, f.send)
     env.wait_for("g1 has the copy", 3, lambda: g1.ct(f).is_copy)
-    env.sleep(2)
+    g0.tick(timeout=15)             # g0's next regular round is ~10 s away
+    env.sleep(1)
+    rs = g1.st("tx_resync") or 0
     g1.flush()
-    env.wait_for("copy re-created", env.I + 2, lambda: g1.ct(f).is_copy)
+    env.wait_for("copy re-created within 2 s (resync)", 2, lambda: g1.ct(f).is_copy)
     lp.wait()
-    env.sleep(2 * env.I + 1)
-    env.ok("recovered via: copies_lost=%s tx_resync=%s created=%s"
-           % (g1.st("copies_lost"), g1.st("tx_resync"), g1.st("inject_created")))
-    env.wait_st("g1 owns the copy again", g1, "owned", 1)
+    env.wait_for("g1 sent a resync request", 2 * 10 + 2,
+                 lambda: (g1.st("tx_resync") or 0) > rs)
+    env.check("g1 counted the lost copy", g1.st("copies_lost"), lambda n: n >= 1)
+    env.wait_for("g1 owns the copy again", 2 * 10 + 2, lambda: (g1.st("owned") or 0) >= 1)
 
 
 @scenario(gateways=2, once=True, tags={"restart"})

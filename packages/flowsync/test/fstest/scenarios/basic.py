@@ -49,9 +49,10 @@ def dead_flow(env):
                  lambda: gone(g0, f))
     env.wait_for("g1 copy gone", env.udp_life(g1, True) + env.E + 2 * env.I, lambda: gone(g1, f))
     env.wait_for("g2 copy gone", env.E + 3 * env.I, lambda: gone(g2, f))
-    tb = g1.st("tx_refresh")
+    tb = [g.st("tx_refresh") for g in (g0, g1, g2)]
     env.sleep(2 * env.I + 1)
-    env.check("no announcements once everything is dead", g1.st("tx_refresh"), tb)
+    env.check("no gateway announces once everything is dead",
+              [g.st("tx_refresh") for g in (g0, g1, g2)], tb)
 
 
 @scenario(gateways=3, tags={"basic"})
@@ -123,6 +124,7 @@ def loss(env):
               100 * (g2.st("rx_datagrams") or 0) // per_peer, lambda p: 85 <= p <= 119)
     env.check("g1 received about two thirds (percent)",
               100 * (g1.st("rx_datagrams") or 0) // per_peer, lambda p: 55 <= p <= 79)
+    env.check("g1 never had to create the copy again", g1.st("inject_created"), 1)
 
 
 @scenario(gateways=3, tags={"basic"})

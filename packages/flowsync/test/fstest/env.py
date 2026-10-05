@@ -8,10 +8,14 @@ from .topo import Topology
 
 
 class Loop:
-    """fn() every period seconds, n times, in the background"""
+    """fn() every period seconds, n times, in the background; a failing fn
+    fails the scenario (once), or traffic that never flowed could pass checks
+    that something is gone"""
 
-    def __init__(self, n, period, fn):
+    def __init__(self, n, period, fn, checks=None):
         self.stopped = False
+        self.checks = checks
+        self.failed = False
         self.t = threading.Thread(target=self._run, args=(n, period, fn), daemon=True)
         self.t.start()
 
@@ -21,8 +25,10 @@ class Loop:
                 return
             try:
                 fn()
-            except Exception:
-                pass
+            except Exception as e:
+                if self.checks and not self.failed:
+                    self.failed = True
+                    self.checks.fail("background traffic: %s" % e)
             time.sleep(period)
 
     def wait(self):
@@ -78,7 +84,7 @@ class Env:
             self.c.wait_for("daemons up", 8, lambda: all(g.up() for g in self.g))
 
     def loop(self, n, period, fn):
-        lp = Loop(n, period, fn)
+        lp = Loop(n, period, fn, self.c)
         self.loops.append(lp)
         return lp
 

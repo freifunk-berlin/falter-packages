@@ -112,7 +112,16 @@ def spoof(env):
            % (open(out).read().strip(), g1.ct_count(), g1.st("inject_created"),
               g1.st("rx_limited"), g1.st("inject_errors")))
     env.check("no injection errors (the table never filled)", g1.st("inject_errors"), 0)
+    env.check("the copy limit refused the rest", g1.st("rx_limited"), lambda n: n > 0)
+    env.check("g1 holds no more copies than the limit (plus one receive pass)",
+              g1.count("udp", "marked"), lambda n: n <= (g1.st("max_copies") or 0) + 2200)
     lp.wait()
+    # the forged copies expire (nothing refreshes them): the pool frees up
+    env.wait_for("the forged copies are gone", 6 * env.I + 4 * env.I,
+                 lambda: g1.count("udp", "marked") <= 2)
+    f2 = env.flow("udp", fw=g0, rev=g1)
+    f2.send()
+    env.wait_for("a new flow gets its copy again", 3, lambda: g1.ct(f2).is_copy)
 
 
 @scenario(gateways=2, once=True, tags={"abuse"})
