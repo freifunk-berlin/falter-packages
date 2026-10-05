@@ -82,6 +82,9 @@ static int cmd_run(void)
 	resync_init();
 	set_rcvbuf(udp_fd, "udp", cfg.rcvbuf);
 	check_kernel_timeouts();
+	if (!cfg.ifname[0])
+		logmsg(LOG_WARNING, "no interface set: datagrams with a peer's source address are "
+		       "accepted from every interface, the mesh side too (set it to the uplink)");
 
 	logmsg(LOG_NOTICE, "started on %s port %lu: %u peers, %u prefixes, interval %lus, "
 	       "element_timeout %lus", cfg.bind_set ? addr_str(&cfg.bind, abuf, sizeof(abuf)) : "*",
@@ -132,8 +135,10 @@ static int cmd_run(void)
 		if (owed && !gauge.refresh_running && !refresh_pending())
 			next_tick = now;
 		/* a peer asked for a round (it restarted or lost copies) */
-		if (resync_round_wanted() && !gauge.refresh_running && !refresh_pending())
+		if (resync_round_wanted() && !gauge.refresh_running && !refresh_pending()) {
 			next_tick = now;
+			resync_round_pulled();
+		}
 		resync_tick();
 		/* we asked for a resync: refresh our copies from the answers */
 		if (resync_own_round_wanted() && !gauge.refresh_running && !refresh_pending() &&
@@ -215,6 +220,7 @@ static int cmd_check(void)
 
 	printf("debug %d\n", cfg.debug);
 	printf("bind_address %s\n", cfg.bind_set ? addr_str(&cfg.bind, abuf, sizeof(abuf)) : "*");
+	printf("interface %s\n", cfg.ifname[0] ? cfg.ifname : "*");
 	printf("port %lu\n", cfg.port);
 	printf("interval %lu\n", cfg.interval);
 	printf("element_timeout %lu\n", cfg.element_timeout);

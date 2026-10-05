@@ -515,20 +515,25 @@ static void test_classify(void)
 	CHECK(refresh_due(e, 60, 0, 1080) == REFRESH_NO);	/* nobody announced it yet */
 }
 
-/* a peer's resync request starts a round; at most one such extra round per
- * interval/2, whoever asked */
+/* a peer's resync request pulls a round forward; at most two such rounds in
+ * a row, then two per interval, whoever asked */
 static void test_resync(void)
 {
-	cfg.n_peer = 2;
+	cfg.n_peer = 3;
 	resync_round_started();
 	resync_from(0);
 	CHECK(resync_round_wanted());
+	resync_round_pulled();
 	resync_round_started();				/* served */
 	resync_from(0);					/* again at once: ignored */
 	CHECK(!resync_round_wanted());
-	resync_from(1);					/* another peer: noted, but no */
-	CHECK(!resync_round_wanted());			/* second extra round so soon */
-	resync_round_started();				/* the next round serves it */
+	resync_from(1);					/* another peer: served too */
+	CHECK(resync_round_wanted());
+	resync_round_pulled();
+	resync_round_started();
+	resync_from(2);					/* a third at once: the budget */
+	CHECK(!resync_round_wanted());			/* waits */
+	resync_round_started();				/* a regular round serves it */
 	CHECK(!resync_round_wanted());
 	cfg.n_peer = 0;
 }

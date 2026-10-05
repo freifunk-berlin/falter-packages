@@ -139,8 +139,11 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
 
 ### RX
 
-- UDP socket on `bind_address`:`port`; datagrams from addresses not listed as
-  `peer` are dropped.
+- UDP socket on `bind_address`:`port`, bound to the `interface` device;
+  datagrams from addresses not listed as `peer` are dropped, and so are IPv6
+  datagrams whose source is a v4-mapped address (the IPv6 stack lets them
+  through, and to a dual-stack socket they look exactly like IPv4 datagrams
+  from that address; only real IPv4 datagrams carry `IP_PKTINFO`).
 - Records are decoded and checked against the policy. A per-tuple table
   (131072 slots, linear probing) remembers when each tuple was last announced
   and injected and whether its entry is a copy of ours. An announcement of a
@@ -239,12 +242,12 @@ reserved bytes are zero.
   copies exists any more, every announcement becomes a create with EXCL, a
   copy that does exist answers EEXIST and the next dump learns it again.
 - A peer serves a request (`rx_resync`) by starting its next round at once,
-  at most once per requesting peer per `interval`/4 and with at most one such
-  extra round per `interval`/2 whoever asked (a round started meanwhile serves
-  every request, and forged requests cannot keep a gateway in back-to-back
-  rounds). A requester asks at most once per `interval`/2 and repeats the
-  request on its next two heartbeats unless every peer has sent records since
-  (the request is a single datagram and can be lost). If the peer is busy
+  at most once per requesting peer per `interval`/4, and it pulls rounds
+  forward for requests at most twice per `interval` whoever asked (two in a
+  row, then the budget refills; a round started meanwhile serves every
+  request, and forged requests cannot keep a gateway in back-to-back rounds).
+  A requester asks at most once per `interval`/2; a lost request (a single
+  datagram) costs the wait for the peers' next regular round. If the peer is busy
   with an overrunning round when the request comes, it is served by the round
   after that one, not dropped.
 - The DESTROY socket can overrun too (`ds_overruns`, a flush of many copies):
@@ -268,6 +271,7 @@ on other hosts").
 | option | UCI option | default | meaning |
 |---|---|---|---|
 | `-b, --bind ADDR` | `bind_address` | any | local address for receiving and sending; peers check the source address, so set it to the address the peers list. IPv4 or IPv6. |
+| `-I, --interface DEV` | `interface` | any | the uplink device: sync datagrams are accepted only when they arrive on it (`SO_BINDTODEVICE`). Peers are recognised by source address alone and the kernel accepts a datagram for any local address on any interface, so without it a host on the mesh side can send with a peer's address; the daemon warns at startup if it is unset |
 | `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
 | `-i, --interval SEC` | `interval` | `30` | seconds between refresh rounds and counter logs |
 | `-t, --element-timeout SEC` | `element_timeout` | `90` | timeout of injected entries; must be at least `2 x interval` (3 x is the default) and should stay below the protocols' natural timeouts (UDP stream 120 s), see "Known limits" |
@@ -311,6 +315,7 @@ slow logd, so do not leave it on.
         option enabled '1'
         option debug '0'
         option bind_address '<this gateway uplink IPv4>'
+        option interface '<the uplink device>'
         option port '3780'
         option interval '30'
         option element_timeout '90'
@@ -470,7 +475,10 @@ so counters lag by up to that.
   TCP SYN from a synced prefix creates a 90 s ESTABLISHED copy on every peer,
   just like any UDP packet does, within the same policy bound. Anybody who can
   send from a peer's uplink address (UDP needs no handshake) can make a
-  gateway create copies; without a bound about 2 Mbit/s of forged records
+  gateway create copies. Set `interface` to the uplink: otherwise that is any
+  host on the mesh side too (the kernel delivers a datagram for any local
+  address on any interface, rp_filter is off by default, and Falter's freifunk
+  zone accepts input). Without a bound about 2 Mbit/s of forged records
   would fill `nf_conntrack_max` (524288) and drop new flows of the gateway's
   own clients. `max_copies` bounds this: beyond it new copies are refused
   (`rx_limited`) while refreshes of existing copies go on, so a forger can

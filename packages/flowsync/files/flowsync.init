@@ -39,6 +39,7 @@ render_options() {
 	config_get_bool debug main debug 0
 	[ "$debug" = 1 ] && "$add" --debug
 	_opt "$add" bind_address bind
+	_opt "$add" interface interface
 	_opt "$add" port port
 	_opt "$add" interval interval
 	_opt "$add" element_timeout element-timeout

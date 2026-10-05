@@ -68,6 +68,12 @@ static int apply_option(const char *name, const char *val)
 			return -1;
 		}
 		cfg.bind_set = true;
+	} else if (!strcmp(name, "interface")) {
+		if (strlen(val) >= sizeof(cfg.ifname)) {
+			logmsg(LOG_ERR, "option %s: name too long '%s'", name, val);
+			return -1;
+		}
+		strcpy(cfg.ifname, val);	/* "" for any */
 	} else if (!strcmp(name, "port")) {
 		return opt_uint(name, val, 1, 65535, &cfg.port, 10);
 	} else if (!strcmp(name, "interval")) {
@@ -129,6 +135,7 @@ static const struct {
 	const char *help;
 } options[] = {
 	{ 'b', "bind",             "bind_address",     "ADDR",  "local address (default: any)" },
+	{ 'I', "interface",        "interface",        "DEV",   "accept sync datagrams on this device only" },
 	{ 'p', "port",             "port",             "N",     "UDP port (3780)" },
 	{ 'i', "interval",         "interval",         "SEC",   "refresh and log interval (30)" },
 	{ 't', "element-timeout",  "element_timeout",  "SEC",   "timeout of injected entries (90)" },

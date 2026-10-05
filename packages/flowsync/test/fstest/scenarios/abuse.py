@@ -5,6 +5,35 @@ from ..gateway import PORT, PREFIX, XDST
 from ..scenario import scenario
 
 
+@scenario(gateways=2, once=True, tags={"abuse"})
+def peer_spoof(env):
+    """A host on the mesh side sends a resync request to g1's mesh address,
+    with g0's IPv4 address as v4-mapped IPv6 source: to a socket on any
+    address it looks exactly like g0's request. g1 listens on any address here
+    (no bind_address). Without interface it must count as a non-peer's
+    datagram; with interface eth0 (the sync link) it never reaches the daemon."""
+    g0, g1 = env.g[:2]
+    req = "01000100"            # version 1, no records, flags: resync
+    g0.start()
+    g1.start("-b", "", "-I", "")
+    env.wait_for("daemons up", 8, lambda: g0.up() and g1.up())
+    g1.block_sync(g0)           # g0's real requests and heartbeats stay out
+
+    def forged():
+        g1.tick()
+        r0, b0 = g1.st("rx_resync") or 0, g1.st("rx_bad_peer") or 0
+        env.probe(env.cl, "v6udp", "::ffff:" + g0.addr, 40000, "fd00:1:1::1", PORT, req)
+        g1.tick()
+        return (g1.st("rx_resync") or 0) - r0, (g1.st("rx_bad_peer") or 0) - b0
+
+    env.check("no interface: not taken for g0's request, counted as a non-peer's",
+              forged(), (0, 1))
+    g1.restart("-b", "", "-I", "eth0")
+    env.wait_for("g1 restarted with interface eth0", 8, g1.up)
+    env.check("interface eth0: the datagram from the mesh side never reaches g1",
+              forged(), (0, 0))
+
+
 @scenario(gateways=2, tags={"abuse"})
 def garbage(env):
     """Garbage from a peer, a datagram from a non-peer and a record outside the

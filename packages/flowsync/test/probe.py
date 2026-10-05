@@ -19,6 +19,8 @@ namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
                  flags: any of S A P F R, e.g. "SA" for a SYN/ACK
   probe.py icmp6 <src> <dst> <count>                         echo requests, one id each
   probe.py raw   <src> <sport> <dst> <dport> <count>         random garbage datagrams
+  probe.py v6udp <src> <sport> <dst> <dport> <hex payload>   one UDP datagram in a hand-built
+                 IPv6 header: any source, a v4-mapped one too
 
   probe.py --mark N <command> ...                            the same with SO_MARK N on every
                  socket, to pick a policy route (the test topology routes
@@ -258,6 +260,30 @@ def raw(src, sport, dst, dport, count):
     s.close()
 
 
+def _csum(data):
+    if len(data) % 2:
+        data += b"\0"
+    s = sum(struct.unpack("!%dH" % (len(data) // 2), data))
+    while s >> 16:
+        s = (s & 0xffff) + (s >> 16)
+    return ~s & 0xffff
+
+
+def v6udp(src, sport, dst, dport, payload):
+    # one UDP datagram in a hand-built IPv6 header, so the source may be
+    # anything, a v4-mapped address too (no socket can bind to one)
+    data = bytes.fromhex(payload)
+    s6, d6 = socket.inet_pton(socket.AF_INET6, src), socket.inet_pton(socket.AF_INET6, dst)
+    ulen = 8 + len(data)
+    udp = struct.pack("!HHHH", int(sport), int(dport), ulen, 0) + data
+    c = _csum(s6 + d6 + struct.pack("!I3xB", ulen, 17) + udp) or 0xffff
+    udp = udp[:6] + struct.pack("!H", c) + udp[8:]
+    ip6 = struct.pack("!IHBB", 6 << 28, ulen, 17, 64) + s6 + d6
+    s = sock(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_RAW)
+    s.sendto(ip6 + udp, (dst, 0))
+    s.close()
+
+
 if __name__ == "__main__":
     argv = sys.argv[1:]
     if argv[0] == "--mark":
@@ -265,4 +291,5 @@ if __name__ == "__main__":
         argv = argv[2:]
     cmd, args = argv[0], argv[1:]
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
-     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw}[cmd](*args)
+     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
+     "v6udp": v6udp}[cmd](*args)

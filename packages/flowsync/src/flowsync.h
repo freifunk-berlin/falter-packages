@@ -36,6 +36,7 @@
 #ifndef FLOWSYNC_H
 #define FLOWSYNC_H
 
+#include <net/if.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -108,6 +109,7 @@ struct config {
 	bool debug;
 	bool bind_set;
 	struct in6_addr bind;
+	char ifname[IFNAMSIZ];		/* the sync socket's device, "" for any */
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
 	unsigned long ct_mark, ct_mark_mask;
 	unsigned long max_copies;	/* 0: derived at startup, see rx_limit_init() */
@@ -248,6 +250,7 @@ int wire_get(const uint8_t *src, struct flow *f);
 /* udp.c */
 void set_rcvbuf(int fd, const char *what, unsigned long size);
 int udp_open(bool bind_port);
+ssize_t udp_recv(uint8_t *buf, size_t len, struct sockaddr_in6 *from, bool *forged);
 void peers_init(void);
 int peer_index(const struct in6_addr *a);
 /* per peer: datagrams received and when the last one came (now_s, 0: never) */
@@ -305,8 +308,8 @@ void handle_destroy(void);
 void resync_request(void);
 void resync_destroys_pending(bool pending);
 void resync_from(int peer);
-void resync_answered(int peer);
 bool resync_round_wanted(void);
+void resync_round_pulled(void);
 bool resync_own_round_wanted(void);
 void resync_round_started(void);
 void resync_tick(void);

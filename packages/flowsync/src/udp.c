@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <syslog.h>
 #include <unistd.h>
 
@@ -13,6 +14,8 @@
 
 int udp_fd = -1;
 static struct sockaddr_in6 peer_sa[MAX_PEERS];
+/* IPv4 datagrams on the socket carry IP_PKTINFO (see udp_recv) */
+static bool v4info;
 
 /* the datagram under assembly; the header is written on flush */
 static struct {
@@ -38,7 +41,7 @@ int udp_open(bool bind_port)
 {
 	struct sockaddr_in6 sa = { .sin6_family = AF_INET6 };
 	char abuf[INET6_ADDRSTRLEN];
-	int fd, off = 0;
+	int fd, off = 0, on = 1;
 
 	fd = socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (fd < 0) {
@@ -47,6 +50,22 @@ int udp_open(bool bind_port)
 	}
 	/* dual stack: IPv4 addresses are handled as v4-mapped */
 	setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off));
+	if (bind_port) {
+		/* peers are recognised by their source address only: accept
+		 * datagrams from the uplink alone, not from a mesh host that
+		 * sends with a peer's address (the kernel delivers a datagram for
+		 * any local address on any interface) */
+		if (cfg.ifname[0] &&
+		    setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, cfg.ifname, strlen(cfg.ifname))) {
+			logmsg(LOG_ERR, "interface %s: %s", cfg.ifname, strerror(errno));
+			close(fd);
+			return -1;
+		}
+		v4info = setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &on, sizeof(on)) == 0;
+		if (!v4info)
+			logmsg(LOG_WARNING, "udp: IP_PKTINFO: %s (v4-mapped sources over IPv6 "
+			       "not recognised)", strerror(errno));
+	}
 	sa.sin6_addr = cfg.bind_set ? cfg.bind : in6addr_any;
 	sa.sin6_port = bind_port ? htons(cfg.port) : 0;
 	if (bind(fd, (struct sockaddr *)&sa, sizeof(sa))) {
@@ -57,6 +76,36 @@ int udp_open(bool bind_port)
 		return -1;
 	}
 	return fd;
+}
+
+/*
+ * One datagram, without blocking. *forged is set for an IPv6 datagram whose
+ * source is a v4-mapped address: recvfrom shows it exactly like a datagram
+ * from that IPv4 address, and the IPv6 stack does not drop such sources.
+ * Only IPv4 datagrams carry IP_PKTINFO, which tells them apart.
+ */
+ssize_t udp_recv(uint8_t *buf, size_t len, struct sockaddr_in6 *from, bool *forged)
+{
+	char ctl[CMSG_SPACE(sizeof(struct in_pktinfo))] __attribute__((aligned(8)));
+	struct iovec iov = { .iov_base = buf, .iov_len = len };
+	struct msghdr m = {
+		.msg_name = from, .msg_namelen = sizeof(*from),
+		.msg_iov = &iov, .msg_iovlen = 1,
+		.msg_control = ctl, .msg_controllen = sizeof(ctl),
+	};
+	struct cmsghdr *c;
+	bool v4 = false;
+	ssize_t n;
+
+	n = recvmsg(udp_fd, &m, MSG_DONTWAIT);
+	if (n < 0)
+		return n;
+	for (c = CMSG_FIRSTHDR(&m); c; c = CMSG_NXTHDR(&m, c))
+		if (c->cmsg_level == IPPROTO_IP && c->cmsg_type == IP_PKTINFO)
+			v4 = true;
+	*forged = v4info && from->sin6_family == AF_INET6 &&
+		  IN6_IS_ADDR_V4MAPPED(&from->sin6_addr) && !v4;
+	return n;
 }
 
 void peers_init(void)

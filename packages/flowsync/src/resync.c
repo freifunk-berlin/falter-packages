@@ -10,12 +10,12 @@
  * restart or reboot: the table may be gone, and refreshes that arrived while
  * the daemon was down are lost) and when one of its copies is destroyed early
  * (see handle_destroy() in tx.c). A requester asks at most once per
- * interval/2, and repeats the request on its next two heartbeats unless every
- * peer has sent records since (a request is a single datagram). A peer
- * honours a request from the same peer at most once per interval/4, and
- * serves requests with at most one extra round per interval/2, whoever asked:
- * a round started meanwhile serves them all, and forged requests from many
- * peer addresses cannot make it run rounds back to back.
+ * interval/2; a request that gets lost (a single datagram) costs the wait for
+ * the peers' next regular round. A peer honours a request from the same peer at most once
+ * per interval/4, and pulls rounds forward for requests at most twice per
+ * interval, whoever asked (a budget that refills): a round started meanwhile
+ * serves them all, and forged requests from many peer addresses cannot make
+ * it run rounds back to back.
  */
 
 #define _GNU_SOURCE
@@ -33,9 +33,8 @@ static uint64_t peer_asked[MAX_PEERS];	/* last request honoured, per peer */
 static bool peer_silent[MAX_PEERS];
 static uint32_t started;		/* now_s() at startup */
 static bool destroys_pending;		/* DESTROY events still queued */
-static uint64_t last_served;		/* when a round last served requests (mono ms) */
-static unsigned int repeats;		/* heartbeats that repeat our request */
-static uint64_t answered;		/* peers that sent records since we asked */
+static double budget = 2;		/* rounds we may pull forward for requests */
+static uint64_t budget_ts;
 
 /* ask the peers for a round as soon as allowed */
 void resync_request(void)
@@ -66,18 +65,30 @@ void resync_from(int peer)
 	round_wanted = true;
 }
 
-/* a datagram with records came from a peer: it answers our request, if any */
-void resync_answered(int peer)
+/* two rounds per interval, at most two in a row */
+static void budget_refill(uint64_t now)
 {
-	answered |= 1ull << peer;
+	if (budget_ts)
+		budget += (double)(now - budget_ts) * 2 / (cfg.interval * 1000.0);
+	if (budget > 2)
+		budget = 2;
+	budget_ts = now;
 }
 
-/* main loop: a peer's request is to be served by a round now (at most one
- * such extra round per interval/2; a regular round serves it too) */
+/* main loop: a peer's request is to be served by a round now, if the budget
+ * allows; otherwise it waits for the budget or the next regular round */
 bool resync_round_wanted(void)
 {
-	return round_wanted &&
-	       (!last_served || mono_ms() - last_served >= cfg.interval * 1000 / 2);
+	if (!round_wanted)
+		return false;
+	budget_refill(mono_ms());
+	return budget >= 1;
+}
+
+/* main loop: it pulls the next round forward for the requests */
+void resync_round_pulled(void)
+{
+	budget -= 1;
 }
 
 /* we asked the peers: our copies are refreshed by our own dump, so run one
@@ -90,10 +101,33 @@ bool resync_own_round_wanted(void)
 /* a round started: it serves every request that came before it */
 void resync_round_started(void)
 {
-	if (round_wanted)
-		last_served = mono_ms();
 	round_wanted = false;
 	own_round_wanted = false;
+}
+
+/*
+ * The conntrack table is at least 95 % full (looked at once a second). The
+ * kernel then evicts entries that are not ASSURED, our idle copies first
+ * (early_drop, and the gc worker above 95 %): a copy lost that way is no
+ * reason to have every peer re-send its table, the copies it would re-create
+ * only evict other entries, the gateway's own new flows among them.
+ */
+static bool table_pressure(uint64_t now)
+{
+	static uint64_t checked;
+	static bool full;
+	static uint64_t last_log;
+	unsigned long count, max;
+
+	if (checked && now - checked < 1000)
+		return full;
+	checked = now;
+	full = !read_sysctl("/proc/sys/net/netfilter/nf_conntrack_count", &count) &&
+	       !read_sysctl("/proc/sys/net/netfilter/nf_conntrack_max", &max) &&
+	       max && count >= max / 20 * 19;
+	if (full && log_ok(&last_log))
+		logmsg(LOG_WARNING, "conntrack table %lu of %lu: resync request held", count, max);
+	return full;
 }
 
 /* main loop: send a pending request if the rate allows */
@@ -109,13 +143,14 @@ void resync_tick(void)
 	 * surviving copies and refresh nothing */
 	if (!cnt.refresh_rounds)
 		return;
+	/* held, not dropped: it goes out once the table has room again */
+	if (table_pressure(now))
+		return;
 	request_pending = false;
 	last_request = now;
 	cnt.tx_resync++;
 	dgram_control(WIRE_F_RESYNC);
 	own_round_wanted = true;
-	repeats = 2;
-	answered = 0;
 }
 
 void resync_init(void)
@@ -129,20 +164,10 @@ void heartbeat(void)
 {
 	char abuf[INET6_ADDRSTRLEN];
 	uint32_t now = now_s(), last, limit = 3 * cfg.interval;
-	uint64_t all = cfg.n_peer >= 64 ? ~0ull : (1ull << cfg.n_peer) - 1;
-	uint8_t flags = 0;
 	unsigned int i;
 	bool silent;
 
-	/* our request may have been lost: repeat it while some peer has not
-	 * answered with records (a peer without flows to announce never does,
-	 * hence the bound) */
-	if (repeats) {
-		repeats--;
-		if ((answered & all) != all)
-			flags = WIRE_F_RESYNC;
-	}
-	dgram_control(flags);
+	dgram_control(0);
 	for (i = 0; i < cfg.n_peer; i++) {
 		last = peer_last[i] ? peer_last[i] : started;
 		silent = now - last > limit;

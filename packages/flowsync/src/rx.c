@@ -351,19 +351,17 @@ void handle_rx(void)
 	static uint8_t buf[65536];
 	static uint64_t last_log;
 	struct sockaddr_in6 from;
-	socklen_t fromlen;
 	char abuf[INET6_ADDRSTRLEN];
 	struct flow f;
 	unsigned int count, r;
 	uint8_t flags;
+	bool forged;
 	ssize_t n;
 	int i, p, rc;
 
 	/* drain a bounded burst, then inject it in one netlink batch */
 	for (i = 0; i < DRAIN_MAX; i++) {
-		fromlen = sizeof(from);
-		n = recvfrom(udp_fd, buf, sizeof(buf), MSG_DONTWAIT,
-			     (struct sockaddr *)&from, &fromlen);
+		n = udp_recv(buf, sizeof(buf), &from, &forged);
 		if (n < 0) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
@@ -373,7 +371,8 @@ void handle_rx(void)
 				logmsg(LOG_WARNING, "udp receive: %s", strerror(errno));
 			break;
 		}
-		p = from.sin6_family == AF_INET6 ? peer_index(&from.sin6_addr) : -1;
+		/* a v4-mapped source that came as IPv6 is nobody's (udp_recv) */
+		p = from.sin6_family == AF_INET6 && !forged ? peer_index(&from.sin6_addr) : -1;
 		if (p < 0) {
 			cnt.rx_datagrams++;
 			cnt.rx_bad_peer++;
@@ -405,7 +404,6 @@ void handle_rx(void)
 			    addr_str(&from.sin6_addr, abuf, sizeof(abuf)));
 			continue;
 		}
-		resync_answered(p);
 		for (r = 0; r < count; r++) {
 			if (wire_get(buf + WIRE_HDR_LEN + r * WIRE_REC_LEN, &f) != PARSE_OK) {
 				cnt.rx_parse++;

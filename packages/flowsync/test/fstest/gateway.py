@@ -168,7 +168,7 @@ table inet sync {
         for g in env.g:
             if g is not self:
                 peers += ["-e", g.addr]
-        argv = [sys.executable, env.ptyrun, env.flowsync, "-b", self.addr] + peers + [
+        argv = [sys.executable, env.ptyrun, env.flowsync, "-b", self.addr, "-I", "eth0"] + peers + [
             "-x", PREFIX, "-D", XDST, "-i", env.I, "-t", env.E, "-s", self.status
         ] + (["-d"] if debug else []) + self.opts + ["run"]
         log = open(self.logpath, "a")
