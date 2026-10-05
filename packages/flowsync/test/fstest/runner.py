@@ -52,6 +52,15 @@ def heavy_slot(lockdir, slots):
         time.sleep(0.2)
 
 
+def load_lock(lockdir, heavy):
+    """every run holds the load lock: the others shared, a heavy one (a flood)
+    exclusive, so that floods never run beside the timing checks of other
+    scenarios (kernel resources are shared by all namespaces)"""
+    f = open(os.path.join(lockdir, "load.lock"), "a")
+    fcntl.flock(f, fcntl.LOCK_EX if heavy else fcntl.LOCK_SH)
+    return f
+
+
 # ------------------------------------------------------------------ child
 def child(args):
     """a worker (inside unshare -Urn): run a list of scenarios in one
@@ -67,6 +76,7 @@ def child(args):
         log = Log(args.log, prefix="[%s %s] " % (combo.name, name), echo=False,
                   own=os.path.join(wd, "checks.log"))
         lock = heavy_slot(args.lockdir, args.heavy) if "heavy" in sc.tags and args.lockdir else None
+        loadlock = load_lock(args.lockdir, "heavy" in sc.tags) if args.lockdir else None
         checks = Checks(log)
         log.line("=== %s ===" % name)
         t0 = time.monotonic()
@@ -104,6 +114,8 @@ def child(args):
                 pass
         if not keep:
             topo = None
+        if loadlock:
+            loadlock.close()    # after the teardown: a flood's cleanup is load too
         secs = time.monotonic() - t0
         log.line("--- %s: %s%s (%.0fs)" % (name, res, " (%d)" % checks.fails if checks.fails else "",
                                           secs))

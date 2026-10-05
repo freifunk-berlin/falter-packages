@@ -364,8 +364,13 @@ static void inj_resolve(void)
 		struct rx_ent *e = rx_find(&replace[i].f);
 
 		inj_add_delete(&replace[i].orig, replace[i].id);
-		if (e)
+		if (e) {
 			rx_own(e, now_s());	/* tentative, like any create */
+			/* a server segment between the delete and the create (on
+			 * another CPU) makes a new reversed pickup and the create
+			 * fails: then the next announcement looks again at once */
+			e->checked_at = 0;
+		}
 		inj_add(&replace[i].f, e, INJ_CREATE);
 		cnt.inject_replaced++;
 	}

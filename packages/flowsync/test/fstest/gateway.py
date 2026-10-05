@@ -230,8 +230,9 @@ table inet sync {
             return ""
 
     def tick(self, timeout=None):
-        """wait until the daemon has just written its status (a round and its
-        sweep are done), plus a moment"""
+        """wait until the daemon has just written its status, plus a moment:
+        it does that at its tick, right after starting a round (the status
+        shows the rounds completed before it; the new one runs now)"""
         timeout = timeout or 3 * self.env.I + 5
         m0 = os.stat(self.status).st_mtime_ns if self.up() else 0
         t0 = time.monotonic()

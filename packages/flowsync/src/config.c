@@ -156,6 +156,7 @@ static const struct {
 	{ 'X', "exclude",          "exclude",          "CIDR",  "client prefix not synced, repeatable" },
 	{ 'D', "exclude-dst",      "exclude_dst",      "CIDR",  "server prefix not synced, repeatable" },
 	{ 's', "status-file",      NULL,               "PATH",  "status file (" STATUS_FILE ")" },
+	{ 'u', "user",             NULL,               "NAME",  "run as this user, CAP_NET_ADMIN only" },
 	{ 'd', "debug",            "debug",            NULL,    "log every record and injection" },
 	{ 'h', "help",             NULL,               NULL,    "this text" },
 };
@@ -214,6 +215,10 @@ int parse_args(int argc, char **argv)
 		}
 		if (c == 's') {
 			status_path = optarg;
+			continue;
+		}
+		if (c == 'u') {
+			cfg.user = optarg;
 			continue;
 		}
 		if (c == ':' || c == '?') {

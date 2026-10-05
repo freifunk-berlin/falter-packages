@@ -29,6 +29,9 @@ define Package/flowsync
 	URL:=https://github.com/freifunk-berlin/falter-packages
 	DEPENDS:=+libnetfilter-conntrack +libmnl
 	EXTRA_DEPENDS:=kmod-nf-conntrack-netlink (>=6.12)
+	# the daemon drops to this user (CAP_NET_ADMIN only) once its sockets
+	# are open, see --user in the README
+	USERID:=flowsync=3780:flowsync=3780
 endef
 
 define Package/flowsync/description

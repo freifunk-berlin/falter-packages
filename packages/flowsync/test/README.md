@@ -101,7 +101,11 @@ cached in `~/.cache/flowsync-fstest-durations.json`). A worker builds its
 topology once and resets it between scenarios (daemons stopped, tables
 flushed, flows, servers and rules removed, counters and timers restored); after
 a failure it rebuilds. Scenarios tagged `heavy` run one after the other in a
-worker of their own. Default `--jobs`: two thirds of the CPUs, at most 24.
+worker of their own, and alone: every run holds a load lock, shared, and a
+heavy one exclusive, so no flood runs beside another scenario's timing checks.
+A scenario whose daemon exits on its own fails, and so does one whose
+background traffic generator fails. Default `--jobs`: two thirds of the CPUs,
+at most 24.
 
 ## Scenarios
 
@@ -223,8 +227,8 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   intervals. Kernel resources are shared by all namespaces (the per-CPU
   receive backlog, the conntrack hash, the rtnl lock), so a flood in one
   worker can stall daemons (`loop_max_ms` of seconds) or drop packets in
-  others. The heavy scenarios therefore run one at a time, and more jobs than
-  about two thirds of the CPUs make checks fail. A failure that does not
+  others. The heavy scenarios therefore run alone (load lock), and more jobs
+  than about two thirds of the CPUs make checks fail. A failure that does not
   reproduce with `P=... S=...` alone is most likely load; the daemon log's
   `refresh_ms` / `loop_max_ms` show it.
 - **Profile coverage of load and abuse scenarios.** They run in the first

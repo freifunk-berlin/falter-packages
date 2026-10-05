@@ -4,6 +4,13 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
+#include <grp.h>
+#include <limits.h>
+#include <pwd.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <linux/capability.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
@@ -60,6 +67,57 @@ static void check_kernel_timeouts(void)
 		       "unnoticed (set it to 1 or 2)");
 }
 
+/*
+ * Once the sockets are open and bound: keep CAP_NET_ADMIN only (ctnetlink
+ * checks it on every message, the subscriptions and SO_RCVBUFFORCE need it
+ * when a socket is reopened), as cfg.user if given, with no_new_privs. The
+ * network-facing parser then never runs with full root. The status file's
+ * directory is created for that user first.
+ */
+static int drop_privileges(void)
+{
+	struct __user_cap_header_struct h = { .version = _LINUX_CAPABILITY_VERSION_3 };
+	struct __user_cap_data_struct d[2];
+	struct passwd *pw = NULL;
+	char dir[PATH_MAX], *slash;
+	int cap;
+
+	if (cfg.user) {
+		pw = getpwnam(cfg.user);
+		if (!pw) {
+			logmsg(LOG_ERR, "user %s: unknown", cfg.user);
+			return -1;
+		}
+	}
+	snprintf(dir, sizeof(dir), "%s", status_path);
+	slash = strrchr(dir, '/');
+	if (slash && slash != dir) {
+		*slash = 0;
+		/* a directory of our own only: an existing one keeps its owner */
+		if (!mkdir(dir, 0755) && pw && chown(dir, pw->pw_uid, pw->pw_gid))
+			logmsg(LOG_WARNING, "%s: chown: %s", dir, strerror(errno));
+	}
+	/* the bounding set first, while CAP_SETPCAP is still there */
+	for (cap = 0; cap < 64; cap++)
+		if (cap != CAP_NET_ADMIN && prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) && errno != EINVAL) {
+			logmsg(LOG_ERR, "capability bounding set: %s", strerror(errno));
+			return -1;
+		}
+	if (pw && (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) || setgroups(0, NULL) ||
+		   setgid(pw->pw_gid) || setuid(pw->pw_uid))) {
+		logmsg(LOG_ERR, "user %s: %s", cfg.user, strerror(errno));
+		return -1;
+	}
+	memset(d, 0, sizeof(d));
+	d[CAP_TO_INDEX(CAP_NET_ADMIN)].effective = CAP_TO_MASK(CAP_NET_ADMIN);
+	d[CAP_TO_INDEX(CAP_NET_ADMIN)].permitted = CAP_TO_MASK(CAP_NET_ADMIN);
+	if (syscall(SYS_capset, &h, d) || prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
+		logmsg(LOG_ERR, "capabilities: %s", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
 static int cmd_run(void)
 {
 	struct sigaction sa = { .sa_handler = on_signal };
@@ -89,8 +147,10 @@ static int cmd_run(void)
 	udp_fd = udp_open(true);
 	if (udp_fd < 0 || inj_open() || ev_open() || destroy_open())
 		return 1;
-	resync_init();
 	set_rcvbuf(udp_fd, "udp", cfg.rcvbuf);
+	if (drop_privileges())
+		return 1;
+	resync_init();
 	check_kernel_timeouts();
 	if (!cfg.ifname[0])
 		logmsg(LOG_WARNING, "no interface set: datagrams with a peer's source address are "

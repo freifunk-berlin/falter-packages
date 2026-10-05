@@ -93,7 +93,7 @@ struct nlmsghdr;
 #define DUMP_RCVBUF	(256 * 1024)
 #define LOG_INTERVAL_MS	10000
 #define EARLY_ROUND_MS	1000	/* delay of the round pulled forward after lost events */
-#define STATUS_FILE	"/var/run/flowsync.status"
+#define STATUS_FILE	"/var/run/flowsync/status"
 
 struct prefix {
 	struct in6_addr addr;
@@ -110,6 +110,7 @@ struct config {
 	bool bind_set;
 	struct in6_addr bind;
 	char ifname[IFNAMSIZ];		/* the sync socket's device, "" for any */
+	const char *user;		/* run as this user once the sockets are open */
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
 	unsigned long ct_mark, ct_mark_mask;
 	unsigned long max_copies;	/* 0: derived at startup, see rx_limit_init() */

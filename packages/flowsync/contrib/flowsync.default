@@ -1,4 +1,0 @@
-# /etc/default/flowsync - options for flowsync.service, see flowsync --help
-#FLOWSYNC_OPTS="--bind 192.0.2.1 --peer 192.0.2.2 --peer 192.0.2.3 \
-#  --prefix 2001:db8:100::/44 --exclude-dst 2001:db8::/32 \
-#  --interface eth0"

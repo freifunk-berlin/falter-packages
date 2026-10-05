@@ -267,9 +267,8 @@ reserved bytes are zero.
 ## Configuration
 
 The daemon is configured on the command line only; it does not read any file.
-On OpenWrt the init script renders `/etc/config/flowsync` (written by
-bbb-configs) into these options. Elsewhere, pass them directly (see "Running
-on other hosts").
+The init script renders `/etc/config/flowsync` (written by bbb-configs) into
+these options.
 
     flowsync [options] <command>
       run                                        run the daemon
@@ -297,7 +296,8 @@ on other hosts").
 | `-x, --prefix CIDR` | `prefix` (list) | - | repeatable; synced client prefixes |
 | `-X, --exclude CIDR` | `exclude` (list) | - | repeatable; client prefixes not synced |
 | `-D, --exclude-dst CIDR` | `exclude_dst` (list) | - | repeatable; server prefixes not synced |
-| `-s, --status-file PATH` | - | `/var/run/flowsync.status` | where `run` writes its counters |
+| `-s, --status-file PATH` | - | `/var/run/flowsync/status` | where `run` writes its counters |
+| `-u, --user NAME` | - | - | after opening its sockets, run as this user with `CAP_NET_ADMIN` only (the init script passes `flowsync`, the package creates the user); without it the daemon stays root but drops every other capability |
 | `-d, --debug` | `debug` | off | log every record sent, received and injected |
 
 Giving a repeatable option replaces its default (`--proto tcp` alone would drop
@@ -311,8 +311,8 @@ logs an error if `nf_conntrack_events` is 0 (the kernel then sends no
 conntrack events at all: new flows wait for the next round, lost copies go
 unnoticed).
 
-Logging goes to syslog (tag `flowsync`) when the daemon is started by procd or
-systemd, and to the terminal with timestamps (`HH:MM:SS [level] message`) when
+Logging goes to syslog (tag `flowsync`) when the daemon is started by procd,
+and to the terminal with timestamps (`HH:MM:SS [level] message`) when
 `flowsync run` is started from a shell. `--debug` adds one line per record and
 per injection batch, which is a lot under load, and `syslog()` can block on a
 slow logd, so do not leave it on.
@@ -350,18 +350,20 @@ change restarts the daemon (procd reload trigger + file watch).
 bbb-configs templates written for the text format render `batch_lines '14'`;
 that still works but wastes datagrams, raise it to 30.
 
-### Running on other hosts
+### Privileges
 
-Any Linux with conntrack: the only dependencies are libnetfilter_conntrack and
-libmnl (Debian: `libnetfilter-conntrack-dev libmnl-dev`). No UCI, no ubus.
+The daemon starts as root (procd), opens its sockets and binds them, then
+drops every capability but `CAP_NET_ADMIN` (ctnetlink needs it for every
+message) and, with `--user`, switches to that user; `no_new_privs` is set.
+The UDP parser, the part exposed to the network, thus never runs with full
+root. The status file lives in `/var/run/flowsync/`, which the init script
+creates for that user.
 
-    make -C src && make -C src test                # unit test, needs only libmnl
-    sudo make -C src install                       # /usr/local/sbin/flowsync
-    sudo install -m 644 contrib/flowsync.service /etc/systemd/system/
-    sudo install -m 644 contrib/flowsync.default /etc/default/flowsync   # set FLOWSYNC_OPTS
-    sudo systemctl enable --now flowsync
+### Development builds
 
-The unit runs `flowsync $FLOWSYNC_OPTS run` with `CAP_NET_ADMIN` only.
+The package targets OpenWrt. For development it builds on any Linux with
+libnetfilter_conntrack and libmnl (Debian: `libnetfilter-conntrack-dev
+libmnl-dev`), see "Source layout and tests".
 
 ## Operation
 
@@ -370,7 +372,7 @@ renders the UCI options). `flowsync status` needs no configuration, it reads the
 status file.
 
 Every `interval` the daemon logs its counters to syslog (tag `flowsync`) and
-writes them to `/var/run/flowsync.status`:
+writes them to `/var/run/flowsync/status`:
 
 | counter | meaning |
 |---|---|
