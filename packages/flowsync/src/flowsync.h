@@ -257,8 +257,12 @@ int peer_index(const struct in6_addr *a);
 /* per peer: datagrams received and when the last one came (now_s, 0: never) */
 extern uint64_t peer_rx[MAX_PEERS];
 extern uint32_t peer_last[MAX_PEERS];
+extern uint64_t peer_tx_errors[MAX_PEERS];
 void dgram_add(const struct flow *f);
-void dgram_flush(void);
+bool dgram_flush(void);
+bool dgram_send(bool hold);
+bool dgram_held(void);
+bool dgram_resend(void);
 void dgram_control(uint8_t flags);
 
 /* tx.c */

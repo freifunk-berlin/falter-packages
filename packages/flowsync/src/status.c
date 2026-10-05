@@ -74,9 +74,10 @@ void write_status(void)
 		fprintf(f, "peer %s rx %llu age ", addr_str(&cfg.peer[i], abuf, sizeof(abuf)),
 			(unsigned long long)peer_rx[i]);
 		if (peer_last[i])
-			fprintf(f, "%u\n", now - peer_last[i]);
+			fprintf(f, "%u", now - peer_last[i]);
 		else
-			fprintf(f, "never\n");
+			fprintf(f, "never");
+		fprintf(f, " tx_errors %llu\n", (unsigned long long)peer_tx_errors[i]);
 	}
 	fprintf(f, "refresh_running %d\n", gauge.refresh_running);
 	fprintf(f, "refresh_entries %llu\n", (unsigned long long)gauge.refresh_entries);

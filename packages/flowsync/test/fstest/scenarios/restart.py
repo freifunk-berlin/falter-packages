@@ -157,7 +157,7 @@ def peer_liveness(env):
     g2.stop()
     env.sleep(4 * env.I + 1)
     line = g0.status_line("peer %s " % g2.addr)
-    m = re.match(r"peer \S+ rx (\d+) age (\d+)$", line)
+    m = re.match(r"peer \S+ rx (\d+) age (\d+)( |$)", line)
     env.true("g0's status shows g2 silent for three intervals",
              bool(m) and int(m.group(1)) >= 1 and int(m.group(2)) >= 3 * env.I, line)
     env.check("g0 logged it", g0.log().count("peer %s: nothing received" % g2.addr), 1)

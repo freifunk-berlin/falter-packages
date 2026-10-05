@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -37,6 +38,33 @@ void set_rcvbuf(int fd, const char *what, unsigned long size)
 		       "(raise net.core.rmem_max)", what, eff / 2, v);
 }
 
+/*
+ * The send buffer holds a datagram until the device has sent it. A refresh
+ * tick sends a burst of tx_rate/20 datagrams to every peer back to back
+ * (about 2.3 KiB of buffer each with overhead), and announcements of new
+ * flows come on top: room for twice that, so that the default buffer
+ * (about 200 KiB) does not drop datagrams from four peers on.
+ */
+static void set_sndbuf(int fd)
+{
+	unsigned long burst = cfg.tx_rate / 20 ? cfg.tx_rate / 20 : 1;
+	unsigned long want = 2 * burst * (cfg.n_peer ? cfg.n_peer : 1) * 2304;
+	int v, eff = 0;
+	socklen_t len = sizeof(eff);
+
+	if (want < 256 * 1024)
+		want = 256 * 1024;
+	if (want > INT_MAX / 2)
+		want = INT_MAX / 2;
+	v = want;
+	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUFFORCE, &v, sizeof(v)) &&
+	    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &v, sizeof(v)))
+		logmsg(LOG_WARNING, "udp: SO_SNDBUF %d: %s", v, strerror(errno));
+	if (!getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &eff, &len) && eff / 2 < v)
+		logmsg(LOG_WARNING, "udp: send buffer is %d, wanted %d (raise "
+		       "net.core.wmem_max)", eff / 2, v);
+}
+
 int udp_open(bool bind_port)
 {
 	struct sockaddr_in6 sa = { .sin6_family = AF_INET6 };
@@ -65,6 +93,7 @@ int udp_open(bool bind_port)
 		if (!v4info)
 			logmsg(LOG_WARNING, "udp: IP_PKTINFO: %s (v4-mapped sources over IPv6 "
 			       "not recognised)", strerror(errno));
+		set_sndbuf(fd);
 	}
 	sa.sin6_addr = cfg.bind_set ? cfg.bind : in6addr_any;
 	sa.sin6_port = bind_port ? htons(cfg.port) : 0;
@@ -134,32 +163,108 @@ int peer_index(const struct in6_addr *a)
 	return -1;
 }
 
-/* send the datagram under assembly to all peers; never blocks */
-void dgram_flush(void)
+uint64_t peer_tx_errors[MAX_PEERS];
+
+/* a refresh datagram that some peers' send buffer had no room for */
+static struct {
+	uint8_t buf[MAX_DGRAM];
+	size_t len;
+	uint64_t peers;
+} held;
+
+static bool full(int err)
+{
+	return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS;
+}
+
+/* a datagram to the given peers; returns those whose send buffer was full
+ * when keep is set (left to the caller), every failure counts otherwise */
+static uint64_t send_to(const uint8_t *buf, size_t len, uint64_t peers, bool keep)
 {
 	static uint64_t last_log;
 	char abuf[INET6_ADDRSTRLEN];
+	uint64_t failed = 0;
 	unsigned int i;
+
+	for (i = 0; i < cfg.n_peer; i++) {
+		if (!(peers & 1ull << i))
+			continue;
+		if (sendto(udp_fd, buf, len, MSG_DONTWAIT,
+			   (struct sockaddr *)&peer_sa[i], sizeof(peer_sa[i])) >= 0) {
+			cnt.tx_datagrams++;
+			continue;
+		}
+		if (keep && full(errno)) {
+			failed |= 1ull << i;
+			continue;
+		}
+		cnt.tx_errors++;
+		peer_tx_errors[i]++;
+		if (log_ok(&last_log))
+			logmsg(LOG_WARNING, "send to %s: %s",
+			       addr_str(&cfg.peer[i], abuf, sizeof(abuf)), strerror(errno));
+	}
+	return failed;
+}
+
+static uint64_t all_peers(void)
+{
+	return cfg.n_peer >= 64 ? ~0ull : (1ull << cfg.n_peer) - 1;
+}
+
+/*
+ * Send the datagram under assembly to all peers, never blocking. With hold
+ * (the refresh), a peer whose send buffer is full gets it later: the datagram
+ * is held and dgram_held() is true until dgram_resend() got it out, and the
+ * refresh waits meanwhile (a slower round, not a lost refresh). Without hold
+ * (announcements of new flows), the datagram is lost for such a peer; returns
+ * false then, so that the caller can have a round repair it.
+ */
+bool dgram_send(bool hold)
+{
+	uint64_t failed;
 	size_t len;
 
 	if (!dgram.count)
-		return;
+		return true;
 	wire_put_hdr(dgram.buf, dgram.count, 0);
 	len = WIRE_HDR_LEN + dgram.count * WIRE_REC_LEN;
 	DBG("tx: %u records in %zu bytes to %u peers", dgram.count, len, cfg.n_peer);
-	for (i = 0; i < cfg.n_peer; i++) {
-		if (sendto(udp_fd, dgram.buf, len, MSG_DONTWAIT,
-			   (struct sockaddr *)&peer_sa[i], sizeof(peer_sa[i])) < 0) {
-			cnt.tx_errors++;
-			if (log_ok(&last_log))
-				logmsg(LOG_WARNING, "send to %s: %s",
-				       addr_str(&cfg.peer[i], abuf, sizeof(abuf)),
-				       strerror(errno));
-		} else {
-			cnt.tx_datagrams++;
-		}
-	}
 	dgram.count = 0;
+	failed = send_to(dgram.buf, len, all_peers(), true);
+	if (!failed)
+		return true;
+	if (hold) {
+		memcpy(held.buf, dgram.buf, len);
+		held.len = len;
+		held.peers = failed;
+		return true;
+	}
+	/* an announcement: lost for those peers */
+	for (unsigned int i = 0; i < cfg.n_peer; i++)
+		if (failed & 1ull << i) {
+			cnt.tx_errors++;
+			peer_tx_errors[i]++;
+		}
+	return false;
+}
+
+bool dgram_flush(void)
+{
+	return dgram_send(false);
+}
+
+bool dgram_held(void)
+{
+	return held.peers != 0;
+}
+
+/* the held datagram to the peers still missing it; true when all have it */
+bool dgram_resend(void)
+{
+	if (held.peers)
+		held.peers = send_to(held.buf, held.len, held.peers, true);
+	return !held.peers;
 }
 
 /* a datagram without records to all peers: heartbeat, or a resync request */
@@ -175,6 +280,7 @@ void dgram_control(uint8_t flags)
 		if (sendto(udp_fd, hdr, sizeof(hdr), MSG_DONTWAIT,
 			   (struct sockaddr *)&peer_sa[i], sizeof(peer_sa[i])) < 0) {
 			cnt.tx_errors++;
+			peer_tx_errors[i]++;
 			if (log_ok(&last_log))
 				logmsg(LOG_WARNING, "send to %s: %s",
 				       addr_str(&cfg.peer[i], abuf, sizeof(abuf)), strerror(errno));
@@ -187,7 +293,7 @@ void dgram_control(uint8_t flags)
 void dgram_add(const struct flow *f)
 {
 	if (dgram.count >= cfg.batch_lines)
-		dgram_flush();
+		dgram_send(false);
 	/* batch_lines <= WIRE_MAX_RECORDS, so this always fits */
 	wire_put(dgram.buf + WIRE_HDR_LEN + dgram.count * WIRE_REC_LEN, f);
 	dgram.count++;

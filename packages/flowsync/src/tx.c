@@ -72,6 +72,25 @@ static const struct {
 #define N_PHASES (sizeof(phases) / sizeof(phases[0]))
 
 /*
+ * Each phase is a walk over the whole conntrack table with softirqs off
+ * until a chunk is full, so phases that cannot find anything are skipped.
+ * The offloaded-native phase finds nothing for TCP, which nft offloads only
+ * once ASSURED (phase 1 has those), and nothing without the flowtable: it
+ * runs for UDP while the nf_flow_table module is loaded or once any entry
+ * was seen offloaded.
+ */
+static bool offload_seen;
+
+static bool phase_wanted(int proto, unsigned int phase)
+{
+	if (!(phases[phase].status & IPS_OFFLOAD))
+		return true;
+	if (proto == IPPROTO_TCP)
+		return false;
+	return offload_seen || access("/sys/module/nf_flow_table", F_OK) == 0;
+}
+
+/*
  * Loop prevention through conntrack status. Injected copies carry SEEN_REPLY
  * from the start, so both the UDP and the TCP tracker set ASSURED on the first
  * packet they see in either direction. A copy on a gateway that never sees
@@ -272,8 +291,10 @@ void handle_events(void)
 		}
 		mnl_cb_run(buf, n, 0, 0, ev_cb, NULL);
 	}
-	/* no batching across reads: the reply may already be on its way */
-	dgram_flush();
+	/* no batching across reads: the reply may already be on its way. A
+	 * peer whose send buffer was full missed these: a round repairs it */
+	if (!dgram_flush())
+		ev_lost = true;
 }
 
 /*
@@ -452,6 +473,8 @@ static int dump_cb(const struct nlmsghdr *nlh, void *data)
 	cnt.tx_scanned++;
 	if (ct_parse(nlh, &c) != 0 || !wanted(&c.f))
 		return MNL_CB_OK;
+	if (c.status & IPS_OFFLOAD)
+		offload_seen = true;
 	if (!phases[cur_phase].copies) {
 		/* native: announced while it exists. Peers never refresh it
 		 * (EXCL), so it lives on packets alone. */
@@ -614,9 +637,10 @@ bool refresh_wants_read(void)
 	return round_running && dump_nl && Q_SIZE - (q_len - q_pos) >= Q_CHUNK_RESERVE;
 }
 
+/* queued entries, and a held datagram counts as one */
 size_t refresh_pending(void)
 {
-	return q_len - q_pos;
+	return q_len - q_pos + (dgram_held() ? 1 : 0);
 }
 
 /* 1: a round started, 0: the previous one is still being dumped or sent,
@@ -706,10 +730,12 @@ void handle_refresh(void)
 		return;
 
 	/* NLMSG_DONE: next request, or the round is complete */
-	if ((unsigned int)++cur_phase == N_PHASES) {
-		cur_phase = 0;
-		cur_proto = next_proto(cur_proto);
-	}
+	do {
+		if ((unsigned int)++cur_phase == N_PHASES) {
+			cur_phase = 0;
+			cur_proto = next_proto(cur_proto);
+		}
+	} while (cur_proto >= 0 && !phase_wanted(cur_proto, cur_phase));
 	if (cur_proto >= 0) {
 		if (dump_send() < 0)
 			refresh_fail("dump request");
@@ -760,13 +786,19 @@ void refresh_tick(void)
 	if (tokens > burst)
 		tokens = burst;
 
+	/* a datagram some peer's send buffer had no room for goes first; the
+	 * queue waits until it is out (a slower round, nothing dropped) */
+	if (dgram_held() && !dgram_resend())
+		return;
 	while (tokens >= 1 && q_pos < q_len) {
 		for (i = 0; i < cfg.batch_lines && q_pos < q_len; i++) {
 			dgram_add(&queue[q_pos++]);
 			cnt.tx_refresh++;
 		}
-		dgram_flush();
+		dgram_send(true);
 		tokens -= 1;
+		if (dgram_held())
+			break;
 	}
 	if (q_pos == q_len)
 		q_pos = q_len = 0;

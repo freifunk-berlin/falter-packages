@@ -116,7 +116,9 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
 - Every `interval` seconds the IPv6 table is dumped per configured protocol in
   four kernel-filtered phases: native entries with `status & SEEN_REPLY == 0`,
   native entries with `ASSURED`, offloaded native entries that are
-  `SEEN_REPLY` but not `ASSURED` (see "Flow offloading"), and our marked
+  `SEEN_REPLY` but not `ASSURED` (see "Flow offloading"; UDP only, and only
+  while the `nf_flow_table` module is loaded or an offloaded entry was seen:
+  every phase walks the whole table with softirqs off), and our marked
   copies whatever their status
   (`CTA_MARK`/`CTA_MARK_MASK` and `CTA_FILTER` on the protocol). Natives are
   announced; copies are announced only with traffic evidence (rule 2) and
@@ -370,7 +372,7 @@ writes them to `/var/run/flowsync.status`:
 | `tx_scanned` | entries returned by the refresh dumps (natives of other protocols and natives that are `SEEN_REPLY` but not `ASSURED` are filtered in the kernel and not counted) |
 | `tx_refresh` | records announced from the refresh dumps, natives and copies |
 | `tx_copies` | of these, copies announced because they saw a packet since the previous round |
-| `tx_datagrams` / `tx_errors` | datagrams with records sent / send errors (per peer; a full socket buffer counts as an error, sends never block) |
+| `tx_datagrams` / `tx_errors` | datagrams with records sent / send errors (per peer, also in the peer lines). Sends never block: a refresh datagram that a full send buffer cannot take waits and the refresh with it (a slower round); an announcement of a new flow is lost then, counted, and a round is pulled forward to repair it |
 | `tx_control` / `tx_resync` | heartbeats and resync requests sent (per peer) / resync requests made |
 | `tx_refresh_dropped` | refresh entries dropped because the queue was full (should stay 0) |
 | `refresh_rounds` | completed refresh rounds |
@@ -414,7 +416,8 @@ and these gauges:
 | `owned` | our copies: per-tuple table slots that own one, kept up to date as copies are created and destroyed (what `max_copies` limits; `max_copies` and `max_copies_per_client` follow in the status file) |
 
 and one line per peer, `peer <address> rx <datagrams> age <seconds since the
-last one>` (`age never` if nothing came yet). Every peer sends a heartbeat
+last one> tx_errors <n>` (`age never` if nothing came yet; `tx_errors` counts
+datagrams to that peer lost to send errors). Every peer sends a heartbeat
 each `interval`, so an `age` of more than a few intervals means the peer or
 the path to it is down.
 
