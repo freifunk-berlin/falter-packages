@@ -169,7 +169,7 @@ enum inj_acct { ACCT_OK, ACCT_RETRY, ACCT_ERROR };
 #define COUNTERS(X) \
 	X(tx_events) X(tx_scanned) X(tx_refresh) X(tx_copies) X(tx_datagrams) X(tx_errors) \
 	X(tx_refresh_dropped) X(tx_control) X(tx_resync) X(refresh_rounds) X(refresh_overrun) X(refresh_errors) \
-	X(ev_recv) X(ev_own) X(ev_overruns) \
+	X(ev_recv) X(ev_own) X(ev_overruns) X(ds_overruns) \
 	X(rx_datagrams) X(rx_control) X(rx_resync) X(rx_records) X(rx_bad_peer) X(rx_policy) \
 	X(rx_parse) X(rx_version) X(rx_dup) X(rx_evictions) X(rx_own_lost) X(rx_limited) \
 	X(inject_created) X(inject_refreshed) X(inject_held) X(inject_exists) X(inject_replaced) X(inject_gone) X(inject_errors) \
@@ -264,7 +264,7 @@ void handle_events(void);
 void ev_filter(int fd, bool copies);
 int refresh_fd(void);
 bool refresh_wants_read(void);
-void refresh_start(void);
+int refresh_start(void);
 void refresh_close(void);
 void handle_refresh(void);
 void refresh_tick(void);
@@ -305,6 +305,7 @@ void handle_destroy(void);
 void resync_request(void);
 void resync_destroys_pending(bool pending);
 void resync_from(int peer);
+void resync_answered(int peer);
 bool resync_round_wanted(void);
 bool resync_own_round_wanted(void);
 void resync_round_started(void);

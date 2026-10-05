@@ -405,6 +405,7 @@ void handle_rx(void)
 			    addr_str(&from.sin6_addr, abuf, sizeof(abuf)));
 			continue;
 		}
+		resync_answered(p);
 		for (r = 0; r < count; r++) {
 			if (wire_get(buf + WIRE_HDR_LEN + r * WIRE_REC_LEN, &f) != PARSE_OK) {
 				cnt.rx_parse++;

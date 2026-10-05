@@ -51,6 +51,12 @@ static void check_kernel_timeouts(void)
 			       strrchr(t[i].path, '/') + 1, v, cfg.element_timeout,
 			       proto_name(t[i].proto));
 	}
+	/* 0: no event extension on new entries, so no NEW and no DESTROY events
+	 * at all, while subscribing still succeeds */
+	if (!read_sysctl("/proc/sys/net/netfilter/nf_conntrack_events", &v) && !v)
+		logmsg(LOG_ERR, "nf_conntrack_events is 0: the kernel sends no conntrack events, "
+		       "new flows are announced only by the next round and lost copies go "
+		       "unnoticed (set it to 1 or 2)");
 }
 
 static int cmd_run(void)
@@ -59,7 +65,7 @@ static int cmd_run(void)
 	struct pollfd fds[5];
 	uint64_t now, next_tick, busy_since = 0, busy, loop_max = 0, last_early = 0;
 	char abuf[INET6_ADDRSTRLEN];
-	bool first = true;
+	bool first = true, owed = false;
 	int timeout, nfds;
 
 	sigaction(SIGTERM, &sa, NULL);
@@ -94,8 +100,19 @@ static int cmd_run(void)
 				ev_open();
 			if (destroy_fd() < 0)
 				destroy_open();
-			refresh_start();
-			resync_round_started();	/* this round serves the peers' requests */
+			switch (refresh_start()) {
+			case 1:
+				owed = false;
+				resync_round_started();	/* it serves the peers' requests */
+				break;
+			case 0:
+				/* the previous round is still being sent: the next
+				 * one is owed and starts once its queue is empty */
+				owed = true;
+				break;
+			default:
+				break;		/* failed: retried at the next tick */
+			}
 			heartbeat();
 			write_status();
 			next_tick = now + cfg.interval * 1000;
@@ -109,6 +126,11 @@ static int cmd_run(void)
 			next_tick = now + EARLY_ROUND_MS;
 			last_early = now;
 		}
+		/* a round owed since an overrun tick: as soon as the previous one
+		 * is sent, not a whole interval later (which would double the
+		 * period between refreshes), and the interval counts from here */
+		if (owed && !gauge.refresh_running && !refresh_pending())
+			next_tick = now;
 		/* a peer asked for a round (it restarted or lost copies) */
 		if (resync_round_wanted() && !gauge.refresh_running && !refresh_pending())
 			next_tick = now;

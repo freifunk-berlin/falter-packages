@@ -124,8 +124,9 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   per loop iteration and only while the send queue has room for it. Queued
   entries are announced at `tx_rate` datagrams per second per peer. A round
   whose entries are not all sent when the next `interval` comes is not
-  restarted and nothing is dropped; the next round is delayed instead
-  (`refresh_overrun`, raise `tx_rate`). Only a dump that delivers no chunk for
+  restarted and nothing is dropped; the next round is delayed instead and
+  starts as soon as the previous one is sent, the interval counting from
+  there (`refresh_overrun`, raise `tx_rate`). Only a dump that delivers no chunk for
   `2 x interval` while it has room in the queue is considered stuck and
   started over (`refresh_errors`); a round held back by its own send queue is
   slow, not stuck.
@@ -238,8 +239,18 @@ reserved bytes are zero.
   copies exists any more, every announcement becomes a create with EXCL, a
   copy that does exist answers EEXIST and the next dump learns it again.
 - A peer serves a request (`rx_resync`) by starting its next round at once,
-  at most once per requesting peer per `interval`/2; a requester asks at most
-  once per `interval`/2.
+  at most once per requesting peer per `interval`/4 and with at most one such
+  extra round per `interval`/2 whoever asked (a round started meanwhile serves
+  every request, and forged requests cannot keep a gateway in back-to-back
+  rounds). A requester asks at most once per `interval`/2 and repeats the
+  request on its next two heartbeats unless every peer has sent records since
+  (the request is a single datagram and can be lost). If the peer is busy
+  with an overrunning round when the request comes, it is served by the round
+  after that one, not dropped.
+- The DESTROY socket can overrun too (`ds_overruns`, a flush of many copies):
+  then which copies are gone is unknown, and ownership of all of them is
+  dropped, once when the overrun is reported and again when the queue has
+  been read empty (the kernel drops events until then).
 
 ## Configuration
 
@@ -281,7 +292,10 @@ Giving a repeatable option replaces its default (`--proto tcp` alone would drop
 `element_timeout < 2 x interval` is refused: one lost datagram would expire
 entries before the next refresh. At startup the daemon warns if
 `nf_conntrack_udp_timeout_stream` or `nf_conntrack_tcp_timeout_unacknowledged`
-is not above `element_timeout` (copies could then never show traffic).
+is not above `element_timeout` (copies could then never show traffic), and
+logs an error if `nf_conntrack_events` is 0 (the kernel then sends no
+conntrack events at all: new flows wait for the next round, lost copies go
+unnoticed).
 
 Logging goes to syslog (tag `flowsync`) when the daemon is started by procd or
 systemd, and to the terminal with timestamps (`HH:MM:SS [level] message`) when
@@ -357,6 +371,7 @@ writes them to `/var/run/flowsync.status`:
 | `ev_recv` | messages read from the event socket (after the kernel filter) |
 | `ev_own` | NEW events of our own injections that got past the kernel filter, ignored (0 while the filter is attached) |
 | `ev_overruns` | event socket overruns (ENOBUFS); events were lost, an early round repairs |
+| `ds_overruns` | DESTROY event socket overruns (or reopens); ownership of all copies dropped, a resync request follows |
 | `rx_datagrams` | datagrams with records received |
 | `rx_control` / `rx_resync` | heartbeats and resync requests received / resync requests received |
 | `rx_records` | records accepted for injection |

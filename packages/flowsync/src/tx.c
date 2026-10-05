@@ -344,6 +344,27 @@ static int destroy_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
+/*
+ * DESTROY events were lost (a flush or an eviction storm overran the socket,
+ * or it had to be reopened): which copies are gone is unknown. The kernel
+ * goes on dropping events until the queue is empty, so the episode ends
+ * only when a read finds it empty (ds_overrun).
+ */
+static bool ds_overrun;
+
+static void destroys_lost(void)
+{
+	static uint64_t last_log;
+
+	cnt.ds_overruns++;
+	ds_overrun = true;
+	if (log_ok(&last_log))
+		logmsg(LOG_WARNING, "conntrack destroy events: overrun, ownership of all copies "
+		       "dropped (raise rcvbuf)");
+	rx_disown_all();
+	resync_request();
+}
+
 void handle_destroy(void)
 {
 	static char buf[NL_BUF_SIZE] __attribute__((aligned(8)));
@@ -361,14 +382,12 @@ void handle_destroy(void)
 			if (errno == EINTR)
 				continue;
 			if (errno == ENOBUFS) {
-				/* a mass destroy (flush) overran the socket:
-				 * which copies are gone is unknown */
-				rx_disown_all();
-				resync_request();
+				destroys_lost();
 				continue;
 			}
 			logmsg(LOG_WARNING, "conntrack destroy events: %s, resubscribing",
 			       strerror(errno));
+			destroys_lost();
 			destroy_open();
 			drained = true;		/* a fresh socket holds nothing */
 			break;
@@ -376,10 +395,26 @@ void handle_destroy(void)
 		mnl_cb_run(buf, n, 0, 0, destroy_cb, NULL);
 	}
 	/* stopped at DRAIN_MAX: the last read may have emptied the queue, and
-	 * then poll never reports it again; look */
-	if (!drained && recv(mnl_socket_get_fd(ds_nl), buf, 1, MSG_PEEK | MSG_DONTWAIT) < 0 &&
-	    (errno == EAGAIN || errno == EWOULDBLOCK))
-		drained = true;
+	 * then poll never reports it again; look. Any read, the peek too,
+	 * returns and clears an overrun that happened meanwhile. */
+	while (!drained && ds_nl) {
+		if (recv(mnl_socket_get_fd(ds_nl), buf, 1, MSG_PEEK | MSG_DONTWAIT) >= 0)
+			break;			/* more to read: poll reports it */
+		if (errno == ENOBUFS)
+			destroys_lost();
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			drained = true;
+		else if (errno != EINTR)
+			break;
+	}
+	/* the queue is empty, which ends an overrun. Ownership asserted while the
+	 * kernel was still dropping events may be of copies already gone, so it
+	 * is dropped again; the resync request goes out now and its answers
+	 * re-create what is missing (EEXIST for what exists, the dump re-learns) */
+	if (drained && ds_overrun) {
+		ds_overrun = false;
+		rx_disown_all();
+	}
 	/* a resync request waits until every queued DESTROY is read */
 	resync_destroys_pending(!drained);
 }
@@ -577,7 +612,9 @@ size_t refresh_pending(void)
 	return q_len - q_pos;
 }
 
-void refresh_start(void)
+/* 1: a round started, 0: the previous one is still being dumped or sent,
+ * -1: it could not start */
+int refresh_start(void)
 {
 	static uint64_t last_log;
 	uint64_t now = mono_ms();
@@ -591,21 +628,21 @@ void refresh_start(void)
 	}
 	if (round_running || refresh_pending()) {
 		/* the previous round is still being dumped or sent: let it finish,
-		 * then start the next one at the following tick */
+		 * the next one starts as soon as its queue is empty */
 		cnt.refresh_overrun++;
 		if (log_ok(&last_log))
 			logmsg(LOG_WARNING, "refresh: previous round not finished after %lu s "
 			       "(%zu entries still to send), next one delayed (raise tx_rate)",
 			       cfg.interval, refresh_pending());
-		return;
+		return 0;
 	}
 	if (!dump_nl && dump_open() < 0) {
 		refresh_fail("netlink socket");
-		return;
+		return -1;
 	}
 	cur_proto = next_proto(-1);
 	if (cur_proto < 0)
-		return;
+		return -1;
 	cur_phase = 0;
 	ev_lost = false;	/* this round covers what the events missed */
 	round_start = round_progress = now;
@@ -615,8 +652,11 @@ void refresh_start(void)
 	rx_round_start();
 	round_running = true;
 	gauge.refresh_running = true;
-	if (dump_send() < 0)
+	if (dump_send() < 0) {
 		refresh_fail("dump request");
+		return -1;
+	}
+	return 1;
 }
 
 void handle_refresh(void)
