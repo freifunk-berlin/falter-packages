@@ -52,14 +52,6 @@ def heavy_slot(lockdir, slots):
         time.sleep(0.2)
 
 
-def load_lock(lockdir, heavy):
-    """every run holds the load lock: the others shared, a heavy one (a flood)
-    exclusive, so that floods never run beside the timing checks of other
-    scenarios (kernel resources are shared by all namespaces)"""
-    f = open(os.path.join(lockdir, "load.lock"), "a")
-    fcntl.flock(f, fcntl.LOCK_EX if heavy else fcntl.LOCK_SH)
-    return f
-
 
 # ------------------------------------------------------------------ child
 def child(args):
@@ -76,7 +68,6 @@ def child(args):
         log = Log(args.log, prefix="[%s %s] " % (combo.name, name), echo=False,
                   own=os.path.join(wd, "checks.log"))
         lock = heavy_slot(args.lockdir, args.heavy) if "heavy" in sc.tags and args.lockdir else None
-        loadlock = load_lock(args.lockdir, "heavy" in sc.tags) if args.lockdir else None
         checks = Checks(log)
         log.line("=== %s ===" % name)
         t0 = time.monotonic()
@@ -114,8 +105,6 @@ def child(args):
                 pass
         if not keep:
             topo = None
-        if loadlock:
-            loadlock.close()    # after the teardown: a flood's cleanup is load too
         secs = time.monotonic() - t0
         log.line("--- %s: %s%s (%.0fs)" % (name, res, " (%d)" % checks.fails if checks.fails else "",
                                           secs))
@@ -189,11 +178,22 @@ def parent(args):
         if heavy:
             workers.append((sum(est(u) for u in heavy), k, combos[k], [u[2] for u in heavy],
                             "h"))
-    total = sum(est(u) for us in by_combo.values() for u in us) or 1
+    # workers per combination: one each, then every further one to the
+    # combination with the most work per worker, which keeps the longest
+    # worker as short as the split allows (rounding a proportional share
+    # left a small combination on one worker that then finished last)
+    load = {k: sum(est(u) for u in us) for k, us in by_combo.items() if us}
+    nw = {k: 1 for k in load}
+    for _ in range(max(0, args.jobs - len(nw))):
+        k = max((k for k in nw if nw[k] < len(by_combo[k])),
+                key=lambda k: load[k] / nw[k], default=None)
+        if k is None:
+            break
+        nw[k] += 1
     for k, us in sorted(by_combo.items()):
         if not us:
             continue
-        n = max(1, min(len(us), round(args.jobs * sum(est(u) for u in us) / total)))
+        n = nw[k]
         bins = [[0, []] for _ in range(n)]
         for u in sorted(us, key=lambda u: -est(u)):
             b = min(bins, key=lambda b: b[0])

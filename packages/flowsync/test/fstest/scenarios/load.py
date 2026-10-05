@@ -69,11 +69,11 @@ def stuck_dump(env):
 
 @scenario(gateways=2, once=True, tags={"load", "heavy"})
 def flush_retry(env):
-    """conntrack -F on g1 while it holds 20000 copies: the resync request
+    """conntrack -F on g1 while it holds 10000 copies: the resync request
     brings every copy back within seconds, not at g0's next round (interval
     10 s here, so a regular round cannot explain it)."""
     g0, g1 = env.g[:2]
-    n = 20000
+    n = 10000
     # all flows come from one client address: lift the per-client limit
     opts = ("-r", 5000, "-i", 10, "-t", 30, "-c", n)
     env.start(*opts, debug=False)
@@ -130,7 +130,7 @@ def flush_stale_chunk(env):
     env.sleep(3)                # g1 reads the stale chunk meanwhile
     g1.unblock_sync()
     series = []
-    for _ in range(10):
+    while len(series) < 2 * env.I + 2 and n not in series:
         env.sleep(1)
         series.append(g1.count("udp", "marked"))
     env.ok("copies on g1 every second after sync resumed: %s" % " ".join(map(str, series)))

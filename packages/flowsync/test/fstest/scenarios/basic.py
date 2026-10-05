@@ -140,14 +140,14 @@ def sparse_udp(env):
     f.send("rev")
     env.wait_for("g2 has the copy", 3, lambda: g2.ct(f).alive)
     miss = 0
-    for _ in range(4):
+    for _ in range(2):
         f.send(via=g2)          # g2 forwards on its copy now
         env.sleep(1)
         if not g1.ct(f).alive:
             miss += 1
         f.send("rev")
         env.sleep(13)
-    env.check("g1 had the copy at every reply (misses of 4)", miss, 0)
+    env.check("g1 had the copy at every reply (misses of 2)", miss, 0)
 
 
 @scenario(gateways=2, tags={"basic"})

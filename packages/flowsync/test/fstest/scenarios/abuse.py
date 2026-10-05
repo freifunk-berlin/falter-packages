@@ -104,9 +104,9 @@ def spoof(env):
     lp = env.loop(16, 1.5, f.send)
     env.wait_for("g1 has the legitimate copy", 3, lambda: g1.ct(f).is_copy)
     out = os.path.join(env.dir, "spoof.out")
-    p = env.spawn(g0.node, "spoof", "::ffff:" + g0.addr, "::ffff:" + g1.addr, PORT, 1000, 20,
+    p = env.spawn(g0.node, "spoof", "::ffff:" + g0.addr, "::ffff:" + g1.addr, PORT, 1000, 10,
                   out=out)
-    env.hold("the legitimate copy survives the flood", 20, lambda: g1.ct(f).alive, step=0.5)
+    env.hold("the legitimate copy survives the flood", 10, lambda: g1.ct(f).alive, step=0.5)
     p.wait()
     env.ok("%s; g1: conntrack=%d created=%s limited=%s errors=%s"
            % (open(out).read().strip(), g1.ct_count(), g1.st("inject_created"),

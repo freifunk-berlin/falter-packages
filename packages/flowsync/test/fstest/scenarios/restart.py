@@ -51,15 +51,15 @@ def expiry_resume(env):
     5-tuple. g0 announces its new native at once (NEW event); g1 must create
     the copy from that announcement, not a round or two later (the DESTROY of
     an expired copy carries no timeout, but it tells g1 the copy is gone).
-    Interval 10 s here."""
+    Interval 5 s here."""
     g0, g1 = env.g[:2]
-    env.start("-i", 10, "-t", 30)
+    env.start("-i", 5, "-t", 15)
     f = env.flow("udp", fw=g0, rev=g1)
     f.send()
     env.wait_for("g1 has the copy", 3, lambda: g1.ct(f).is_copy)
     # g0's native expires after the UDP timeout and g0 stops announcing it;
     # g1's copy runs out within element_timeout plus a round after that
-    env.wait_for("g1's copy expired", env.timers["udp"] + 30 + 10 + 5,
+    env.wait_for("g1's copy expired", env.timers["udp"] + 15 + 5 + 5,
                  lambda: not g1.ct(f).alive, step=0.1)
     f.send()
     env.wait_for("g1 creates the copy again from g0's announcement", 2,

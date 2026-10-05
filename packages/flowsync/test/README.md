@@ -101,9 +101,7 @@ cached in `~/.cache/flowsync-fstest-durations.json`). A worker builds its
 topology once and resets it between scenarios (daemons stopped, tables
 flushed, flows, servers and rules removed, counters and timers restored); after
 a failure it rebuilds. Scenarios tagged `heavy` run one after the other in a
-worker of their own, and alone: every run holds a load lock, shared, and a
-heavy one exclusive, so no flood runs beside another scenario's timing checks.
-A scenario whose daemon exits on its own fails, and so does one whose
+worker of their own. A scenario whose daemon exits on its own fails, and so does one whose
 background traffic generator fails. Default `--jobs`: two thirds of the CPUs,
 at most 24.
 
@@ -164,7 +162,7 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   in the kernel, ownership is re-learned from the mark, refreshes resume.
 - **flush** (g2): `conntrack -F` on g1; the DESTROY events trigger a resync
   request and the copy is back at once.
-- **expiry_resume** (g2, once, interval 10 s): a flow idles until g1's copy
+- **expiry_resume** (g2, once, interval 5 s): a flow idles until g1's copy
   has expired, then resumes on the same 5-tuple; g0's announcement from the
   NEW event must create the copy at once, not a round or two later.
 - **restart_idle_copy** (g3): after a restart a copy seen for the first time
@@ -200,7 +198,7 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
 - **overrun**: tx_rate too low, a round takes longer than the interval: the
   next is delayed, nothing dropped.
 - **stuck_dump**: a round held back by its own send queue is slow, not stuck.
-- **flush_retry**: `conntrack -F` on g1 with 20000 copies: all back within 3 s
+- **flush_retry**: `conntrack -F` on g1 with 10000 copies: all back within 3 s
   (resync), not at g0's next round.
 - **flush_stale_chunk**: `conntrack -F` on g1 while its copies phase is held
   back by its own send queue (3000 copies with traffic, tx_rate 6): the dump
@@ -227,7 +225,7 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   intervals. Kernel resources are shared by all namespaces (the per-CPU
   receive backlog, the conntrack hash, the rtnl lock), so a flood in one
   worker can stall daemons (`loop_max_ms` of seconds) or drop packets in
-  others. The heavy scenarios therefore run alone (load lock), and more jobs
+  others. The heavy scenarios therefore run one at a time, and more jobs
   than about two thirds of the CPUs make checks fail. A failure that does not
   reproduce with `P=... S=...` alone is most likely load; the daemon log's
   `refresh_ms` / `loop_max_ms` show it.
