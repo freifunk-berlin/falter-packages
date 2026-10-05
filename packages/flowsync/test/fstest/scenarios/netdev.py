@@ -46,7 +46,7 @@ def syncs(env, g0, g1):
     lp2.stop()
 
 
-@scenario(gateways=2, once=True, tags={"netdev", "restart", "repro"})
+@scenario(gateways=2, once=True, tags={"netdev", "restart"})
 def uplink_recreate(env):
     """g1's sync device (-I eth0) is deleted and created again with the same
     name and address. The daemon must go on syncing in both directions,
@@ -72,7 +72,7 @@ def uplink_recreate(env):
     env.check("g1's sends no longer fail", (g1.st("tx_errors") or 0) - e0, 0)
 
 
-@scenario(gateways=2, once=True, tags={"netdev", "restart", "repro"})
+@scenario(gateways=2, once=True, tags={"netdev", "restart"})
 def uplink_late(env):
     """g1's daemon starts while its sync device (-I eth0, with the bind
     address) does not exist yet, as at boot before netifd has set up a VLAN

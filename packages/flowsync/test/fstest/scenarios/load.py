@@ -52,7 +52,7 @@ def enobufs_early(env):
                  marked(g1, 2000))
 
 
-@scenario(gateways=2, once=True, tags={"load", "heavy", "repro"})
+@scenario(gateways=2, once=True, tags={"load", "heavy"})
 def resync_bulk(env):
     """conntrack -F on g1 while it holds 6000 copies, with a slow refresh
     (tx_rate 50: 1500 records/s per peer, a 4 s round). The resync answer

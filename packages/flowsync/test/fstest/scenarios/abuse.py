@@ -54,7 +54,7 @@ def client_quota(env):
     env.check("the pool was never full", g1.st("rx_limited"), 0)
 
 
-@scenario(gateways=2, once=True, tags={"abuse", "repro"})
+@scenario(gateways=2, once=True, tags={"abuse"})
 def client_spread(env):
     """One location (a /56 of the synced /44) floods from 17 of its /64s: a
     per-/64 limit lets it fill the whole pool (17 x 50 > 800). Counted per /56

@@ -278,7 +278,7 @@ def tcp_flush_norule(env):
            % (g1.st("copies_lost"), g1.st("tx_resync"), g0.st("rx_resync")))
 
 
-@scenario(gateways=2, once=True, requires=ACK_ON_G1, tags={"tcp", "heavy", "repro"})
+@scenario(gateways=2, once=True, requires=ACK_ON_G1, tags={"tcp", "heavy"})
 def reversed_race(env):
     """conntrack -F on g1 while the servers of two TCP flows send 40000
     segments/s each through it: their segments are picked up reversed
@@ -325,7 +325,7 @@ def reversed_race(env):
              "not after flush %s" % slow)
 
 
-@scenario(gateways=2, tags={"tcp", "repro"})
+@scenario(gateways=2, tags={"tcp"})
 def syn_sent_reroute(env):
     """g0 sees the client's SYN (native SYN_SENT), g1 the SYN/ACK and the
     server's data on its copy. Then the reply path moves onto g0: the server's

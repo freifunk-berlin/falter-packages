@@ -14,6 +14,7 @@
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nfnetlink_conntrack.h>
 #include <linux/netfilter/nf_conntrack_common.h>
+#include <linux/netfilter/nf_conntrack_tcp.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 
 #include "flowsync.h"
@@ -24,6 +25,16 @@
 static struct mnl_socket *ev_nl;
 /* NEW events were lost since the last round started (ENOBUFS) */
 static bool ev_lost;
+/*
+ * The event socket overran and the kernel goes on dropping NEW events until a
+ * read finds the queue empty, without reporting ENOBUFS again. A round that
+ * starts meanwhile misses the flows created after its dump walked past them:
+ * ev_lost stays set until the overrun has ended, and the repair round comes
+ * after that.
+ */
+static bool ev_overrun;
+/* the running round is the one that clears ev_lost: if it fails, set it again */
+static bool round_covers_lost;
 
 /* refresh: one dump socket, one round of requests, a small queue */
 static struct mnl_socket *dump_nl;
@@ -56,18 +67,27 @@ static uint64_t tokens_ts;
  * are SEEN_REPLY but not yet ASSURED. Our copies (mark bit set) are dumped
  * whatever their status, to re-learn ownership and to find the ones with
  * traffic.
+ *
+ * For TCP the first phase takes that class too (status_mask_tcp): a native
+ * that is SEEN_REPLY but still SYN_SENT is a connection whose reply path
+ * moved onto this gateway mid-handshake (the server's segments reach the
+ * SYN_SENT entry, which the tracker ignores without refreshing it), and it is
+ * promoted (see dump_cb). The rest of the class, handshakes in progress, is
+ * small and skipped.
  */
 static const struct {
-	uint32_t status, status_mask;
+	uint32_t status, status_mask, status_mask_tcp;
 	bool copies;
 } phases[] = {
-	{ 0, IPS_SEEN_REPLY, false },		/* native, replies take another gateway */
-	{ IPS_ASSURED, IPS_ASSURED, false },	/* native, symmetric */
+	/* native, replies take another gateway */
+	{ 0, IPS_SEEN_REPLY, IPS_ASSURED, false },
+	{ IPS_ASSURED, IPS_ASSURED, IPS_ASSURED, false },	/* native, symmetric */
 	/* native, symmetric, offloaded before conntrack set ASSURED: its packets
 	 * bypass conntrack now, so it stays SEEN_REPLY without ASSURED and the two
 	 * phases above miss it */
-	{ IPS_OFFLOAD | IPS_SEEN_REPLY, IPS_OFFLOAD | IPS_SEEN_REPLY | IPS_ASSURED, false },
-	{ 0, 0, true },				/* our copies */
+	{ IPS_OFFLOAD | IPS_SEEN_REPLY, IPS_OFFLOAD | IPS_SEEN_REPLY | IPS_ASSURED,
+	  IPS_OFFLOAD | IPS_SEEN_REPLY | IPS_ASSURED, false },
+	{ 0, 0, 0, true },					/* our copies */
 };
 #define N_PHASES (sizeof(phases) / sizeof(phases[0]))
 
@@ -257,40 +277,72 @@ static int ev_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
+/* an overrun: the kernel drops new events until we have drained the queue;
+ * what is queued is intact and a round covers the gap. Reopening would throw
+ * the queue away. */
+static void events_overrun(void)
+{
+	static uint64_t last_log;
+
+	cnt.ev_overruns++;
+	ev_lost = ev_overrun = true;
+	if (log_ok(&last_log))
+		logmsg(LOG_WARNING, "conntrack events: overrun, events lost (raise rcvbuf)");
+}
+
+/* the queue is empty: an overrun has ended, and with it the dropping. Lost
+ * again, so that the repair round comes now, after all of it. */
+static void events_drained(void)
+{
+	if (ev_overrun) {
+		ev_overrun = false;
+		ev_lost = true;
+	}
+}
+
 void handle_events(void)
 {
 	static char buf[NL_BUF_SIZE] __attribute__((aligned(8)));
-	static uint64_t last_log;
+	bool drained = false;
 	ssize_t n;
 	int i;
 
 	for (i = 0; ev_nl && i < DRAIN_MAX; i++) {
 		n = mnl_socket_recvfrom(ev_nl, buf, sizeof(buf));
 		if (n < 0) {
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				drained = true;
 				break;
+			}
 			if (errno == EINTR)
 				continue;
 			if (errno == ENOBUFS) {
-				/* overrun: the kernel drops new events until we have
-				 * drained the queue; what is queued is intact and the
-				 * next refresh covers the gap. Reopening would throw
-				 * the queue away. */
-				cnt.ev_overruns++;
-				ev_lost = true;
-				if (log_ok(&last_log))
-					logmsg(LOG_WARNING, "conntrack events: overrun, events lost "
-					       "(raise rcvbuf)");
+				events_overrun();
 				continue;
 			}
 			logmsg(LOG_WARNING, "conntrack events: %s, resubscribing",
 			       strerror(errno));
 			ev_lost = true;		/* the queue goes with the socket */
+			ev_overrun = false;
 			ev_open();
 			break;
 		}
 		mnl_cb_run(buf, n, 0, 0, ev_cb, NULL);
 	}
+	/* stopped at DRAIN_MAX during an overrun: the last read may have emptied
+	 * the queue, and then poll never reports it again; look */
+	while (!drained && ev_overrun && ev_nl) {
+		if (recv(mnl_socket_get_fd(ev_nl), buf, 1, MSG_PEEK | MSG_DONTWAIT) >= 0)
+			break;			/* more to read: poll reports it */
+		if (errno == ENOBUFS)
+			events_overrun();
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			drained = true;
+		else if (errno != EINTR)
+			break;
+	}
+	if (drained)
+		events_drained();
 	/* no batching across reads: the reply may already be on its way. A
 	 * peer whose send buffer was full missed these: a round repairs it */
 	if (!dgram_flush())
@@ -476,9 +528,27 @@ static int dump_cb(const struct nlmsghdr *nlh, void *data)
 	if (c.status & IPS_OFFLOAD)
 		offload_seen = true;
 	if (!phases[cur_phase].copies) {
+		if (is_copy(c.mark))
+			return MNL_CB_OK;
+		/* a TCP native that saw replies but no handshake: the client's
+		 * SYN passed here, the SYN/ACK took another gateway, and now the
+		 * reply path has moved here. The tracker ignores the server's
+		 * segments in SYN_SENT (accepted, as SEEN_REPLY, but not refreshed),
+		 * so the busy connection would die at the SYN_SENT timeout. It is
+		 * made ESTABLISHED like a copy; the next packet makes it ASSURED,
+		 * and the next round announces it as a symmetric native. */
+		if (c.f.proto == IPPROTO_TCP && (c.status & IPS_SEEN_REPLY) &&
+		    !(c.status & (IPS_ASSURED | IPS_OFFLOAD))) {
+			if (c.tcp_state == TCP_CONNTRACK_SYN_SENT) {
+				flow_dbg("promote", &c.f);
+				inj_add_promote(&c.f);
+				cnt.tx_promoted++;
+			}
+			return MNL_CB_OK;
+		}
 		/* native: announced while it exists. Peers never refresh it
 		 * (EXCL), so it lives on packets alone. */
-		if (!is_copy(c.mark) && announce_ok(c.status))
+		if (announce_ok(c.status))
 			queue_push(&c.f);
 		return MNL_CB_OK;
 	}
@@ -540,17 +610,19 @@ static int dump_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-/* NEW events were lost and no round has started since: the main loop pulls
- * the next round forward instead of waiting up to a whole interval */
+/* NEW events were lost, the overrun is over, and no round has started since:
+ * the main loop pulls the next round forward instead of waiting up to a whole
+ * interval */
 bool events_lost(void)
 {
-	return ev_lost;
+	return ev_lost && !ev_overrun;
 }
 
 /* the subscription was down and is back: its events are lost */
 void events_reopened(void)
 {
 	ev_lost = true;
+	ev_overrun = false;
 }
 
 /* first configured protocol after "from", or -1 */
@@ -591,7 +663,9 @@ static int dump_send(void)
 	char buf[256] __attribute__((aligned(8)));
 	struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
 
-	ct_build_dump(nlh, cur_proto, phases[cur_phase].status, phases[cur_phase].status_mask,
+	ct_build_dump(nlh, cur_proto, phases[cur_phase].status,
+		      cur_proto == IPPROTO_TCP ? phases[cur_phase].status_mask_tcp :
+						 phases[cur_phase].status_mask,
 		      phases[cur_phase].copies ? cfg.ct_mark : 0, cfg.ct_mark_mask);
 	if (!++dump_seq)
 		dump_seq = 1;
@@ -624,6 +698,10 @@ static void refresh_fail(const char *what)
 	if (log_ok(&last_log))
 		logmsg(LOG_WARNING, "refresh: %s: %s", what, strerror(errno));
 	refresh_close();
+	/* the round that was to cover lost events did not complete */
+	if (round_covers_lost)
+		ev_lost = true;
+	round_covers_lost = false;
 }
 
 int refresh_fd(void)
@@ -685,7 +763,11 @@ int refresh_start(void)
 		refresh_fail("dump request");
 		return -1;
 	}
-	ev_lost = false;	/* this round covers what the events missed */
+	/* this round covers what the events missed before it, but not what an
+	 * overrun still going on drops after it (events_drained) */
+	round_covers_lost = ev_lost && !ev_overrun;
+	if (round_covers_lost)
+		ev_lost = false;
 	return 1;
 }
 
@@ -742,6 +824,7 @@ void handle_refresh(void)
 		return;
 	}
 	round_running = false;
+	round_covers_lost = false;
 	gauge.refresh_running = false;
 	gauge.refresh_ms = mono_ms() - round_start;
 	gauge.refresh_entries = round_entries;
@@ -755,9 +838,27 @@ void handle_refresh(void)
 	    (unsigned long long)round_copies, (unsigned long long)gauge.refresh_ms);
 }
 
+/*
+ * A round that answers a peer's resync request is sent at resync_rate: the
+ * peer has lost its copies (a flush, a reboot) and every second it waits is a
+ * second of rejected replies. The send buffer's back-pressure (held datagrams)
+ * still bounds it.
+ */
+static bool fast_round;
+
+void refresh_fast(bool fast)
+{
+	fast_round = fast;
+}
+
+static unsigned long rate(void)
+{
+	return fast_round ? cfg.resync_rate : cfg.tx_rate;
+}
+
 static double burst_size(void)
 {
-	double burst = cfg.tx_rate / 20.0;
+	double burst = rate() / 20.0;
 
 	return burst < 1 ? 1 : burst;
 }
@@ -765,12 +866,13 @@ static double burst_size(void)
 /* poll timeout while refresh records are pending: one burst worth of time */
 int refresh_pace_ms(void)
 {
-	int ms = (int)(1000.0 * burst_size() / cfg.tx_rate);
+	int ms = (int)(1000.0 * burst_size() / rate());
 
 	return ms < 10 ? 10 : ms;
 }
 
-/* send queued refresh entries at tx_rate datagrams per second (per peer) */
+/* send queued refresh entries at tx_rate (resync_rate) datagrams per second
+ * (per peer) */
 void refresh_tick(void)
 {
 	uint64_t now = mono_ms();
@@ -781,7 +883,7 @@ void refresh_tick(void)
 	if (round_running && !refresh_wants_read())
 		round_progress = now;
 
-	tokens += (now - tokens_ts) * (double)cfg.tx_rate / 1000.0;
+	tokens += (now - tokens_ts) * (double)rate() / 1000.0;
 	tokens_ts = now;
 	if (tokens > burst)
 		tokens = burst;

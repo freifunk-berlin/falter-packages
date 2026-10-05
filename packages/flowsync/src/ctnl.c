@@ -23,7 +23,7 @@
 #define CTA_FILTER_F_CTA_PROTO_NUM	(1 << 3)
 
 struct ct_attrs {
-	const struct nlattr *tuple, *status, *mark, *timeout, *id;
+	const struct nlattr *tuple, *status, *mark, *timeout, *id, *protoinfo;
 };
 
 struct tuple_attrs {
@@ -63,7 +63,28 @@ static int ct_cb(const struct nlattr *attr, void *data)
 		if (mnl_attr_validate(attr, MNL_TYPE_U32) == 0)
 			a->id = attr;
 		break;
+	case CTA_PROTOINFO:
+		if (mnl_attr_validate(attr, MNL_TYPE_NESTED) == 0)
+			a->protoinfo = attr;
+		break;
 	}
+	return MNL_CB_OK;
+}
+
+/* CTA_PROTOINFO -> CTA_PROTOINFO_TCP -> CTA_PROTOINFO_TCP_STATE */
+static int tcp_state_cb(const struct nlattr *attr, void *data)
+{
+	if (mnl_attr_get_type(attr) == CTA_PROTOINFO_TCP_STATE &&
+	    mnl_attr_validate(attr, MNL_TYPE_U8) == 0)
+		*(uint8_t *)data = mnl_attr_get_u8(attr);
+	return MNL_CB_OK;
+}
+
+static int protoinfo_cb(const struct nlattr *attr, void *data)
+{
+	if (mnl_attr_get_type(attr) == CTA_PROTOINFO_TCP &&
+	    mnl_attr_validate(attr, MNL_TYPE_NESTED) == 0)
+		mnl_attr_parse_nested(attr, tcp_state_cb, data);
 	return MNL_CB_OK;
 }
 
@@ -122,12 +143,13 @@ static int proto_cb(const struct nlattr *attr, void *data)
 	return MNL_CB_OK;
 }
 
-/* original tuple, status, mark and remaining timeout of an IPv6 entry; -1 if
- * the tuple or the status is missing (mark and timeout default to 0) */
+/* original tuple, status, mark, remaining timeout and TCP state of an IPv6
+ * entry; -1 if the tuple or the status is missing (mark and timeout default
+ * to 0, the TCP state to CT_NO_TCP_STATE) */
 int ct_parse(const struct nlmsghdr *nlh, struct ct_entry *e)
 {
 	const struct nfgenmsg *nfh;
-	struct ct_attrs ct = { NULL, NULL, NULL, NULL, NULL };
+	struct ct_attrs ct = { NULL, NULL, NULL, NULL, NULL, NULL };
 	struct tuple_attrs t = { NULL, NULL };
 	struct ip_attrs ip = { NULL, NULL };
 	struct proto_attrs pr = { NULL, NULL, NULL };
@@ -159,6 +181,9 @@ int ct_parse(const struct nlmsghdr *nlh, struct ct_entry *e)
 		e->timeout = ntohl(mnl_attr_get_u32(ct.timeout));
 	if (ct.id)
 		e->id = mnl_attr_get_u32(ct.id);
+	e->tcp_state = CT_NO_TCP_STATE;
+	if (ct.protoinfo)
+		mnl_attr_parse_nested(ct.protoinfo, protoinfo_cb, &e->tcp_state);
 	return 0;
 }
 
@@ -251,6 +276,22 @@ void ct_build_new(struct nlmsghdr *nlh, const struct flow *f, bool create)
 	mnl_attr_put_u32(nlh, CTA_STATUS, htonl(IPS_SEEN_REPLY | IPS_CONFIRMED));
 	mnl_attr_put_u32(nlh, CTA_MARK, htonl(cfg.ct_mark));
 	mnl_attr_put_u32(nlh, CTA_MARK_MASK, htonl(cfg.ct_mark_mask));
+}
+
+/*
+ * One of this gateway's own native TCP entries to ESTABLISHED, in place: no
+ * NLM_F_CREATE, only the original tuple and the proto-info of a copy (state,
+ * be_liberal). Status, mark and timeout stay; the next packet sets ASSURED
+ * and the established timeout. For an entry stuck in SYN_SENT although
+ * replies pass it (see dump_cb in tx.c). The caller sets nlmsg_seq.
+ */
+void ct_build_promote(struct nlmsghdr *nlh, const struct flow *f)
+{
+	nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_NEW;
+	nlh->nlmsg_flags = NLM_F_REQUEST;
+	put_nfgenmsg(nlh);
+	put_tuple(nlh, CTA_TUPLE_ORIG, &f->c, &f->s, f->proto, f->cport, f->sport);
+	put_tcp_protoinfo(nlh);
 }
 
 /* the same flow seen from the other end: server -> client */

@@ -32,11 +32,10 @@ static void on_signal(int sig)
 }
 
 /*
- * A copy is announced only while its remaining timeout exceeds
- * element_timeout, which a packet causes by setting the protocol's natural
- * timeout. If that natural timeout is not larger than element_timeout, copies
- * on this gateway can never show traffic and stay silent (still correct, but
- * a rerouted flow is then not re-announced from here).
+ * A copy with more than element_timeout plus one interval left is held, not
+ * refreshed: it lives on its own traffic (refresh_due). A natural timeout not
+ * above that is refreshed down to element_timeout on every round instead, so
+ * a copy that carries traffic loses what the tracker gave it.
  */
 static void check_kernel_timeouts(void)
 {
@@ -53,10 +52,10 @@ static void check_kernel_timeouts(void)
 	for (i = 0; i < sizeof(t) / sizeof(t[0]); i++) {
 		if (!cfg.proto[t[i].proto] || read_sysctl(t[i].path, &v))
 			continue;
-		if (v <= cfg.element_timeout)
-			logmsg(LOG_WARNING, "%s is %lu, not above element_timeout %lu: %s copies can "
-			       "never show traffic and will not be announced from here",
-			       strrchr(t[i].path, '/') + 1, v, cfg.element_timeout,
+		if (v <= cfg.element_timeout + cfg.interval)
+			logmsg(LOG_WARNING, "%s is %lu, not above element_timeout + interval %lu: %s "
+			       "copies that carry traffic are cut back to element_timeout by refreshes",
+			       strrchr(t[i].path, '/') + 1, v, cfg.element_timeout + cfg.interval,
 			       proto_name(t[i].proto));
 	}
 	/* 0: no event extension on new entries, so no NEW and no DESTROY events
@@ -92,9 +91,14 @@ static int drop_privileges(void)
 	snprintf(dir, sizeof(dir), "%s", status_path);
 	slash = strrchr(dir, '/');
 	if (slash && slash != dir) {
+		struct stat st;
+
 		*slash = 0;
-		/* a directory of our own only: an existing one keeps its owner */
-		if (!mkdir(dir, 0755) && pw && chown(dir, pw->pw_uid, pw->pw_gid))
+		/* ours, or root's (left by a run without user, or made by hand):
+		 * another user's directory keeps its owner */
+		if (pw && (!mkdir(dir, 0755) || (!stat(dir, &st) && S_ISDIR(st.st_mode) &&
+						  !st.st_uid)) &&
+		    chown(dir, pw->pw_uid, pw->pw_gid))
 			logmsg(LOG_WARNING, "%s: chown: %s", dir, strerror(errno));
 	}
 	/* the bounding set first, while CAP_SETPCAP is still there */
@@ -126,7 +130,7 @@ static int cmd_run(void)
 	struct pollfd fds[5];
 	uint64_t now, next_tick, busy_since = 0, busy, loop_max = 0, last_early = 0;
 	char abuf[INET6_ADDRSTRLEN];
-	bool first = true, owed = false;
+	bool first = true, owed = false, fast = false;
 	int timeout, nfds;
 
 	sigaction(SIGTERM, &sa, NULL);
@@ -145,9 +149,9 @@ static int cmd_run(void)
 	rx_limit_init();
 	peers_init();
 	udp_fd = udp_open(true);
-	if (udp_fd < 0 || inj_open() || ev_open() || destroy_open())
+	/* an interface that does not exist yet is waited for (udp_tick) */
+	if ((udp_fd < 0 && errno != ENODEV) || inj_open() || ev_open() || destroy_open())
 		return 1;
-	set_rcvbuf(udp_fd, "udp", cfg.rcvbuf);
 	if (drop_privileges())
 		return 1;
 	resync_init();
@@ -173,10 +177,15 @@ static int cmd_run(void)
 				events_reopened();	/* nothing was received meanwhile */
 			if (destroy_fd() < 0)
 				destroy_open();
+			/* the interface came, or came anew: we were deaf and mute */
+			if (udp_tick())
+				resync_request();
 			rx_local_refresh();	/* addresses may have come or gone */
 			switch (refresh_start()) {
 			case 1:
 				owed = false;
+				refresh_fast(fast);	/* pulled for a resync request */
+				fast = false;
 				resync_round_started();	/* it serves the peers' requests */
 				break;
 			case 0:
@@ -185,12 +194,19 @@ static int cmd_run(void)
 				owed = true;
 				break;
 			default:
-				break;		/* failed: retried at the next tick */
+				/* failed: retried at the next tick, not pulled again
+				 * at once (owed would make that a busy loop) */
+				owed = false;
+				break;
 			}
 			heartbeat();
 			write_status();
 			next_tick = now + cfg.interval * 1000;
 		}
+		/* before the checks below: a queue that this sends empty lets them
+		 * pull the next round now, not at the next unrelated wake-up */
+		if (refresh_pending())
+			refresh_tick();
 		/* NEW events were lost: the flows they announced wait for the next
 		 * round. Pull it forward (a second from now, once the burst that
 		 * caused the overrun has passed), at most once per interval so that a
@@ -208,6 +224,7 @@ static int cmd_run(void)
 		/* a peer asked for a round (it restarted or lost copies) */
 		if (resync_round_wanted() && !gauge.refresh_running && !refresh_pending()) {
 			next_tick = now;
+			fast = true;
 			resync_round_pulled();
 		}
 		resync_tick();
@@ -215,8 +232,6 @@ static int cmd_run(void)
 		if (resync_own_round_wanted() && !gauge.refresh_running && !refresh_pending() &&
 		    next_tick > now + EARLY_ROUND_MS)
 			next_tick = now + EARLY_ROUND_MS;
-		if (refresh_pending())
-			refresh_tick();
 
 		now = mono_ms();
 		timeout = next_tick > now ? (int)(next_tick - now) : 0;
@@ -304,6 +319,8 @@ static int cmd_check(void)
 	printf("ct_mark_mask 0x%08lx\n", cfg.ct_mark_mask);
 	printf("max_copies %lu\n", cfg.max_copies);
 	printf("max_copies_per_client %lu\n", cfg.max_copies_client);
+	printf("client_prefix_len %lu\n", cfg.client_prefix_len);
+	printf("resync_rate %lu\n", cfg.resync_rate);
 	for (i = 0; i < 256; i++)
 		if (cfg.proto[i] && proto_name(i))
 			printf("proto %s\n", proto_name(i));

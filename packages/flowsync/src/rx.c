@@ -21,8 +21,10 @@
 #include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <sys/socket.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "flowsync.h"
 
@@ -30,12 +32,20 @@ static struct rx_ent *table;
 static unsigned int mask;
 
 /*
+ * Both hashes take tuples that anybody on the mesh can choose (and, without
+ * authentication, records anybody can forge): seeded at startup, so that
+ * nobody can aim at one probe window.
+ */
+static uint32_t seed;
+
+/*
  * Our copies, counted: gauge.owned is the number of slots that own one, and
- * clients[] counts them per client /64 (the copy limits). Both follow every
- * change of own (rx_own, rx_disown) and are recounted from the table by each
- * sweep, which also drops /64s without copies. Open addressing on the /64
- * (0: empty, no client of a synced prefix has it); a /64 whose window is full
- * is not counted and so not limited.
+ * clients[] counts them per client prefix (client_prefix_len, the copy
+ * limits). Both follow every change of own (rx_own, rx_disown) and are
+ * recounted from the table by each sweep, which also drops prefixes without
+ * copies. Open addressing on the prefix (0: empty, no client of a synced
+ * prefix has it); a prefix whose window is full is not counted and so not
+ * limited.
  */
 #define CLIENTS		(1 << 16)
 #define CLIENT_PROBES	64
@@ -44,16 +54,26 @@ static struct client {
 	uint32_t n;
 } clients[CLIENTS];
 
+/* the client's prefix, the first client_prefix_len bits, as a number */
+static uint64_t client_prefix(const struct flow *f)
+{
+	uint64_t p = 0;
+	unsigned int i;
+
+	for (i = 0; i < 8; i++)
+		p = p << 8 | f->c.s6_addr[i];
+	return p & ~0ull << (64 - cfg.client_prefix_len);
+}
+
 static uint32_t *client_count(const struct flow *f, bool add)
 {
-	uint64_t p;
+	uint64_t p = client_prefix(f);
 	uint32_t h;
 	unsigned int i;
 
-	memcpy(&p, f->c.s6_addr, sizeof(p));
 	if (!p)
 		return NULL;		/* the empty mark, not a client */
-	h = (uint32_t)((p ^ (p >> 31)) * 0x9e3779b97f4a7c15ull >> 40);
+	h = (uint32_t)(((p ^ seed) ^ (p >> 31)) * 0x9e3779b97f4a7c15ull >> 40);
 	for (i = 0; i < CLIENT_PROBES; i++) {
 		struct client *c = &clients[(h + i) & (CLIENTS - 1)];
 
@@ -71,7 +91,7 @@ static uint32_t *client_count(const struct flow *f, bool add)
 
 static uint32_t flow_hash(const struct flow *f)
 {
-	uint32_t h = 2166136261u;
+	uint32_t h = 2166136261u ^ seed;
 	unsigned int i;
 
 #define MIX(b) do { h ^= (uint8_t)(b); h *= 16777619u; } while (0)
@@ -98,6 +118,8 @@ int rx_init(unsigned int size)
 	mask = size - 1;
 	gauge.owned = 0;
 	memset(clients, 0, sizeof(clients));
+	if (getrandom(&seed, sizeof(seed), GRND_NONBLOCK) != sizeof(seed))
+		seed = (uint32_t)mono_ms() ^ (uint32_t)getpid() << 16;
 	return 0;
 }
 
@@ -325,12 +347,14 @@ void rx_sweep(uint32_t round, uint32_t round_start)
  * re-creates after ENOENT go on. A forger can then degrade the sync, not the
  * gateway. The same happens without any forging when one client opens flows
  * by the thousand (a scanner, P2P): every peer would hold a copy of each, and
- * the pool would be gone for everybody else. So each client /64 may hold only
- * max_copies_per_client of them (rx_limited_client).
+ * the pool would be gone for everybody else. So each client prefix may hold
+ * only max_copies_per_client of them (rx_limited_client), when that is set.
+ * The prefix is client_prefix_len bits long: a /64 is one client network, and
+ * a /56 one Freifunk location, whose host can source from any of its /64s.
  *
- * Default: a quarter of nf_conntrack_max, and at most three quarters of the
- * per-tuple table (beyond that it evicts live tuples, see RX_PROBES); per
- * client a sixteenth of that.
+ * Default: a quarter of nf_conntrack_max (0: unlimited), and at most three
+ * quarters of the per-tuple table (beyond that it evicts live tuples, see
+ * RX_PROBES); no limit per client.
  */
 void rx_limit_init(void)
 {
@@ -343,13 +367,14 @@ void rx_limit_init(void)
 	} else {
 		cfg.max_copies = rx_max;
 		if (!read_sysctl("/proc/sys/net/netfilter/nf_conntrack_max", &ct_max) &&
-		    ct_max / 4 < rx_max)
-			cfg.max_copies = ct_max / 4;
+		    ct_max && ct_max / 4 < rx_max)
+			cfg.max_copies = ct_max / 4 ? ct_max / 4 : 1;
 	}
-	if (!cfg.max_copies_client)
-		cfg.max_copies_client = cfg.max_copies / 16 ? cfg.max_copies / 16 : 1;
-	logmsg(LOG_NOTICE, "copy limit %lu, %lu per client /64", cfg.max_copies,
-	       cfg.max_copies_client);
+	if (cfg.max_copies_client)
+		logmsg(LOG_NOTICE, "copy limit %lu, %lu per client /%lu", cfg.max_copies,
+		       cfg.max_copies_client, cfg.client_prefix_len);
+	else
+		logmsg(LOG_NOTICE, "copy limit %lu, no limit per client", cfg.max_copies);
 }
 
 /* whether a new copy of f may be created (not for our own copies: refreshes
@@ -368,14 +393,19 @@ bool rx_admit(const struct flow *f)
 			       "max_copies, or forged announcements)", cfg.max_copies);
 		return false;
 	}
-	n = client_count(f, false);
+	n = cfg.max_copies_client ? client_count(f, false) : NULL;
 	if (n && *n >= cfg.max_copies_client) {
 		cnt.rx_limited_client++;
 		if (log_ok(&last_log_client)) {
+			uint64_t pfx = client_prefix(f);
+			unsigned int i;
+
 			memset(&p, 0, sizeof(p));
-			memcpy(&p, &f->c, 8);
-			logmsg(LOG_WARNING, "client %s/64 holds %u copies, more refused "
-			       "(max_copies_per_client)", addr_str(&p, buf, sizeof(buf)), *n);
+			for (i = 0; i < 8; i++)
+				p.s6_addr[i] = pfx >> (56 - 8 * i);
+			logmsg(LOG_WARNING, "client %s/%lu holds %u copies, more refused "
+			       "(max_copies_per_client)", addr_str(&p, buf, sizeof(buf)),
+			       cfg.client_prefix_len, *n);
 		}
 		return false;
 	}
@@ -389,21 +419,38 @@ bool rx_admit(const struct flow *f)
  * comes in on and whatever the zone rules say: such a record is refused.
  * (Networks behind the gateway are not known here: exclude_dst covers them.)
  */
-#define MAX_LOCAL 128
+#define MAX_LOCAL 512
 static struct in6_addr local_addr[MAX_LOCAL];
 static unsigned int n_local;
 
 void rx_local_refresh(void)
 {
+	static uint64_t last_log;
 	struct ifaddrs *ifa, *i;
+	bool full = false;
 
 	if (getifaddrs(&ifa))
 		return;
 	n_local = 0;
-	for (i = ifa; i && n_local < MAX_LOCAL; i = i->ifa_next)
-		if (i->ifa_addr && i->ifa_addr->sa_family == AF_INET6)
-			local_addr[n_local++] = ((struct sockaddr_in6 *)i->ifa_addr)->sin6_addr;
+	for (i = ifa; i; i = i->ifa_next) {
+		const struct in6_addr *a;
+
+		if (!i->ifa_addr || i->ifa_addr->sa_family != AF_INET6)
+			continue;
+		a = &((struct sockaddr_in6 *)i->ifa_addr)->sin6_addr;
+		/* never a server of a synced flow (wanted() needs a routable one) */
+		if (IN6_IS_ADDR_LINKLOCAL(a) || IN6_IS_ADDR_LOOPBACK(a))
+			continue;
+		if (n_local == MAX_LOCAL) {
+			full = true;
+			break;
+		}
+		local_addr[n_local++] = *a;
+	}
 	freeifaddrs(ifa);
+	if (full && log_ok(&last_log))
+		logmsg(LOG_WARNING, "more than %d local IPv6 addresses: copies of flows to the "
+		       "others are not refused", MAX_LOCAL);
 }
 
 static bool is_local(const struct in6_addr *a)
@@ -475,10 +522,17 @@ void handle_rx(void)
 		/* a v4-mapped source that came as IPv6 is nobody's (udp_recv) */
 		p = from.sin6_family == AF_INET6 && !forged ? peer_index(&from.sin6_addr) : -1;
 		if (p < 0) {
+			static uint64_t last_bad;
+
 			cnt.rx_datagrams++;
 			cnt.rx_bad_peer++;
-			DBG("rx: %zd bytes from non-peer %s", n,
-			    addr_str(&from.sin6_addr, abuf, sizeof(abuf)));
+			/* a peer whose source address is not the one configured
+			 * here (bind_address unset on a multi-homed gateway) looks
+			 * exactly like this: say who it was */
+			if (log_ok(&last_bad))
+				logmsg(LOG_NOTICE, "rx: %zd bytes from %s%s, not a peer", n,
+				       addr_str(&from.sin6_addr, abuf, sizeof(abuf)),
+				       forged ? " (v4-mapped over IPv6)" : "");
 			continue;
 		}
 		rc = wire_check(buf, n, &count, &flags);

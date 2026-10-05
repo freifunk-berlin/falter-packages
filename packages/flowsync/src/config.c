@@ -94,6 +94,10 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 0, 100000000, &cfg.max_copies, 10);
 	} else if (!strcmp(name, "max_copies_per_client")) {
 		return opt_uint(name, val, 0, 100000000, &cfg.max_copies_client, 10);
+	} else if (!strcmp(name, "client_prefix_len")) {
+		return opt_uint(name, val, 1, 64, &cfg.client_prefix_len, 10);
+	} else if (!strcmp(name, "resync_rate")) {
+		return opt_uint(name, val, 0, 4000000, &cfg.resync_rate, 10);
 	} else if (!strcmp(name, "proto")) {
 		p = proto_num(val);
 		if (p < 0) {
@@ -143,12 +147,16 @@ static const struct {
 	{ 't', "element-timeout",  "element_timeout",  "SEC",   "timeout of injected entries (90)" },
 	{ 'l', "batch-lines",      "batch_lines",      "N",     "records per datagram, 1..34 (30)" },
 	{ 'r', "tx-rate",          "tx_rate",          "N",     "refresh datagrams per second per peer (500)" },
+	{ 'R', "resync-rate",      "resync_rate",      "N",
+	  "the same for a round that answers a resync request, 0: 4 x tx_rate (0)" },
 	{ 'B', "rcvbuf",           "rcvbuf",           "BYTES", "socket receive buffers (8388608)" },
 	{ 'm', "ct-mark",          "ct_mark",          "HEX",   "mark set on injected entries (0x01000000)" },
 	{ 'M', "ct-mark-mask",     "ct_mark_mask",     "HEX",   "mask of that mark (0x01000000)" },
 	{ 'C', "max-copies",       "max_copies",       "N",     "most copies held, 0: nf_conntrack_max/4 (0)" },
 	{ 'c', "max-copies-per-client", "max_copies_per_client", "N",
-	  "most copies per client /64, 0: max_copies/16 (0)" },
+	  "most copies per client prefix, 0: no limit (0)" },
+	{ 'L', "client-prefix-len", "client_prefix_len", "N",
+	  "length of a client prefix for that limit, 1..64 (64)" },
 	{ 'P', "proto",            "proto",            "NAME",  "synced protocol, repeatable (udp tcp)" },
 	{ 'S', "skip-server-port", "skip_server_port", "N",     "server port never synced, repeatable (53)" },
 	{ 'e', "peer",             "peer",             "ADDR",  "other gateway, repeatable" },
@@ -195,6 +203,7 @@ int parse_args(int argc, char **argv)
 	cfg.rcvbuf = 8388608;
 	cfg.ct_mark = 0x01000000;
 	cfg.ct_mark_mask = 0x01000000;
+	cfg.client_prefix_len = 64;
 
 	memset(longopts, 0, sizeof(longopts));
 	*s++ = ':';
@@ -241,6 +250,8 @@ int parse_args(int argc, char **argv)
 		cfg.skip_port[53 / 8] |= 1 << (53 % 8);
 		cfg.n_skip_port = 1;
 	}
+	if (!cfg.resync_rate)
+		cfg.resync_rate = 4 * cfg.tx_rate;
 
 	if (!cfg.ct_mark_mask || !cfg.ct_mark || (cfg.ct_mark & ~cfg.ct_mark_mask)) {
 		logmsg(LOG_ERR, "ct_mark 0x%08lx / ct_mark_mask 0x%08lx: mark must be "
@@ -266,6 +277,14 @@ int parse_args(int argc, char **argv)
 
 		if (cfg.bind_set && IN6_ARE_ADDR_EQUAL(&cfg.peer[i], &cfg.bind)) {
 			logmsg(LOG_ERR, "peer %u is our own bind_address", i + 1);
+			ret = -1;
+		}
+		/* a socket bound to an IPv4 address cannot reach an IPv6 peer and
+		 * vice versa: every send would fail */
+		if (cfg.bind_set && !IN6_IS_ADDR_UNSPECIFIED(&cfg.bind) &&
+		    IN6_IS_ADDR_V4MAPPED(&cfg.peer[i]) != IN6_IS_ADDR_V4MAPPED(&cfg.bind)) {
+			logmsg(LOG_ERR, "peer %u and bind_address are of different address families",
+			       i + 1);
 			ret = -1;
 		}
 		for (k = 0; k < i; k++)

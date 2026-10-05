@@ -146,10 +146,15 @@ void resync_tick(void)
 	/* held, not dropped: it goes out once the table has room again */
 	if (table_pressure(now))
 		return;
-	request_pending = false;
+	/* no socket while the interface is away: it goes out once there is one */
+	if (udp_fd < 0)
+		return;
 	last_request = now;
+	/* every send failed: still pending, tried again after the spacing */
+	if (!dgram_control(WIRE_F_RESYNC))
+		return;
+	request_pending = false;
 	cnt.tx_resync++;
-	dgram_control(WIRE_F_RESYNC);
 	own_round_wanted = true;
 }
 

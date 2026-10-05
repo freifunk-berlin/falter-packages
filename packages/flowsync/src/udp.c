@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
+#include <net/if.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -12,6 +13,10 @@
 #include <unistd.h>
 
 #include "flowsync.h"
+
+#ifndef IPV6_FREEBIND
+#define IPV6_FREEBIND	78	/* linux/in6.h, not in every libc's netinet/in.h */
+#endif
 
 int udp_fd = -1;
 static struct sockaddr_in6 peer_sa[MAX_PEERS];
@@ -65,10 +70,14 @@ static void set_sndbuf(int fd)
 		       "net.core.wmem_max)", eff / 2, v);
 }
 
+/* the interface the sync socket is bound to, by index (0: none) */
+static unsigned int bound_ifindex;
+
 int udp_open(bool bind_port)
 {
 	struct sockaddr_in6 sa = { .sin6_family = AF_INET6 };
 	char abuf[INET6_ADDRSTRLEN];
+	unsigned int ifindex = 0;
 	int fd, off = 0, on = 1;
 
 	fd = socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
@@ -82,18 +91,32 @@ int udp_open(bool bind_port)
 		/* peers are recognised by their source address only: accept
 		 * datagrams from the uplink alone, not from a mesh host that
 		 * sends with a peer's address (the kernel delivers a datagram for
-		 * any local address on any interface) */
-		if (cfg.ifname[0] &&
-		    setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, cfg.ifname, strlen(cfg.ifname))) {
-			logmsg(LOG_ERR, "interface %s: %s", cfg.ifname, strerror(errno));
-			close(fd);
-			return -1;
+		 * any local address on any interface). The kernel keeps the
+		 * device's index, so udp_tick() reopens the socket when the
+		 * device is created anew (netifd does that to a VLAN uplink on
+		 * every ifup). */
+		if (cfg.ifname[0]) {
+			ifindex = if_nametoindex(cfg.ifname);
+			if (!ifindex ||
+			    setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, cfg.ifname,
+				       strlen(cfg.ifname))) {
+				if (ifindex)
+					logmsg(LOG_ERR, "interface %s: %s", cfg.ifname,
+					       strerror(errno));
+				close(fd);
+				errno = ENODEV;
+				return -1;
+			}
 		}
 		v4info = setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &on, sizeof(on)) == 0;
 		if (!v4info)
 			logmsg(LOG_WARNING, "udp: IP_PKTINFO: %s (v4-mapped sources over IPv6 "
 			       "not recognised)", strerror(errno));
+		/* the bind address may not be configured yet (at boot, or while
+		 * the device is away): bind anyway */
+		setsockopt(fd, IPPROTO_IPV6, IPV6_FREEBIND, &on, sizeof(on));
 		set_sndbuf(fd);
+		set_rcvbuf(fd, "udp", cfg.rcvbuf);
 	}
 	sa.sin6_addr = cfg.bind_set ? cfg.bind : in6addr_any;
 	sa.sin6_port = bind_port ? htons(cfg.port) : 0;
@@ -104,7 +127,47 @@ int udp_open(bool bind_port)
 		close(fd);
 		return -1;
 	}
+	if (bind_port)
+		bound_ifindex = ifindex;
 	return fd;
+}
+
+/*
+ * Every tick: with an interface, (re)open the sync socket when the device has
+ * come (it may be missing at startup) or has been created anew under the same
+ * name. A socket bound to the old index receives nothing and cannot send; the
+ * daemon would be deaf and mute until restarted. Returns true when a new
+ * socket was opened: we may have missed announcements meanwhile.
+ */
+bool udp_tick(void)
+{
+	static uint64_t last_log;
+	unsigned int ifindex;
+	int fd;
+
+	if (!cfg.ifname[0] && udp_fd >= 0)
+		return false;
+	ifindex = cfg.ifname[0] ? if_nametoindex(cfg.ifname) : 0;
+	if (udp_fd >= 0 && ifindex == bound_ifindex)
+		return false;
+	if (cfg.ifname[0] && !ifindex) {
+		/* gone, or not there yet: keep what we have */
+		if (udp_fd < 0 && log_ok(&last_log))
+			logmsg(LOG_WARNING, "interface %s does not exist (yet): no sync until it "
+			       "does", cfg.ifname);
+		return false;
+	}
+	fd = udp_open(true);
+	if (fd < 0)
+		return false;
+	if (udp_fd >= 0) {
+		close(udp_fd);
+		logmsg(LOG_NOTICE, "interface %s was created anew: sync socket reopened", cfg.ifname);
+	} else if (cfg.ifname[0]) {
+		logmsg(LOG_NOTICE, "interface %s exists: sync socket open", cfg.ifname);
+	}
+	udp_fd = fd;
+	return true;
 }
 
 /*
@@ -186,6 +249,8 @@ static uint64_t send_to(const uint8_t *buf, size_t len, uint64_t peers, bool kee
 	uint64_t failed = 0;
 	unsigned int i;
 
+	if (udp_fd < 0)
+		return 0;	/* no socket while the interface is away: nothing to send on */
 	for (i = 0; i < cfg.n_peer; i++) {
 		if (!(peers & 1ull << i))
 			continue;
@@ -249,9 +314,18 @@ bool dgram_send(bool hold)
 	return false;
 }
 
+/* an announcement datagram that dgram_add() had to send on its own (it was
+ * full) was lost for some peer */
+static bool add_lost;
+
+/* send the announcements; false if any of them since the last flush was lost
+ * for some peer */
 bool dgram_flush(void)
 {
-	return dgram_send(false);
+	bool ok = dgram_send(false) && !add_lost;
+
+	add_lost = false;
+	return ok;
 }
 
 bool dgram_held(void)
@@ -267,14 +341,17 @@ bool dgram_resend(void)
 	return !held.peers;
 }
 
-/* a datagram without records to all peers: heartbeat, or a resync request */
-void dgram_control(uint8_t flags)
+/* a datagram without records to all peers: heartbeat, or a resync request;
+ * returns how many peers it was sent to */
+unsigned int dgram_control(uint8_t flags)
 {
 	static uint64_t last_log;
 	char abuf[INET6_ADDRSTRLEN];
 	uint8_t hdr[WIRE_HDR_LEN];
-	unsigned int i;
+	unsigned int i, sent = 0;
 
+	if (udp_fd < 0)
+		return 0;
 	wire_put_hdr(hdr, 0, flags);
 	for (i = 0; i < cfg.n_peer; i++) {
 		if (sendto(udp_fd, hdr, sizeof(hdr), MSG_DONTWAIT,
@@ -286,14 +363,16 @@ void dgram_control(uint8_t flags)
 				       addr_str(&cfg.peer[i], abuf, sizeof(abuf)), strerror(errno));
 		} else {
 			cnt.tx_control++;
+			sent++;
 		}
 	}
+	return sent;
 }
 
 void dgram_add(const struct flow *f)
 {
-	if (dgram.count >= cfg.batch_lines)
-		dgram_send(false);
+	if (dgram.count >= cfg.batch_lines && !dgram_send(false))
+		add_lost = true;
 	/* batch_lines <= WIRE_MAX_RECORDS, so this always fits */
 	wire_put(dgram.buf + WIRE_HDR_LEN + dgram.count * WIRE_REC_LEN, f);
 	dgram.count++;

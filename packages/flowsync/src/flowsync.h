@@ -13,9 +13,10 @@
  *  1. a peer never refreshes an entry this gateway did not create (NLM_F_EXCL
  *     for everything but our own copies), so native entries live on packets
  *     alone;
- *  2. a native entry is announced while it exists, a copy only while its
- *     remaining timeout exceeds element_timeout, which only a packet can
- *     cause (a refresh sets exactly element_timeout);
+ *  2. a native entry is announced while it exists, a copy only with evidence
+ *     of a packet since the last round: its remaining timeout deviates from
+ *     plain decay, which only a packet can cause (a refresh sets exactly
+ *     element_timeout);
  *  3. ownership of copies is re-learned from the kernel every refresh round
  *     (the mark), so restarts, evictions and flushes heal themselves.
  *
@@ -114,7 +115,9 @@ struct config {
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
 	unsigned long ct_mark, ct_mark_mask;
 	unsigned long max_copies;	/* 0: derived at startup, see rx_limit_init() */
-	unsigned long max_copies_client;	/* per client /64; 0: derived */
+	unsigned long max_copies_client;	/* per client prefix; 0: no limit */
+	unsigned long client_prefix_len;	/* that prefix's length, 1..64 */
+	unsigned long resync_rate;	/* tx_rate of a round answering a resync request */
 	bool proto[256];
 	unsigned int n_proto;
 	uint8_t skip_port[65536 / 8];
@@ -138,7 +141,9 @@ struct ct_entry {
 	uint32_t mark;
 	uint32_t timeout;	/* remaining seconds */
 	uint32_t id;		/* CTA_ID, network order as the kernel sent it */
+	uint8_t tcp_state;	/* TCP_CONNTRACK_*, CT_NO_TCP_STATE if none */
 };
+#define CT_NO_TCP_STATE	0xff
 
 /*
  * Per-tuple RX state. t_rx is the last announcement received for the tuple
@@ -167,11 +172,11 @@ struct rx_ent {
 
 enum rx_class { RX_DUP, RX_NOTED, RX_CREATE };
 enum refresh_do { REFRESH_NO, REFRESH_HELD, REFRESH_YES };
-enum inj_kind { INJ_CREATE, INJ_REFRESH, INJ_CHECK, INJ_DELETE };
+enum inj_kind { INJ_CREATE, INJ_REFRESH, INJ_CHECK, INJ_DELETE, INJ_PROMOTE };
 enum inj_acct { ACCT_OK, ACCT_RETRY, ACCT_ERROR };
 
 #define COUNTERS(X) \
-	X(tx_events) X(tx_scanned) X(tx_refresh) X(tx_copies) X(tx_datagrams) X(tx_errors) \
+	X(tx_events) X(tx_scanned) X(tx_refresh) X(tx_copies) X(tx_promoted) X(tx_datagrams) X(tx_errors) \
 	X(tx_refresh_dropped) X(tx_control) X(tx_resync) X(refresh_rounds) X(refresh_overrun) X(refresh_errors) \
 	X(ev_recv) X(ev_own) X(ev_overruns) X(ds_overruns) \
 	X(rx_datagrams) X(rx_control) X(rx_resync) X(rx_records) X(rx_bad_peer) X(rx_policy) \
@@ -237,6 +242,7 @@ int ct_parse(const struct nlmsghdr *nlh, struct ct_entry *e);
 void ct_build_new(struct nlmsghdr *nlh, const struct flow *f, bool create);
 void ct_build_get(struct nlmsghdr *nlh, const struct flow *f);
 void ct_build_delete(struct nlmsghdr *nlh, const struct flow *orig, uint32_t id);
+void ct_build_promote(struct nlmsghdr *nlh, const struct flow *f);
 void flow_reverse(struct flow *r, const struct flow *f);
 bool flow_eq(const struct flow *a, const struct flow *b);
 void ct_build_dump(struct nlmsghdr *nlh, uint8_t proto, uint32_t status, uint32_t status_mask,
@@ -252,6 +258,7 @@ int wire_get(const uint8_t *src, struct flow *f);
 /* udp.c */
 void set_rcvbuf(int fd, const char *what, unsigned long size);
 int udp_open(bool bind_port);
+bool udp_tick(void);
 ssize_t udp_recv(uint8_t *buf, size_t len, struct sockaddr_in6 *from, bool *forged);
 void peers_init(void);
 int peer_index(const struct in6_addr *a);
@@ -264,7 +271,7 @@ bool dgram_flush(void);
 bool dgram_send(bool hold);
 bool dgram_held(void);
 bool dgram_resend(void);
-void dgram_control(uint8_t flags);
+unsigned int dgram_control(uint8_t flags);
 
 /* tx.c */
 int ev_open(void);
@@ -277,6 +284,7 @@ int refresh_start(void);
 void refresh_close(void);
 void handle_refresh(void);
 void refresh_tick(void);
+void refresh_fast(bool fast);
 size_t refresh_pending(void);
 bool events_lost(void);
 void events_reopened(void);
@@ -289,6 +297,7 @@ unsigned int inject_portid(void);
 void inj_drain(void);
 void inj_flush(void);
 void inj_add(const struct flow *f, struct rx_ent *e, enum inj_kind kind);
+void inj_add_promote(const struct flow *f);
 enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e);
 
 /* rx.c */

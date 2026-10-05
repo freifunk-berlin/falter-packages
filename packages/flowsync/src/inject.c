@@ -165,10 +165,14 @@ static void note_error(uint32_t seq, int err)
 	/* the slot may have been taken by another tuple meanwhile */
 	if (e && !flow_eq(&e->f, f))
 		e = NULL;
-	/* a lookup found nothing or a delete found the entry changed: nothing to do */
-	if (kind == INJ_CHECK || kind == INJ_DELETE)
+	/* a lookup found nothing, a delete found the entry changed, a promoted
+	 * native was gone: nothing to do */
+	if (kind == INJ_CHECK || kind == INJ_DELETE || kind == INJ_PROMOTE)
 		return;
-	if (kind == INJ_CREATE && err == -EEXIST && e && n_check < INJ_RETRY) {
+	/* only TCP pickups are replaced (note_entry): a lookup for anything else
+	 * would only cost a round trip per element_timeout */
+	if (kind == INJ_CREATE && err == -EEXIST && e && e->f.proto == IPPROTO_TCP &&
+	    n_check < INJ_RETRY) {
 		now = now_s();
 		if (!e->checked_at || now - e->checked_at >= cfg.element_timeout) {
 			e->checked_at = now;
@@ -328,6 +332,15 @@ void inj_add(const struct flow *f, struct rx_ent *e, enum inj_kind kind)
 	inj_commit(nlh, f, e, kind);
 }
 
+/* one of our own natives to ESTABLISHED (ct_build_promote) */
+void inj_add_promote(const struct flow *f)
+{
+	struct nlmsghdr *nlh = mnl_nlmsg_put_header(mnl_nlmsg_batch_current(inj_batch));
+
+	ct_build_promote(nlh, f);
+	inj_commit(nlh, f, NULL, INJ_PROMOTE);
+}
+
 static void inj_add_get(const struct flow *f)
 {
 	struct nlmsghdr *nlh = mnl_nlmsg_put_header(mnl_nlmsg_batch_current(inj_batch));
@@ -357,7 +370,6 @@ static void inj_resolve(void)
 		inj_add_get(&check[i]);
 	inj_send();
 	mnl_nlmsg_batch_reset(inj_batch);
-	n_check = 0;	/* creates below may report EEXIST again: next time */
 	n = n_replace;
 	n_replace = 0;
 	for (i = 0; i < n; i++) {
@@ -368,7 +380,8 @@ static void inj_resolve(void)
 			rx_own(e, now_s());	/* tentative, like any create */
 			/* a server segment between the delete and the create (on
 			 * another CPU) makes a new reversed pickup and the create
-			 * fails: then the next announcement looks again at once */
+			 * fails with EEXIST: that queues the lookup again, and the
+			 * next flush (the next datagram or dump chunk) tries anew */
 			e->checked_at = 0;
 		}
 		inj_add(&replace[i].f, e, INJ_CREATE);
@@ -376,7 +389,6 @@ static void inj_resolve(void)
 	}
 	inj_send();
 	mnl_nlmsg_batch_reset(inj_batch);
-	n_check = 0;
 }
 
 /* send what is queued, then re-create the copies the kernel reported gone */

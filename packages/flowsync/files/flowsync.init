@@ -4,13 +4,18 @@
 # shellcheck disable=SC3043
 
 USE_PROCD=1
-START=90
+# right after the network (20), long before bird (70) attracts traffic: the
+# copies should be in place when replies start to arrive. The daemon waits for
+# its interface and binds its address before netifd has set it.
+START=21
 STOP=10
 EXTRA_COMMANDS="check announce"
 EXTRA_HELP="	check	Print the configuration as the daemon parses it
 	announce <client> <cport> <server> <sport> [proto]	Send one record to all peers"
 
 PROG=/usr/sbin/flowsync
+
+. /lib/functions/network.sh
 
 # render UCI into command line options; $1 is the function that takes
 # each option (procd_append_param command, or append_arg for the commands)
@@ -33,13 +38,21 @@ _list() {
 
 render_options() {
 	local add="$1"
-	local debug
+	local debug iface dev
 
 	config_load flowsync
 	config_get_bool debug main debug 0
 	[ "$debug" = 1 ] && "$add" --debug
 	_opt "$add" bind_address bind
-	_opt "$add" interface interface
+	# a logical interface (uplink) or a device (eth0.1301): the daemon binds
+	# to a device. A logical interface that is not up yet (at boot) is taken
+	# from its configuration; anything else is a device name.
+	config_get iface main interface
+	if [ -n "$iface" ]; then
+		network_get_device dev "$iface" 2>/dev/null ||
+			dev="$(uci -q get "network.$iface.device")"
+		"$add" --interface "${dev:-$iface}"
+	fi
 	_opt "$add" port port
 	_opt "$add" interval interval
 	_opt "$add" element_timeout element-timeout
@@ -50,6 +63,8 @@ render_options() {
 	_opt "$add" ct_mark_mask ct-mark-mask
 	_opt "$add" max_copies max-copies
 	_opt "$add" max_copies_per_client max-copies-per-client
+	_opt "$add" client_prefix_len client-prefix-len
+	_opt "$add" resync_rate resync-rate
 	_list "$add" proto proto
 	_list "$add" skip_server_port skip-server-port
 	_list "$add" peer peer
@@ -73,7 +88,10 @@ start_service() {
 	procd_append_param command --user flowsync run
 	# the daemon takes its config from the command line: restart on change
 	procd_set_param file /etc/config/flowsync
-	procd_set_param respawn 3600 5 0
+	# a daemon that cannot start (bad config) gives up after 5 tries an hour
+	# instead of filling the log every 5 s; a missing interface is waited for
+	# by the daemon itself
+	procd_set_param respawn 3600 5 5
 	procd_set_param stderr 1
 	procd_close_instance
 }

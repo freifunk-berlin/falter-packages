@@ -579,7 +579,8 @@ static void test_resync(void)
 	cfg.n_peer = 0;
 
 	/* our own request: not before the first round, not while DESTROY
-	 * events are queued, at most once per interval/2 */
+	 * events are queued, at most once per interval/2, and only once it
+	 * could be sent (one peer on loopback) */
 	{
 		uint64_t t0 = cnt.tx_resync, r0 = cnt.refresh_rounds;
 
@@ -593,10 +594,21 @@ static void test_resync(void)
 		CHECK(cnt.tx_resync == t0);
 		resync_destroys_pending(false);
 		resync_tick();
+		CHECK(cnt.tx_resync == t0);			/* no socket: still pending */
+		cfg.n_peer = 1;
+		cfg.peer[0] = in6addr_loopback;
+		cfg.port = 3780;
+		peers_init();
+		udp_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+		CHECK(udp_fd >= 0);
+		resync_tick();
 		CHECK(cnt.tx_resync == t0 + 1);
 		resync_request();
 		resync_tick();
 		CHECK(cnt.tx_resync == t0 + 1);
+		close(udp_fd);
+		udp_fd = -1;
+		cfg.n_peer = 0;
 		cnt.refresh_rounds = r0;
 	}
 }
