@@ -90,6 +90,11 @@ def flush_retry(env):
     back = next((k for k, x in enumerate(series) if x == n), None)
     env.true("every copy is back within 3 s of the flush", back is not None and back <= 6,
              "after %s s" % (back / 2 if back is not None else "-"))
+    # the re-created copies' NEW events stay in the kernel (mark filter): they
+    # would otherwise overrun g1's event socket and drop real flows' events
+    g1.tick(timeout=15)
+    env.check("none of g1's own copies reached its event socket", g1.st("ev_own"), 0)
+    env.check("g1's event socket did not overrun", g1.st("ev_overruns"), 0)
 
 
 @scenario(gateways=2, once=True, tags={"load", "heavy"})

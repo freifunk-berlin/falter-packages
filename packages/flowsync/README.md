@@ -107,7 +107,10 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
 - Subscribes to conntrack NEW events. The subscription carries a kernel-side BPF
   filter (built with libnetfilter_conntrack) that drops everything but the
   configured protocols, IPv6, and clients inside the configured prefixes (up to
-  20 prefixes; with more, prefixes are checked in user space only). `exclude`,
+  20 prefixes; with more, prefixes are checked in user space only), and drops
+  the events of our own copies (our mark): every copy we inject comes back as a
+  NEW event, and while a resync answer re-creates thousands of them those
+  echoes would overrun the socket and take real flows' events with them. `exclude`,
   `exclude_dst` and ports are always checked in user space. Every wanted native
   entry that is announceable (see above) is sent immediately to all peers.
 - Every `interval` seconds the IPv6 table is dumped per configured protocol in
@@ -352,7 +355,7 @@ writes them to `/var/run/flowsync.status`:
 | `refresh_overrun` | interval ticks at which the previous round was still running (raise `tx_rate`) |
 | `refresh_errors` | dump socket or request errors; the round is aborted |
 | `ev_recv` | messages read from the event socket (after the kernel filter) |
-| `ev_own` | NEW events of our own injections, ignored |
+| `ev_own` | NEW events of our own injections that got past the kernel filter, ignored (0 while the filter is attached) |
 | `ev_overruns` | event socket overruns (ENOBUFS); events were lost, an early round repairs |
 | `rx_datagrams` | datagrams with records received |
 | `rx_control` / `rx_resync` | heartbeats and resync requests received / resync requests received |
@@ -412,7 +415,9 @@ so counters lag by up to that.
    entry `ESTABLISHED` with about 90 s left and no `[ASSURED]` until B forwards
    a packet of it.
 3. Loop check: B's `tx_events`/`tx_refresh` must not increase for the injected
-   entry (B's `ev_own` does), and A's `rx_records` must not increase.
+   entry (the kernel filter keeps its NEW event from B's daemon; `ev_own`
+   counts one only if that filter could not be attached), and A's
+   `rx_records` must not increase.
 4. Real flow from a client in a synced prefix: `curl --http3 -6
    https://www.google.com`, a WireGuard handshake to an external endpoint,
    `ntpdate -q` to an IPv6 NTP server. On the gateways not on the outbound path,

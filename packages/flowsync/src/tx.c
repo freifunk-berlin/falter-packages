@@ -120,11 +120,20 @@ void ev_filter(int fd, bool copies)
 		nfct_filter_add_attr_u32(filter, NFCT_FILTER_L4PROTO, p);
 		np++;
 	}
-	if (copies) {
-		/* only entries carrying our mark (entries without a mark pass the
-		 * BPF program, the caller checks again) */
+	/*
+	 * DESTROY: only our copies. NEW: everything but our copies. Each copy we
+	 * inject comes back as a NEW event; while a resync answer re-creates
+	 * thousands of them, those echoes would fill the socket and overrun it,
+	 * and the kernel then drops the NEW events of real flows with them. The
+	 * filter runs before the receive buffer is charged. An event without
+	 * CTA_MARK counts as mark 0. The callbacks check the mark again in case
+	 * the filter could not be attached.
+	 */
+	{
 		struct nfct_filter_dump_mark m = { .val = cfg.ct_mark, .mask = cfg.ct_mark_mask };
 
+		if (!copies)
+			nfct_filter_set_logic(filter, NFCT_FILTER_MARK, NFCT_FILTER_LOGIC_NEGATIVE);
 		nfct_filter_add_attr(filter, NFCT_FILTER_MARK, &m);
 	}
 	nfct_filter_set_logic(filter, NFCT_FILTER_SRC_IPV4, NFCT_FILTER_LOGIC_NEGATIVE);
@@ -156,7 +165,7 @@ void ev_filter(int fd, bool copies)
 	else
 		logmsg(LOG_NOTICE, "conntrack %s events: kernel filter: %u protocols, IPv6 only, "
 		       "%u client prefixes%s%s", copies ? "destroy" : "new", np, n6,
-		       copies ? ", our mark" : "",
+		       copies ? ", our mark" : ", not our mark",
 		       !n6 && cfg.prefix.n ? " (more than 20 prefixes, filtered in user space)" : "");
 	nfct_filter_destroy(filter);
 }
