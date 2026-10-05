@@ -15,6 +15,10 @@ namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
                  send bytes back, close; print SERVED
   probe.py tcpcli <src> <sport> <dst> <dport> <bytes> <timeout>
                  connect, send bytes, read bytes; print "OK <connect ms> <total ms>" or FAIL
+  probe.py tcppush <addr> <port> <gap,gap,...>               accept one connection, send 1 KiB
+                 after each gap (seconds); the client only acknowledges
+  probe.py tcpread <src> <sport> <dst> <dport> <count> <timeout>
+                 connect, read count KiB; print "OK <n>" or "FAIL after <n>: ..."
   probe.py tcp   <src> <sport> <dst> <dport> <flags> <seq> <ack> [payload_len]
   probe.py tcpflood <src> <dst> <fixport> <first> <count> fwd|rev <flags> <rate> <seconds>
                  flags: any of S A P F R, e.g. "SA" for a SYN/ACK
@@ -207,6 +211,56 @@ def tcptalk(src, sport, dst, dport, count, interval, timeout):
         print("FAIL after %d: %s" % (done, e))
 
 
+def tcppush(addr, port, gaps, talk="0"):
+    # accept one connection and send 1 KiB after each of the comma-separated
+    # gaps (seconds): the server speaks, the client only acknowledges; with
+    # talk=1 the client sends 1 KiB first and gets it echoed
+    ls = sock(socket.AF_INET6, socket.SOCK_STREAM)
+    ls.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    ls.bind((addr, int(port)))
+    ls.listen(1)
+    ls.settimeout(30)
+    try:
+        c, _ = ls.accept()
+        if talk == "1":
+            c.settimeout(10)
+            got = b""
+            while len(got) < 1024:
+                got += c.recv(65536)
+            c.sendall(got)
+        for g in gaps.split(","):
+            time.sleep(float(g))
+            c.sendall(b"y" * 1024)
+        time.sleep(1)
+        c.close()
+    except OSError:
+        pass
+
+
+def tcpread(src, sport, dst, dport, count, timeout, talk="0"):
+    # connect and read count KiB pushed by the server: "OK <n>" or "FAIL after <n>";
+    # with talk=1 send 1 KiB first (its echo counts as the first KiB)
+    s = sock(socket.AF_INET6, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((src, int(sport)))
+    s.settimeout(float(timeout))
+    got = 0
+    try:
+        s.connect((dst, int(dport)))
+        if talk == "1":
+            s.sendall(b"x" * 1024)
+            count = int(count) + 1
+        while got < int(count) * 1024:
+            d = s.recv(65536)
+            if not d:
+                raise OSError("closed")
+            got += len(d)
+        s.close()
+        print("OK %d" % (got // 1024))
+    except OSError as e:
+        print("FAIL after %d: %s" % (got // 1024, e))
+
+
 def spoof(src, dst, port, rate, seconds):
     # flowsync wire format v1, 34 policy-conforming UDP records per datagram
     # (clients in 2001:db8:100::/44, server outside the mesh), from src
@@ -329,5 +383,6 @@ if __name__ == "__main__":
         argv = argv[2:]
     cmd, args = argv[0], argv[1:]
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
-     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
+     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk,
+     "tcppush": tcppush, "tcpread": tcpread, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
      "v6udp": v6udp, "tcpflood": tcpflood}[cmd](*args)

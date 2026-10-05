@@ -654,13 +654,17 @@ sync firewall rule.
   stateless UDP rule is for DNS, which flowsync does not sync). QUIC and
   WireGuard mostly ignore it, connected UDP sockets see ECONNREFUSED.
 - An idle asymmetric TCP connection keeps its state on the reply gateway for
-  `nf_conntrack_tcp_timeout_unacknowledged` (300 s) after the server's last
-  data, not for the established timeout: the copy never sees the client's
-  ACKs, so after two server segments the tracker caps it at the
-  unacknowledged timeout. A server that pushes after a longer silence (IMAP
-  IDLE, SSH, push notifications) relies on the stateless rule; raising
-  `nf_conntrack_tcp_timeout_unacknowledged` on the gateways extends it, for
-  natives too.
+  `nf_conntrack_tcp_timeout_unacknowledged` (300 s) plus up to one
+  `element_timeout` after its last packet, not for the established timeout:
+  each gateway sees data whose ACKs take the other path, so the tracker caps
+  both the native and the copy at the unacknowledged timeout; the copy lives
+  on the last refresh after the native is gone. A server that pushes after a
+  longer silence (IMAP IDLE, SSH, push notifications) relies on the stateless
+  rule; raising `nf_conntrack_tcp_timeout_unacknowledged` on the gateways
+  extends it, for natives too. A connection on which the client never sent
+  data (it only acknowledges) is not capped: its native lives on the
+  established timeout and keeps the copy (fstest `tcp_push_talk_idle`,
+  `tcp_push_idle`).
 - The `element_timeout >= 3 x interval` check is local. Every gateway's
   `element_timeout` must cover every *peer's* `interval`; render the same values
   everywhere. A copy that received a RST is in state

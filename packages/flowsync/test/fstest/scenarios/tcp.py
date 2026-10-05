@@ -360,3 +360,135 @@ def syn_sent_reroute(env):
               lambda e: e.is_native and not e.reversed and e.assured)
     env.check("no server segment needed the stateless rule on g0", g0.fwc("ack") - ack0, 0)
     env.check("no server segment was rejected on g0", g0.fwc("rej") - rej0, 0)
+
+
+# Long-lived connections with real TCP stacks, without the stateless rule, so
+# that any gap in the state shows as a reset. Scaled: established 30 s
+# (OpenWrt 7440 s), unacknowledged 15 s (300 s); the server's links are 30 ms
+# away (netem), so that its answers are not faster than any sync could be.
+
+NO_ACK = need(lambda p: not p[0].ack and not p[1].ack,
+              "needs g0 and g1 without the stateless ACK rule")
+
+
+def long_tcp(env):
+    """scaled TCP timers and the server's delay; returns the undo"""
+    for g in env.g:
+        g.set_sysctl(tcp_timeout_established=30, tcp_timeout_unacknowledged=15)
+    for g in env.g:
+        env.sv.run("tc", "qdisc", "add", "dev", "w%d" % g.i, "root", "netem", "delay", "30ms")
+
+    def undo():
+        for g in env.g:
+            env.sv.run("tc", "qdisc", "del", "dev", "w%d" % g.i, "root", check=False)
+    return undo
+
+
+def rejected(env):
+    return sum(g.fwc("rej") for g in env.g)
+
+
+def watch(env, f, proc, gws):
+    """while proc runs, log every change of the gateways' entries for f
+    (alive, mark, TCP state, timeout in 5 s steps)"""
+    t0, last = time.monotonic(), None
+    while proc.poll() is None:
+        now = [g.ct(f) for g in gws]
+        key = [(e.alive, e.mark, e.tcp_state, e.timeout // 5) for e in now]
+        if key != last:
+            env.ok("%4.1f s: %s" % (time.monotonic() - t0, " | ".join(map(str, now))))
+            last = key
+        time.sleep(0.2)
+
+
+def tcp_busy(env, rev):
+    undo = long_tcp(env)
+    env.start()
+    f = env.flow("tcp", fw=env.g[0], rev=rev, real=True)
+    out = os.path.join(env.dir, "cli.out")
+    env.spawn(env.sv, "tcpecho", f.s, f.sport, 60)
+    env.sleep(0.5)
+    r0 = rejected(env)
+    cli = env.spawn(env.cl, "tcptalk", f.c, f.cport, f.s, f.sport, 40, 1, 10, out=out)
+    watch(env, f, cli, env.g[:3])
+    env.check("40 exchanges, one a second", open(out).read().strip(), "^OK 40$")
+    env.check("nothing rejected", rejected(env) - r0, 0)
+    undo()
+
+
+@scenario(gateways=3, requires=NO_ACK, tags={"tcp", "long"})
+def tcp_long_busy(env):
+    """A busy asymmetric connection (SYN and client data via g0, the server
+    via g1) outlives the established timeout: g2's copy, which sees no
+    packet, expires or not, nothing anywhere is cut. (conntrackd syncs that
+    expiry and deletes the entries on g0 and g1: a reset.)"""
+    tcp_busy(env, env.g[1])
+
+
+@scenario(gateways=3, requires=NO_ACK, tags={"tcp", "long"})
+def tcp_long_busy_sym(env):
+    """The same on a symmetric path (both directions via g0): the other
+    gateways hold copies that never see a packet."""
+    tcp_busy(env, env.g[0])
+
+
+def tcp_push(env, talk, gaps, want):
+    """the server pushes 1 KiB after each gap; want: chunks that must arrive"""
+    undo = long_tcp(env)
+    env.start()
+    f = env.flow("tcp", fw=env.g[0], rev=env.g[1], real=True)
+    out = os.path.join(env.dir, "cli.out")
+    env.spawn(env.sv, "tcppush", f.s, f.sport, ",".join(map(str, gaps)), talk)
+    env.sleep(0.5)
+    r0 = rejected(env)
+    cli = env.spawn(env.cl, "tcpread", f.c, f.cport, f.s, f.sport, len(gaps), max(gaps) + 5,
+                    talk, out=out)
+    watch(env, f, cli, env.g[:2])
+    res = open(out).read().strip()
+    # pushed chunks that arrived (the echo of talk=1 counts in the output)
+    n = len(gaps) if res.startswith("OK") else int(res.split()[2].rstrip(":")) - int(talk)
+    env.check("pushed chunks that arrived [%s]" % res, n, want)
+    undo()
+    return rejected(env) - r0
+
+
+@scenario(gateways=3, requires=NO_ACK, tags={"tcp", "long"})
+def tcp_push_idle(env):
+    """The server pushes into a connection the client never sent data on
+    (only ACKs): gaps of 10 and 22 s, above the unacknowledged timeout. g0's
+    native sees nothing unacknowledged and lives on the established
+    timeout, its announcements keep g1's copy: every chunk arrives."""
+    gaps = [0.5, 0.5, 0.5, 10, 0.5, 22, 0.5]
+    env.check("nothing rejected", tcp_push(env, "0", gaps, len(gaps)), 0)
+
+
+@scenario(gateways=3, requires=NO_ACK, tags={"tcp", "long"})
+def tcp_push_talk_idle(env):
+    """The same after a request (SSH, IMAP IDLE): now both gateways hold data
+    whose ACKs they never see, both entries are capped at the unacknowledged
+    timeout. A 10 s gap is fine. The documented limit: g0's native expires
+    15 s after the client's last ACK, g1's copy one refresh (element_timeout)
+    later, so a 30 s gap finds no state and the server's chunk is rejected
+    (production: unacknowledged 300 s + element_timeout 90 s)."""
+    gaps = [0.5, 0.5, 0.5, 10, 0.5, 30, 0.5]
+    env.check("the chunk after the 30 s gap was rejected",
+              tcp_push(env, "1", gaps, 5), lambda n: n >= 1)
+
+
+@scenario(gateways=3, requires=NO_ACK, tags={"tcp", "long"})
+def tcp_resume_idle(env):
+    """The client speaks after 30 s of silence, when the documented limit has
+    removed both entries: g0 picks the segment up mid-stream, and the copy
+    must reach g1 before the server's answer (30 ms later)."""
+    undo = long_tcp(env)
+    env.start()
+    f = env.flow("tcp", fw=env.g[0], rev=env.g[1], real=True)
+    out = os.path.join(env.dir, "cli.out")
+    env.spawn(env.sv, "tcpecho", f.s, f.sport, 50)
+    env.sleep(0.5)
+    r0 = rejected(env)
+    cli = env.spawn(env.cl, "tcptalk", f.c, f.cport, f.s, f.sport, 2, 30, 10, out=out)
+    watch(env, f, cli, env.g[:2])
+    env.check("2 exchanges, 30 s apart", open(out).read().strip(), "^OK 2$")
+    env.check("nothing rejected", rejected(env) - r0, 0)
+    undo()

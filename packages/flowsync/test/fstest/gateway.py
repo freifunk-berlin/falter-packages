@@ -105,6 +105,7 @@ class Gateway:
             "net.netfilter.nf_conntrack_udp_timeout_stream": t["udp_stream"],
             "net.netfilter.nf_conntrack_tcp_timeout_syn_sent": t["tcp_syn_sent"],
             "net.netfilter.nf_conntrack_tcp_timeout_unacknowledged": 300,
+            "net.netfilter.nf_conntrack_tcp_timeout_established": 432000,   # kernel default
             "net.netfilter.nf_conntrack_checksum": 0,
         })
         ft = "/proc/sys/net/netfilter/nf_flowtable_udp_timeout"

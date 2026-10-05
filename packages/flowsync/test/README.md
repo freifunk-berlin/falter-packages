@@ -167,6 +167,24 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   `conntrack -F` on the reply gateway: the resync restores the copy before the
   server's next segment (without the rule a gap means a reset).
 
+Long-lived connections, real TCP stacks, no ACK rule on g0 and g1 (any gap
+in the state is a reset). Scaled: established 30 s, unacknowledged 15 s;
+the server's links are 30 ms away (netem). Each logs every change of the
+gateways' entries.
+
+- **tcp_long_busy** (g3): an asymmetric connection talking every second
+  outlives the established timeout; g2's idle copy cuts nothing (conntrackd
+  syncs its expiry and deletes the live entries: a reset).
+- **tcp_long_busy_sym** (g3): the same on a symmetric path.
+- **tcp_push_idle** (g3): the server pushes after 10 s and 22 s of silence
+  into a connection the client sent no data on: g0's native lives on the
+  established timeout and keeps g1's copy, every chunk arrives.
+- **tcp_push_talk_idle** (g3): the same after a request: 10 s is fine; the
+  documented limit is checked as such: after 30 s (unacknowledged timeout
+  plus one refresh) the server's chunk is rejected.
+- **tcp_resume_idle** (g3): the client speaks after 30 s of silence, both
+  entries gone: g0 picks it up and the copy beats the server's answer.
+
 ### Restarts and resync (`scenarios/restart.py`)
 
 - **restart** (g2): g1's daemon restarts under a live flow; the copy survives
