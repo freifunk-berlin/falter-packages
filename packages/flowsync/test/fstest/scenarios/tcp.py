@@ -1,6 +1,7 @@
 """TCP: split handshakes, pickup, RST, the SYN/ACK race, idle connections,
 reversed entries, DNS over TCP, flushes without the stateless rule."""
 import os
+import time
 
 from ..scenario import need, scenario
 from .common import CLOSE, EST, SYN_SENT, long_lived, native_unreplied, tcp_state
@@ -151,6 +152,38 @@ def tcp_idle(env):
     env.check("g1's entry is still the copy (no reversed pickup)", g1.ct(f), lambda e: e.is_copy)
 
 
+@scenario(gateways=2, tags={"tcp"})
+def tcp_idle_unacked(env):
+    """The documented limit of an idle asymmetric connection: once the server
+    sent two segments that the reply gateway saw unacknowledged (it never sees
+    the client's ACKs), the tracker caps g1's copy at the unacknowledged
+    timeout (scaled 15 s), and after a longer silence the server's next
+    segment finds no state: it passes only on the stateless ACK rule, and is
+    rejected without it."""
+    g0, g1 = env.g[:2]
+    env.start()
+    for g in env.g:
+        g.set_sysctl(tcp_timeout_unacknowledged=15)
+    f = env.flow("tcp", fw=g0, rev=g1)
+    f.tcp("fwd", "PA", 2000, 7000, 10)
+    env.wait_for("g1 has the copy", 4, lambda: g1.ct(f).is_copy)
+    f.tcp("rev", "PA", 7000, 2010, 10)
+    f.tcp("rev", "PA", 7010, 2010, 10)
+    env.check("two unacknowledged server segments cap g1's copy", g1.ct(f),
+              lambda e: e.is_copy and e.timeout <= 15)
+    env.wait_for("g0's native expires (idle)", 20, lambda: not g0.ct(f).alive)
+    env.wait_for("g1's copy is gone once nothing announces it", env.E + 2 * env.I,
+                 lambda: not g1.ct(f).alive)
+    ack0, rej0 = g1.fwc("ack"), g1.fwc("rej")
+    f.tcp("rev", "PA", 7020, 2010, 10)
+    env.sleep(1)
+    if g1.p.ack:
+        env.check("the server's segment after the silence needs the stateless rule",
+                  g1.fwc("ack") - ack0, 1)
+    else:
+        env.check("the server's segment after the silence is rejected", g1.fwc("rej") - rej0, 1)
+
+
 @scenario(gateways=2, requires=ACK_ON_G1, tags={"tcp"})
 def reversed(env):
     """A server segment that reaches g1 before the copy is picked up as a
@@ -243,3 +276,87 @@ def tcp_flush_norule(env):
               "^OK 30$")
     env.ok("g1: copies_lost=%s tx_resync=%s; g0: rx_resync=%s"
            % (g1.st("copies_lost"), g1.st("tx_resync"), g0.st("rx_resync")))
+
+
+@scenario(gateways=2, once=True, requires=ACK_ON_G1, tags={"tcp", "heavy", "repro"})
+def reversed_race(env):
+    """conntrack -F on g1 while the servers of two TCP flows send 40000
+    segments/s each through it: their segments are picked up reversed
+    (stateless ACK rule) and the resync's creates replace the pickups. A server
+    segment between the DELETE and the create makes a new pickup and the create
+    fails; the next announcement must look again, so every copy is back within
+    two rounds, not after element_timeout. Eight flushes: the race is lost in
+    a good part of them."""
+    g0, g1 = env.g[:2]
+    n = 2
+    env.start(debug=False)
+    b = env.bulk(n, fw=g0, rev=g1, first=30000, sport=80)
+    env.probe(env.cl, "tcpflood", b.c, b.s, 80, 30000, n, "fwd", "A", 50000, 0)
+    env.wait_for("g1 holds the copies", 10, lambda: g1.count("tcp", "marked") >= n)
+    slow = []
+    for it in range(8):
+        env.wait_for("copies back before flush %d" % it, env.E + 3 * env.I,
+                     lambda: g1.count("tcp", "marked") >= n)
+        g1.tick(timeout=15)     # resync requests are spaced: start right after a tick
+        env.sleep(1.6)
+        ex0, rp0 = g1.st("inject_exists") or 0, g1.st("inject_replaced") or 0
+        # one flooder per flow: the faster each flow, the likelier the race
+        ps = [env.spawn(env.sv, "tcpflood", b.s, b.c, 80, 30000 + k, 1, "rev", "A", 40000, 4,
+                        out=os.path.join(env.dir, "flood%d-%d.out" % (it, k)))
+              for k in range(n)]
+        env.sleep(0.3)
+        g1.flush()
+        t0 = time.monotonic()
+        back = None
+        while time.monotonic() - t0 < 2 * env.I + 1:
+            if g1.count("tcp", "marked") >= n:
+                back = time.monotonic() - t0
+                break
+            env.sleep(0.2)
+        for p in ps:
+            p.wait()
+        g1.tick(timeout=15)
+        env.ok("flush %d: copies back after %s s, exists +%d replaced +%d"
+               % (it, "%.1f" % back if back is not None else "-",
+                  (g1.st("inject_exists") or 0) - ex0, (g1.st("inject_replaced") or 0) - rp0))
+        if back is None:
+            slow.append(it)
+    env.true("every copy is back within two rounds of each flush", not slow,
+             "not after flush %s" % slow)
+
+
+@scenario(gateways=2, tags={"tcp", "repro"})
+def syn_sent_reroute(env):
+    """g0 sees the client's SYN (native SYN_SENT), g1 the SYN/ACK and the
+    server's data on its copy. Then the reply path moves onto g0: the server's
+    segments reach g0's native, which stays SYN_SENT (an ACK in the reply
+    direction of SYN_SENT is ignored by the tracker) and would die at the
+    SYN_SENT timeout although the connection is busy. g0 must turn it into an
+    established entry that lives on its packets."""
+    g0, g1 = env.g[:2]
+    env.start()
+    f = env.flow("tcp", fw=g0, rev=g1)
+    f.tcp("fwd", "S", 1000, 0)
+    env.wait_for("g1 has the copy", 3, lambda: g1.ct(f).is_copy)
+    f.tcp("rev", "SA", 5000, 1001)
+    f.tcp("rev", "PA", 5001, 1001, 10)
+    f.tcp("fwd", "A", 1001, 5011)
+    f.reroute(rev=g0)
+    t0 = time.monotonic()
+    ack0, rej0 = g0.fwc("ack"), g0.fwc("rej")
+    seq = [5011]
+
+    def server():
+        f.tcp("rev", "PA", seq[0], 1001, 10)
+        seq[0] += 10
+
+    lp = env.loop(env.timers["tcp_syn_sent"] + 3 * env.I, 1, server)
+    env.wait_for("g0's native becomes ESTABLISHED", 2 * env.I + 2,
+                 lambda: tcp_state(g0.ct(f), EST) and g0.ct(f).is_native)
+    lp.wait()
+    env.true("the run outlasted the SYN_SENT timeout",
+             time.monotonic() - t0 > env.timers["tcp_syn_sent"] + 2)
+    env.check("g0's entry is still the connection's native, not a pickup", g0.ct(f),
+              lambda e: e.is_native and not e.reversed and e.assured)
+    env.check("no server segment needed the stateless rule on g0", g0.fwc("ack") - ack0, 0)
+    env.check("no server segment was rejected on g0", g0.fwc("rej") - rej0, 0)

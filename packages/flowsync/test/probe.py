@@ -16,6 +16,7 @@ namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
   probe.py tcpcli <src> <sport> <dst> <dport> <bytes> <timeout>
                  connect, send bytes, read bytes; print "OK <connect ms> <total ms>" or FAIL
   probe.py tcp   <src> <sport> <dst> <dport> <flags> <seq> <ack> [payload_len]
+  probe.py tcpflood <src> <dst> <fixport> <first> <count> fwd|rev <flags> <rate> <seconds>
                  flags: any of S A P F R, e.g. "SA" for a SYN/ACK
   probe.py icmp6 <src> <dst> <count>                         echo requests, one id each
   probe.py raw   <src> <sport> <dst> <dport> <count>         random garbage datagrams
@@ -284,6 +285,43 @@ def v6udp(src, sport, dst, dport, payload):
     s.close()
 
 
+def tcpflood(src, dst, fixport, first, count, direction, flags, rate, seconds):
+    """raw TCP segments for count flows, cycling over them at rate per second for
+    seconds (0: one pass). fwd: sport first+i -> dport fixport; rev: sport
+    fixport -> dport first+i. Prints SENT n."""
+    first, count, fixport = int(first), int(count), int(fixport)
+    rate, seconds = float(rate), float(seconds)
+    bits = 0
+    for ch, bit in (("F", 1), ("S", 2), ("R", 4), ("P", 8), ("A", 16)):
+        if ch in flags:
+            bits |= bit
+    s = sock(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_TCP)
+    s.setsockopt(socket.IPPROTO_IPV6, IPV6_FREEBIND, 1)
+    s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_CHECKSUM, 16)
+    s.bind((src, 0))
+    hdrs = []
+    for i in range(count):
+        sp, dp = (first + i, fixport) if direction == "fwd" else (fixport, first + i)
+        hdrs.append(struct.pack("!HHIIBBHHH", sp, dp, 100000 + i, 200000 + i, 5 << 4, bits,
+                                65535, 0, 0))
+    n, t0 = 0, time.monotonic()
+    end = t0 + seconds
+    while True:
+        s.sendto(hdrs[n % count], (dst, 0))
+        n += 1
+        if seconds == 0 and n >= count:
+            break
+        if n % 64 == 0:
+            now = time.monotonic()
+            if seconds and now >= end:
+                break
+            ahead = n / rate - (now - t0)
+            if ahead > 0:
+                time.sleep(ahead)
+    print("SENT %d %.3f" % (n, time.monotonic() - t0))
+    sys.stdout.flush()
+
+
 if __name__ == "__main__":
     argv = sys.argv[1:]
     if argv[0] == "--mark":
@@ -292,4 +330,4 @@ if __name__ == "__main__":
     cmd, args = argv[0], argv[1:]
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
      "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
-     "v6udp": v6udp}[cmd](*args)
+     "v6udp": v6udp, "tcpflood": tcpflood}[cmd](*args)

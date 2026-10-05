@@ -7,11 +7,12 @@ import re
 
 class Flow:
     def __init__(self, env, proto="udp", fw=None, rev=None, real=False, cport=None, sport=None,
-                 sink=True):
+                 sink=True, client=None):
         self.env = env
         self.id = env.next_id()
         self.proto = proto
-        self.c = "2001:db8:100:%x::1" % self.id
+        # a /64 of its own inside the synced 2001:db8:100::/44, unless given
+        self.c = client or "2001:db8:100:%x::1" % self.id
         self.s = "2a00:1450:4001:%x::e" % self.id
         self.cport = cport or 50000 + self.id
         self.sport = sport or (443 if proto == "udp" else 80)

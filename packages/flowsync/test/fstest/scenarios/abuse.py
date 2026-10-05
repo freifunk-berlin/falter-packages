@@ -54,6 +54,27 @@ def client_quota(env):
     env.check("the pool was never full", g1.st("rx_limited"), 0)
 
 
+@scenario(gateways=2, once=True, tags={"abuse", "repro"})
+def client_spread(env):
+    """One location (a /56 of the synced /44) floods from 17 of its /64s: a
+    per-/64 limit lets it fill the whole pool (17 x 50 > 800). Counted per /56
+    (client_prefix_len 56), the location gets its 50 copies, and another
+    location's new flow still gets its copy."""
+    g0, g1 = env.g[:2]
+    env.start("-C", 800, "-c", 50, "--client-prefix-len", 56, debug=False)
+    g0.set_sysctl(udp_timeout=300)
+    bulks = [env.bulk(60, fw=g0, rev=g1, client="2001:db8:10e:%x::1" % k) for k in range(1, 18)]
+    for b in bulks:
+        b.flood()
+    env.wait_st("g1 refused the rest for that /56", g1, "rx_limited_client", 1)
+    env.check("the location holds at most its 50 copies", g1.count("udp", "marked"),
+              lambda n: 0 < n <= 50)
+    f = env.flow("udp", fw=g0, rev=g1)
+    f.send()
+    env.wait_for("another location's flow gets its copy", 3, lambda: g1.ct(f).is_copy)
+    env.check("the pool was never full", g1.st("rx_limited"), 0)
+
+
 @scenario(gateways=2, tags={"abuse"})
 def garbage(env):
     """Garbage from a peer, a datagram from a non-peer and a record outside the

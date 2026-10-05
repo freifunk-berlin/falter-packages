@@ -1,10 +1,22 @@
 """Many flows: event socket overruns, slow and stuck rounds, flush recovery,
 scale."""
+import time
+
 from ..scenario import scenario
 
 
 def marked(g, n):
     return lambda: g.count("udp", "marked") == n
+
+
+def back_after(g, n, limit):
+    """seconds until g holds n UDP copies again, None if not within limit"""
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < limit:
+        if g.count("udp", "marked") >= n:
+            return time.monotonic() - t0
+        time.sleep(0.1)
+    return None
 
 
 @scenario(gateways=2, once=True, tags={"load", "heavy"})
@@ -38,6 +50,26 @@ def enobufs_early(env):
     b.flood()
     env.wait_for("g1 holds all 2000 copies within 3 s, not at g0's next round", 3,
                  marked(g1, 2000))
+
+
+@scenario(gateways=2, once=True, tags={"load", "heavy", "repro"})
+def resync_bulk(env):
+    """conntrack -F on g1 while it holds 6000 copies, with a slow refresh
+    (tx_rate 50: 1500 records/s per peer, a 4 s round). The resync answer
+    is sent faster than the regular rounds: every copy is back within 2.5 s."""
+    g0, g1 = env.g[:2]
+    n = 6000
+    env.start("-r", 50, "-i", 10, "-t", 30, "-c", n, debug=False)
+    g0.set_sysctl(udp_timeout=300)
+    b = env.bulk(n, fw=g0, rev=g1)
+    b.flood()
+    env.wait_for("g1 holds all %d copies" % n, 30, marked(g1, n))
+    g0.tick(timeout=15)
+    env.sleep(5)                # g0's regular round is sent, the next is 5 s away
+    g1.flush()
+    t = back_after(g1, n, 4.5)
+    env.true("every copy is back within 2.5 s of the flush", t is not None and t <= 2.5,
+             "after %s s" % ("%.1f" % t if t is not None else "> 4.5"))
 
 
 @scenario(gateways=2, once=True, tags={"load", "heavy"})
