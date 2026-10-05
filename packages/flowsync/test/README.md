@@ -160,6 +160,9 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   in the kernel, ownership is re-learned from the mark, refreshes resume.
 - **flush** (g2): `conntrack -F` on g1; the DESTROY events trigger a resync
   request and the copy is back at once.
+- **expiry_resume** (g2, once, interval 10 s): a flow idles until g1's copy
+  has expired, then resumes on the same 5-tuple; g0's announcement from the
+  NEW event must create the copy at once, not a round or two later.
 - **restart_idle_copy** (g3): after a restart a copy seen for the first time
   is no evidence: an idle copy is not announced again.
 - **stale_own** (g2): g1's copy is flushed and g1 then forwards the flow
@@ -195,6 +198,11 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
 - **stuck_dump**: a round held back by its own send queue is slow, not stuck.
 - **flush_retry**: `conntrack -F` on g1 with 20000 copies: all back within 3 s
   (resync), not at g0's next round.
+- **flush_stale_chunk**: `conntrack -F` on g1 while its copies phase is held
+  back by its own send queue (3000 copies with traffic, tx_rate 6): the dump
+  chunk generated before the flush is read after the DESTROY events and must
+  not make g1 take the gone copies for its own; every copy is back with g0's
+  next round once sync works, none stays missing.
 - **scale** (tagged slow, not in the default run): 100000 flows through the
   streaming dump, the event socket and the per-tuple table.
 
@@ -231,6 +239,18 @@ g = minimum gateway count. "Copy" is an entry flowsync injected (marked),
   sysctl may not be writable (then 30 s is assumed).
 - **Gateway-local traffic** appears only in `noise`, which tests the event
   filter; everything else is forwarded traffic.
+- **Uninitialised memory.** The host's gcc build may leave zeros where code
+  reads bytes nobody wrote (struct padding compared byte for byte once made
+  the reversed-entry replacement depend on stack contents: it passed here and
+  could fail on the router). A build that fills every uninitialised local with
+  a pattern turns such bugs into failures; run the matrix against it:
+
+      make -C src clean
+      make -C src CC=clang CFLAGS="-O2 -g -ftrivial-auto-var-init=pattern" all
+      make -C src itest
+
+  (gcc's `-ftrivial-auto-var-init=pattern` did not fill that variable, clang's
+  does; add the include paths of `src/local.mk` to `CFLAGS` if you use it.)
 - **Remaining daemon race** (see the main README): a packet arriving in the
   milliseconds between the dump reading a copy and its refresh can have its
   timeout raise undone by the refresh.

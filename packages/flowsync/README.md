@@ -71,10 +71,14 @@ real traffic has stopped:
 3. **Ownership comes from the kernel.** Every round the table dump includes our
    marked entries; the daemon learns from it which copies it owns (so refreshes
    go through) and forgets the ones that are gone. A daemon restart, a slot
-   eviction or a `conntrack -F` heal within one round. A packet that creates a
-   native entry for a tuple we believed to hold a copy of drops the ownership
-   at once (the NEW event), so a peer's next announcement is an EXCL create
-   that leaves the native alone (`rx_own_lost`).
+   eviction or a `conntrack -F` heal within one round. Any DESTROY event of a
+   copy, expired or not, drops the ownership at once, so the next
+   announcement creates the copy again; a dump chunk that the kernel
+   generated before that DESTROY (one waits in the dump socket while the
+   daemon parses the previous one) does not make it ours again. A packet that
+   creates a native entry for a tuple we believed to hold a copy of drops the
+   ownership too (the NEW event), so a peer's next announcement is an EXCL
+   create that leaves the native alone (`rx_own_lost`).
 
 Every refresh thus traces back to a packet within the last round on some
 gateway. When the traffic stops, natives expire on their natural timeouts,
@@ -122,7 +126,8 @@ prefixes) x (server outside the mesh), each living `element_timeout` seconds.
   `2 x interval` while it has room in the queue is considered stuck and
   started over (`refresh_errors`); a round held back by its own send queue is
   slow, not stuck.
-- UPDATE and DESTROY events are ignored. On ENOBUFS the kernel has dropped
+- UPDATE events are ignored; DESTROY events of our own copies are read for
+  ownership and resync (see "Liveness and resync"). On ENOBUFS the kernel has dropped
   events until the socket queue is drained; what is queued is intact and is
   processed (`ev_overruns`). The next round is then pulled forward to one
   second from now instead of waiting up to `interval`, at most once per
@@ -221,7 +226,8 @@ reserved bytes are zero.
   carries the remaining timeout only if the entry had time left, so a copy
   destroyed with time left was flushed (`conntrack -F`), deleted or evicted,
   never expired (`copies_lost`). The daemon subscribes to DESTROY events,
-  kernel-filtered on its mark. The request goes out only once every queued
+  kernel-filtered on its mark; every one of them, expired or not, ends the
+  ownership of that copy, only those with time left ask for a round. The request goes out only once every queued
   DESTROY event is read: an answer for a copy whose destruction is still
   queued would be taken for a refresh of a copy we own and not re-create it.
   If that socket overruns (a flush of many
@@ -504,7 +510,7 @@ so counters lag by up to that.
 - The kernel-side event filter checks at most 20 client prefixes. With more, all
   IPv6 events of the configured protocols reach user space and are filtered
   there.
-- The per-tuple table has 131072 slots (8 MiB) with a 64-slot probe window.
+- The per-tuple table has 131072 slots (10 MiB) with a 64-slot probe window.
   When a tuple's window is full of live tuples one of them is evicted
   (`rx_evictions`) and misses a refresh until the next round re-learns it; a
   full window stays full, so the same tuples can miss again, and three misses

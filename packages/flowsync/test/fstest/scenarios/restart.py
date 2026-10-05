@@ -42,6 +42,27 @@ def flush(env):
     env.wait_st("g1 owns the copy again", g1, "owned", 1)
 
 
+@scenario(gateways=2, once=True, tags={"restart"})
+def expiry_resume(env):
+    """A flow idles until g1's copy has expired, then resumes on the same
+    5-tuple. g0 announces its new native at once (NEW event); g1 must create
+    the copy from that announcement, not a round or two later (the DESTROY of
+    an expired copy carries no timeout, but it tells g1 the copy is gone).
+    Interval 10 s here."""
+    g0, g1 = env.g[:2]
+    env.start("-i", 10, "-t", 30)
+    f = env.flow("udp", fw=g0, rev=g1)
+    f.send()
+    env.wait_for("g1 has the copy", 3, lambda: g1.ct(f).is_copy)
+    # g0's native expires after the UDP timeout and g0 stops announcing it;
+    # g1's copy runs out within element_timeout plus a round after that
+    env.wait_for("g1's copy expired", env.timers["udp"] + 30 + 10 + 5,
+                 lambda: not g1.ct(f).alive, step=0.1)
+    f.send()
+    env.wait_for("g1 creates the copy again from g0's announcement", 2,
+                 lambda: g1.ct(f).is_copy)
+
+
 @scenario(gateways=3, tags={"restart", "tcp"})
 def restart_idle_copy(env):
     """After a restart the per-tuple table is empty; a copy seen for the first

@@ -63,7 +63,7 @@ struct nlmsghdr;
 #define MAX_PEERS	32
 #define MAX_PREFIXES	256
 /*
- * Per-tuple RX table: slots (power of two, 64 bytes each) and the linear
+ * Per-tuple RX table: slots (power of two, 80 bytes each) and the linear
  * probing window. A tuple whose window is full of live tuples evicts one,
  * which then misses a refresh; three misses in a row expire the copy. A full
  * window stays full, so a short window churns the same tuples every round
@@ -138,11 +138,14 @@ struct ct_entry {
 
 /*
  * Per-tuple RX state. t_rx is the last announcement received for the tuple
- * (0: empty slot), t_inject the last injection we sent for it. own says that
- * the entry in the kernel table is a copy created by us; only then is a
- * refresh sent, everything else is a create with NLM_F_EXCL. own is set
- * tentatively on create, cleared by the injection error (EEXIST, ENOENT) and
- * confirmed or revoked by the refresh dump of our marked entries (seen_round).
+ * (0: empty slot), t_inject the last create we sent for it (the duplicate
+ * filter's clock, 0: none to filter against). own says that the entry in the
+ * kernel table is a copy created by us; only then is a refresh sent,
+ * everything else is a create with NLM_F_EXCL. own is set (rx_own) on create,
+ * tentatively, and by our dump of marked entries; it is cleared by the
+ * injection error (EEXIST, ENOENT) and by any DESTROY of the copy, and revoked
+ * by the sweep after a complete round that started after own_since and did
+ * not see the copy (seen_round).
  */
 struct rx_ent {
 	struct flow f;
@@ -153,6 +156,8 @@ struct rx_ent {
 	uint32_t seen_at;	/* when the dump last saw the copy ... */
 	uint32_t seen_timeout;	/* ... and its remaining timeout then */
 	uint32_t checked_at;	/* when an EEXIST for it was last looked up */
+	uint32_t own_since;	/* when own was last set */
+	uint32_t gone_gen;	/* dump generation at the copy's last DESTROY, 0: none */
 	bool own;
 };
 
@@ -229,6 +234,7 @@ void ct_build_new(struct nlmsghdr *nlh, const struct flow *f, bool create);
 void ct_build_get(struct nlmsghdr *nlh, const struct flow *f);
 void ct_build_delete(struct nlmsghdr *nlh, const struct flow *orig, uint32_t id);
 void flow_reverse(struct flow *r, const struct flow *f);
+bool flow_eq(const struct flow *a, const struct flow *b);
 void ct_build_dump(struct nlmsghdr *nlh, uint8_t proto, uint32_t status, uint32_t status_mask,
 		   uint32_t mark, uint32_t mark_mask);
 
@@ -287,6 +293,7 @@ struct rx_ent *rx_seed(const struct flow *f, uint32_t round, uint32_t now);
 void rx_sweep(uint32_t round, uint32_t round_start);
 void rx_round_start(void);
 void rx_disown_all(void);
+void rx_own(struct rx_ent *e, uint32_t now);
 uint64_t copies_estimate(void);
 void rx_limit_init(void);
 bool rx_limit_reached(void);

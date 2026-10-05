@@ -92,6 +92,49 @@ def flush_retry(env):
              "after %s s" % (back / 2 if back is not None else "-"))
 
 
+@scenario(gateways=2, once=True, tags={"load", "heavy"})
+def flush_stale_chunk(env):
+    """conntrack -F on g1 while its copies phase is held back by its own send
+    queue. The dump chunk the kernel generated before the flush is read after
+    the DESTROY events and still shows copies that are gone; g1 must not take
+    them for its own again. Once sync works, every copy comes back with g0's
+    next announcement, and none stays missing.
+
+    g1 holds 3000 copies that just saw a packet: they are announced from
+    evidence, fill g1's queue, and tx_rate 6 (180 records a second) keeps a
+    generated chunk waiting in the dump socket for seconds. element_timeout
+    60 s and a 120 s UDP stream timeout make the copies live on their traffic
+    (held, not refreshed: a refresh would find a gone copy and re-create it).
+    Sync from g0 is blocked around the flush, so that g0's resync answer
+    cannot re-create the copies before the stale chunk is read."""
+    g0, g1 = env.g[:2]
+    n = 3000
+    g0.start("-t", 60, debug=False)
+    g1.start("-t", 60, "-r", 6, debug=False)
+    env.wait_for("daemons up", 8, lambda: g0.up() and g1.up())
+    g0.set_sysctl(udp_timeout=300)
+    g1.set_sysctl(udp_timeout_stream=120)
+    b = env.bulk(n, fw=g0, rev=g1)
+    b.flood()
+    env.wait_for("g1 holds all %d copies" % n, 2 * env.I + 4, marked(g1, n))
+    b.flood(via=g1)             # a packet on every copy: ASSURED, 120 s, evidence
+    g1.tick()                   # the round that announces them is running
+    g1.block_sync(g0)
+    g1.flush()
+    env.sleep(3)                # g1 reads the stale chunk meanwhile
+    g1.unblock_sync()
+    series = []
+    for _ in range(10):
+        env.sleep(1)
+        series.append(g1.count("udp", "marked"))
+    env.ok("copies on g1 every second after sync resumed: %s" % " ".join(map(str, series)))
+    env.true("every copy is back within two of g0's rounds", n in series[:2 * env.I + 2],
+             "%d missing" % (n - max(series)))
+    env.wait_for("no copy stays missing", 30, marked(g1, n))
+    env.ok("g1: owned=%s copies=%s copies_lost=%s inject_created=%s"
+           % (g1.st("owned"), g1.st("copies"), g1.st("copies_lost"), g1.st("inject_created")))
+
+
 @scenario(gateways=3, once=True, tags={"load", "slow", "heavy"})
 def scale(env):
     """100000 flows: the streaming dump against the small queue, the event

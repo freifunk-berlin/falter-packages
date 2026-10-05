@@ -34,6 +34,15 @@ static int cur_proto, cur_phase;
 static uint64_t round_start, round_progress;
 static uint32_t round_start_s, round_no;
 static uint64_t round_entries, round_copies, round_copies_live, round_copies_offloaded;
+/*
+ * Dump chunk generations. The kernel generates a dump's first chunk in the
+ * request's sendto and every further one in the recv of the previous chunk
+ * (netlink_recvmsg), so the chunk a recv returns shows the table as it was at
+ * the previous generation. dump_gen counts generations, chunk_gen is the one
+ * of the chunk being parsed. A DESTROY of a copy read at dump_gen >= chunk_gen
+ * may have happened after the chunk was generated, which then still shows it.
+ */
+static uint32_t dump_gen = 1, chunk_gen;
 
 static struct flow queue[Q_SIZE];
 static size_t q_len, q_pos;
@@ -206,8 +215,8 @@ static int ev_cb(const struct nlmsghdr *nlh, void *data)
 		return MNL_CB_OK;
 	/* a packet created an entry for a tuple we believe to hold a copy of:
 	 * the copy is gone (flushed, evicted, expired) and this is a native now.
-	 * Without this the next announcement would be a refresh without EXCL and
-	 * clamp the native to element_timeout until the sweep notices. */
+	 * Peers' announcements are then creates with EXCL again (EEXIST leaves
+	 * the native alone), not noted for a copy that does not exist. */
 	if (!is_copy(c.mark) && (e = rx_find(&c.f)) && e->own) {
 		e->own = false;
 		cnt.rx_own_lost++;
@@ -258,10 +267,13 @@ void handle_events(void)
 }
 
 /*
- * DESTROY events of our copies. A DESTROY event carries CTA_TIMEOUT only if
- * the entry had time left (ctnetlink_dump_timeout skips zero), so a copy
- * destroyed with time left was flushed, deleted or evicted, never expired:
- * ask the peers for a round now instead of waiting for their next one.
+ * DESTROY events of our copies. Any of them ends our ownership, so that the
+ * next announcement creates the copy again instead of being noted for a copy
+ * that is gone, and makes dump chunks generated before it stale for that copy
+ * (gone_gen). A DESTROY event carries CTA_TIMEOUT only if the entry had time
+ * left (ctnetlink_dump_timeout skips zero), so a copy destroyed with time
+ * left was flushed, deleted or evicted, never expired: then ask the peers for
+ * a round now instead of waiting for their next one.
  */
 static struct mnl_socket *ds_nl;
 
@@ -307,15 +319,18 @@ static int destroy_cb(const struct nlmsghdr *nlh, void *data)
 	(void)data;
 	if ((nlh->nlmsg_type & 0xff) != IPCTNL_MSG_CT_DELETE)
 		return MNL_CB_OK;
-	if (ct_parse(nlh, &c) != 0 || !is_copy(c.mark) || !c.timeout || !wanted(&c.f))
+	if (ct_parse(nlh, &c) != 0 || !is_copy(c.mark) || !wanted(&c.f))
 		return MNL_CB_OK;
-	/* one of our copies, removed with time left */
-	cnt.copies_lost++;
+	/* one of our copies is gone, expired or not */
 	e = rx_find(&c.f);
 	if (e) {
 		e->own = false;		/* the next announcement creates it, */
 		e->t_inject = 0;	/* however soon after the last create */
+		e->gone_gen = dump_gen;
 	}
+	if (!c.timeout)
+		return MNL_CB_OK;	/* expired */
+	cnt.copies_lost++;
 	resync_request();
 	return MNL_CB_OK;
 }
@@ -405,6 +420,10 @@ static int dump_cb(const struct nlmsghdr *nlh, void *data)
 	 * previous round, then (re)learn that we own it and remember what we saw */
 	now = now_s();
 	e = rx_find(&c.f);
+	/* the kernel generated this chunk before the copy's DESTROY that we have
+	 * read already: what it shows is gone and must not be owned again */
+	if (e && e->gone_gen && e->gone_gen >= chunk_gen)
+		return MNL_CB_OK;
 	if (c.status & IPS_OFFLOAD) {
 		/*
 		 * Offloaded: the flow is in the flowtable, its packets bypass
@@ -503,7 +522,10 @@ static int dump_send(void)
 	if (!++dump_seq)
 		dump_seq = 1;
 	nlh->nlmsg_seq = dump_seq;
-	return mnl_socket_sendto(dump_nl, nlh, nlh->nlmsg_len) < 0 ? -1 : 0;
+	if (mnl_socket_sendto(dump_nl, nlh, nlh->nlmsg_len) < 0)
+		return -1;
+	dump_gen++;		/* the first chunk */
+	return 0;
 }
 
 /*
@@ -612,6 +634,8 @@ void handle_refresh(void)
 		return;
 	}
 	round_progress = mono_ms();
+	chunk_gen = dump_gen;
+	dump_gen++;		/* this recv generated the next chunk */
 	ret = mnl_cb_run(buf, n, dump_seq, dump_portid, dump_cb, NULL);
 	inj_flush();	/* the refreshes this chunk decided */
 	if (ret < 0) {

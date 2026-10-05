@@ -47,12 +47,6 @@ static uint32_t flow_hash(const struct flow *f)
 	return h;
 }
 
-static bool flow_eq(const struct flow *a, const struct flow *b)
-{
-	return a->proto == b->proto && a->cport == b->cport && a->sport == b->sport &&
-	       IN6_ARE_ADDR_EQUAL(&a->c, &b->c) && IN6_ARE_ADDR_EQUAL(&a->s, &b->s);
-}
-
 int rx_init(unsigned int size)
 {
 	table = calloc(size, sizeof(*table));
@@ -129,8 +123,21 @@ enum rx_class rx_classify(struct rx_ent *e, uint32_t now)
 	 * baseline for the evidence check (copy_live) */
 	e->seen_at = now;
 	e->seen_timeout = cfg.element_timeout;
-	e->own = true;
+	rx_own(e, now);
 	return RX_CREATE;
+}
+
+/*
+ * The copy is ours from now on: tentatively after a create, confirmed when
+ * our dump sees it. own_since is what the sweep goes by, not t_inject, which
+ * a DESTROY or an overrun zeroes so that the next create is not filtered as a
+ * duplicate. A create also ends what a DESTROY said about the copy (gone_gen).
+ */
+void rx_own(struct rx_ent *e, uint32_t now)
+{
+	e->own = true;
+	e->own_since = now;
+	e->gone_gen = 0;
 }
 
 /*
@@ -191,7 +198,7 @@ struct rx_ent *rx_seed(const struct flow *f, uint32_t round, uint32_t now)
 		e->t_inject = now > cfg.interval ? now - cfg.interval : 1;
 	}
 	e->t_rx = now;
-	e->own = true;
+	rx_own(e, now);
 	e->seen_round = round;
 	return e;
 }
@@ -243,8 +250,9 @@ void rx_disown_all(void)
 	lost_base = lost_at_start = cnt.copies_lost;
 }
 
-/* after a complete round: a copy created before the round started that the
- * dump did not see is gone (expired, flushed, evicted); stop refreshing it */
+/* after a complete round: a copy owned since before the round started that
+ * the dump did not see is gone (expired, flushed, evicted); stop treating it
+ * as ours, so that the next announcement creates it again */
 void rx_sweep(uint32_t round, uint32_t round_start)
 {
 	unsigned int i;
@@ -259,7 +267,7 @@ void rx_sweep(uint32_t round, uint32_t round_start)
 
 		if (!e->own)
 			continue;
-		if (e->seen_round != round && e->t_inject && e->t_inject < round_start)
+		if (e->seen_round != round && e->own_since < round_start)
 			e->own = false;
 		else
 			owned++;

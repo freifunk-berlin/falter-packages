@@ -256,11 +256,20 @@ void ct_build_new(struct nlmsghdr *nlh, const struct flow *f, bool create)
 /* the same flow seen from the other end: server -> client */
 void flow_reverse(struct flow *r, const struct flow *f)
 {
+	memset(r, 0, sizeof(*r));
 	r->c = f->s;
 	r->s = f->c;
 	r->cport = f->sport;
 	r->sport = f->cport;
 	r->proto = f->proto;
+}
+
+/* field by field: the padding of struct flow is undefined unless the struct
+ * was zeroed, so flows are never compared byte for byte */
+bool flow_eq(const struct flow *a, const struct flow *b)
+{
+	return a->proto == b->proto && a->cport == b->cport && a->sport == b->sport &&
+	       IN6_ARE_ADDR_EQUAL(&a->c, &b->c) && IN6_ARE_ADDR_EQUAL(&a->s, &b->s);
 }
 
 /* the entry that has f as either tuple (the kernel looks up both directions) */

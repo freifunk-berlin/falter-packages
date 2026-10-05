@@ -110,8 +110,11 @@ enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e)
 	if (kind == INJ_CREATE) {
 		if (cnt.inject_created)
 			cnt.inject_created--;
-		if (e)
+		if (e) {
 			e->own = false;
+			/* the create did not set the timeout: no evidence baseline */
+			e->seen_at = 0;
+		}
 		if (err == -EEXIST) {
 			/* an entry we did not create: native, or a copy from before a
 			 * restart. Left untouched; the dump re-learns ownership. */
@@ -142,6 +145,7 @@ enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e)
 static void note_error(uint32_t seq, int err)
 {
 	static uint64_t last_log;
+	const struct flow *f = NULL;
 	struct rx_ent *e = NULL;
 	enum inj_kind kind = INJ_CREATE;
 	unsigned int i = seq & (INJ_RING - 1);
@@ -149,10 +153,11 @@ static void note_error(uint32_t seq, int err)
 
 	if (ring[i].seq == seq) {
 		e = ring[i].e;
+		f = &ring[i].f;
 		kind = ring[i].kind;
 		ring[i].seq = 0;
 		/* the slot may have been taken by another tuple meanwhile */
-		if (e && memcmp(&e->f, &ring[i].f, sizeof(e->f)))
+		if (e && !flow_eq(&e->f, f))
 			e = NULL;
 	}
 	/* a lookup found nothing or a delete found the entry changed: nothing to do */
@@ -167,8 +172,10 @@ static void note_error(uint32_t seq, int err)
 	}
 	switch (inj_account(kind, err, e)) {
 	case ACCT_RETRY:
-		if (e && n_retry < INJ_RETRY)
-			retry[n_retry++] = e->f;
+		/* from the ring's copy: the copy is gone even if its slot was
+		 * reused meanwhile */
+		if (f && n_retry < INJ_RETRY)
+			retry[n_retry++] = *f;
 		break;
 	case ACCT_ERROR:
 		if (log_ok(&last_log))
@@ -193,7 +200,7 @@ static void note_entry(const struct nlmsghdr *nlh)
 	if (ct_parse(nlh, &c) != 0 || !c.id)
 		return;
 	flow_reverse(&rev, &ring[i].f);
-	if (memcmp(&c.f, &rev, sizeof(rev)) || (c.status & IPS_SEEN_REPLY) || is_copy(c.mark) ||
+	if (!flow_eq(&c.f, &rev) || (c.status & IPS_SEEN_REPLY) || is_copy(c.mark) ||
 	    n_replace == INJ_RETRY)
 		return;
 	replace[n_replace].f = ring[i].f;
@@ -252,12 +259,17 @@ static void inj_send(void)
 		cnt.inject_errors += batch_msgs;
 		if (log_ok(&last_log))
 			logmsg(LOG_WARNING, "inject: send: %s", strerror(errno));
-		/* nothing was created: take the tentative ownership back */
+		/* nothing was applied: take the tentative ownership back, and no
+		 * create or refresh set the timeout the evidence baseline assumes */
 		for (seq = batch_first_seq; seq != batch_first_seq + batch_msgs; seq++) {
 			unsigned int i = seq & (INJ_RING - 1);
+			struct rx_ent *e = ring[i].e;
 
-			if (ring[i].seq == seq && ring[i].e && ring[i].kind == INJ_CREATE)
-				ring[i].e->own = false;
+			if (ring[i].seq != seq || !e || !flow_eq(&e->f, &ring[i].f))
+				continue;
+			e->seen_at = 0;
+			if (ring[i].kind == INJ_CREATE)
+				e->own = false;
 		}
 	} else {
 		/* the kernel processes the batch synchronously in sendto(), the
@@ -345,7 +357,7 @@ static void inj_resolve(void)
 
 		inj_add_delete(&replace[i].orig, replace[i].id);
 		if (e)
-			e->own = true;	/* tentative, like any create */
+			rx_own(e, now_s());	/* tentative, like any create */
 		inj_add(&replace[i].f, e, INJ_CREATE);
 		cnt.inject_replaced++;
 	}
@@ -373,7 +385,7 @@ void inj_flush(void)
 		struct rx_ent *e = rx_find(&again[i]);
 
 		if (e)
-			e->own = true;	/* tentative, like any create */
+			rx_own(e, now_s());	/* tentative, like any create */
 		inj_add(&again[i], e, INJ_CREATE);
 	}
 	inj_send();

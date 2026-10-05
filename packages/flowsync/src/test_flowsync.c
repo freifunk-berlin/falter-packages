@@ -49,12 +49,6 @@ static bool addr_eq(const struct in6_addr *a, const char *s)
 	return IN6_ARE_ADDR_EQUAL(a, &b);
 }
 
-static bool flow_eq(const struct flow *a, const struct flow *b)
-{
-	return a->proto == b->proto && a->cport == b->cport && a->sport == b->sport &&
-	       IN6_ARE_ADDR_EQUAL(&a->c, &b->c) && IN6_ARE_ADDR_EQUAL(&a->s, &b->s);
-}
-
 static bool listed(const char *s, const struct prefix_list *l)
 {
 	struct in6_addr a = a6(s);
@@ -429,6 +423,25 @@ static void test_ctnl(void)
 		CHECK(((IPS_SEEN_REPLY | IPS_ASSURED | IPS_OFFLOAD) & mask) != st);	/* phase 2 */
 		CHECK(((IPS_OFFLOAD) & mask) != st);					/* phase 1 */
 	}
+
+	/* the lookup after EEXIST compares the entry it got with the reversed
+	 * flow byte for byte (note_entry): flow_reverse must leave no byte
+	 * undefined, whatever the target held before */
+	{
+		struct flow r = f, rev;
+
+		r.c = f.s;
+		r.s = f.c;
+		r.cport = f.sport;
+		r.sport = f.cport;
+		nlh = mnl_nlmsg_put_header(buf);
+		ct_build_new(nlh, &r, true);
+		CHECK(ct_parse(nlh, &c) == 0);
+		memset(&rev, 0xa5, sizeof(rev));
+		flow_reverse(&rev, &f);
+		CHECK(flow_eq(&rev, &c.f));
+		CHECK(memcmp(&rev, &c.f, sizeof(rev)) == 0);
+	}
 }
 
 /* the per-tuple table: lookup, probing, expiry reuse and eviction */
@@ -539,6 +552,22 @@ static void test_seed_sweep(void)
 	CHECK(e2->own);						/* too young to have been dumped */
 	CHECK(!e->own);						/* old and not seen in round 8 */
 	CHECK(gauge.owned == 1);
+
+	/* lost DESTROY events (overrun) disown everything; the next dump
+	 * re-learns a surviving copy in its existing slot. When that copy is
+	 * gone later, the sweep must revoke it like any other, or every
+	 * announcement of the tuple is only noted and it is never created again */
+	CHECK(rx_init(8) == 0);
+	e = rx_insert(&f, 2000);
+	CHECK(rx_classify(e, 2000) == RX_CREATE);
+	rx_disown_all();
+	e = rx_seed(&f, 10, 2030);
+	CHECK(e->own);
+	rx_sweep(10, 2029);					/* seen: kept */
+	rx_sweep(11, 2060);					/* rounds 11 and 12 */
+	rx_sweep(12, 2090);					/* did not see it */
+	CHECK(!e->own);
+	CHECK(rx_classify(e, 2100) == RX_CREATE);
 }
 
 /* copy limit: last round's count plus creates since that round started */
@@ -601,6 +630,20 @@ static void test_account(void)
 	e.own = true;
 	CHECK(inj_account(INJ_REFRESH, -EINVAL, &e) == ACCT_ERROR);
 	CHECK(cnt.inject_refreshed == 0 && cnt.inject_errors == 2 && !e.own);
+
+	/* a create that hit our existing copy (after a restart) set no timeout:
+	 * the baseline it assumed must go, or the copy's long, undisturbed
+	 * timeout reads as a packet at the next dump */
+	{
+		struct flow f = mkflow(IPPROTO_UDP, 999, 443);
+		struct rx_ent *p;
+
+		CHECK(rx_init(8) == 0);
+		p = rx_insert(&f, 2000);
+		CHECK(rx_classify(p, 2000) == RX_CREATE);
+		inj_account(INJ_CREATE, -EEXIST, p);
+		CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 20, p->seen_timeout, p->seen_at, 2020));
+	}
 }
 
 int main(void)
