@@ -49,7 +49,7 @@ render_options() {
 	# from its configuration; anything else is a device name.
 	config_get iface main interface
 	if [ -n "$iface" ]; then
-		network_get_device dev "$iface" 2>/dev/null ||
+		network_get_device dev "$iface" 2> /dev/null ||
 			dev="$(uci -q get "network.$iface.device")"
 		"$add" --interface "${dev:-$iface}"
 	fi
