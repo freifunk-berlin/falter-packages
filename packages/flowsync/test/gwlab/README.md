@@ -8,16 +8,18 @@ share their state: that is an implementation (`impl/`), and the same
 scenario runs against any of them.
 
     cd packages/flowsync/test
-    python3 -m gwlab steady --impl flowsync                       # ../src/flowsync
+    VNG=/path/to/vng gwlab/vm.sh OUT steady --impl flowsync       # ../src/flowsync and flowsync.o, in a VM
+    sudo python3 -m gwlab steady --impl flowsync                  # the same as root on this host
     python3 -m gwlab steady --impl none --fleet strict            # no sync: asymmetric flows must fail
     python3 -m gwlab steady --impl conntrackd --set conntrackd=PATH --set samplicate=PATH
-    python3 -m gwlab steady --impl flowsync --fleet strict --flow 'tcp_talk:A>gw1>B>gw2'   # one flow
-    VNG=/path/to/vng gwlab/vm.sh OUT steady --impl flowsync_bpf --set bin=PATH --set bpf_object=PATH
+    python3 -m gwlab steady --impl flowsync_conntrack --set bin=PATH   # flowsync as it was on conntrack
+    sudo python3 -m gwlab steady --impl flowsync --fleet strict --flow 'tcp_talk:A>gw1>B>gw2'   # one flow
 
-Python 3 stdlib, iproute2, tc (netem), nft, util-linux. No root: every lab
-runs under `unshare -Urn`, in a systemd scope so that CPU is counted per
-gateway. Implementations that need real root (BPF) run through `vm.sh`
-(virtme-ng: a throwaway VM on the host's kernel); so can all the others.
+Python 3 stdlib, iproute2, tc (netem), nft, util-linux. Without root every
+lab runs under `unshare -Urn`, in a systemd scope so that CPU is counted per
+gateway. flowsync itself needs real root (BPF programs cannot be loaded from
+a user namespace): as root, or through `vm.sh` (virtme-ng: a throwaway VM on
+the host's kernel), which works for all the others too.
 
 ## What you read and write
 
@@ -27,7 +29,7 @@ gateway. Implementations that need real root (BPF) run through `vm.sh`
 | `scenarios/traffic.py` | what a flow does: `tcp_short`, `tcp_talk`, `udp_rr`, `udp_stream` |
 | `scenarios/steady.py` | a scenario: the flows as a grid of traffic x client x server x forward gateway x return gateway |
 | `expect.py` | what "works" means, for any implementation |
-| `impl/*.py` | one file per implementation: `none`, `flowsync`, `conntrackd`, `flowsync_bpf` |
+| `impl/*.py` | one file per implementation: `none`, `flowsync`, `flowsync_conntrack`, `conntrackd` |
 
 A flow is named `traffic:client>forward gateway>server>return gateway`.
 
@@ -116,7 +118,7 @@ what expires before what stays as on a gateway, and a run takes minutes.
 - Beyond some scale a run tests nothing production does, and is refused with
   the reason and the highest usable scale. In general that is 80: above it a
   half-open TCP connection (120 s) is forgotten before the client's first SYN
-  retry (1 s, real time). An implementation can add its own: flowsync's limit
+  retry (1 s, real time). An implementation can add its own: flowsync_conntrack's limit
   is 39, where its refresh (element_timeout + interval) stops being shorter
   than the UDP stream timeout, which the daemon itself warns about.
 - `longlived` runs at scale 30: 4.5 hours of connection in nine minutes, with

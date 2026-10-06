@@ -29,12 +29,12 @@ void log_open(bool daemon)
 /* "udp [c]:p -> [s]:p"; buf needs about 100 bytes */
 const char *flow_str(const struct flow *f, char *buf, size_t len)
 {
-	char c[INET6_ADDRSTRLEN], s[INET6_ADDRSTRLEN];
-	const char *name = proto_name(f->proto);
+	char c[INET6_ADDRSTRLEN], s[INET6_ADDRSTRLEN], p[8];
 
 	inet_ntop(AF_INET6, &f->c, c, sizeof(c));
 	inet_ntop(AF_INET6, &f->s, s, sizeof(s));
-	snprintf(buf, len, "%s [%s]:%u -> [%s]:%u", name ? name : "?", c, f->cport, s, f->sport);
+	snprintf(buf, len, "%s [%s]:%u -> [%s]:%u", proto_str(f->proto, p, sizeof(p)), c, f->cport,
+		 s, f->sport);
 	return buf;
 }
 

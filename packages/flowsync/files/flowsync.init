@@ -5,13 +5,18 @@
 
 USE_PROCD=1
 # right after the network (20), long before bird (70) attracts traffic: the
-# copies should be in place when replies start to arrive. The daemon waits for
-# its interface and binds its address before netifd has set it.
+# programs should be on the uplink and the peers' flows in place when replies
+# start to arrive. The daemon waits for its devices and binds its address
+# before netifd has set it.
 START=21
 STOP=10
-EXTRA_COMMANDS="check announce"
+EXTRA_COMMANDS="check announce flows flow bypass detach"
 EXTRA_HELP="	check	Print the configuration as the daemon parses it
-	announce <client> <cport> <server> <sport> [proto]	Send one record to all peers"
+	announce <client> <cport> <server> <sport> [proto]	Send one record to all peers
+	flows [local|remote]	List the flow tables
+	flow <client> <cport> <server> <sport> [proto]	Look one flow up in both tables
+	bypass [on|off]	Show or switch the bypass until the next restart
+	detach	Stop, take the programs off the uplink, drop the tables and rules"
 
 PROG=/usr/sbin/flowsync
 
@@ -36,34 +41,44 @@ _list() {
 	done
 }
 
+# a logical interface (uplink) or a device (eth0.1301): the daemon works on
+# devices. A logical interface that is not up yet (at boot) is taken from its
+# configuration; anything else is a device name.
+_dev() {
+	local iface dev
+	config_get iface main "$2"
+	[ -n "$iface" ] || return 0
+	network_get_device dev "$iface" 2> /dev/null ||
+		dev="$(uci -q get "network.$iface.device")"
+	"$1" "--$3" "${dev:-$iface}"
+}
+
 render_options() {
 	local add="$1"
-	local debug iface dev
+	local debug bypass
 
 	config_load flowsync
 	config_get_bool debug main debug 0
 	[ "$debug" = 1 ] && "$add" --debug
+	config_get_bool bypass main bypass 0
+	[ "$bypass" = 1 ] && "$add" --bypass
 	_opt "$add" bind_address bind
-	# a logical interface (uplink) or a device (eth0.1301): the daemon binds
-	# to a device. A logical interface that is not up yet (at boot) is taken
-	# from its configuration; anything else is a device name.
-	config_get iface main interface
-	if [ -n "$iface" ]; then
-		network_get_device dev "$iface" 2> /dev/null ||
-			dev="$(uci -q get "network.$iface.device")"
-		"$add" --interface "${dev:-$iface}"
-	fi
+	_dev "$add" interface interface
+	_dev "$add" uplink uplink
 	_opt "$add" port port
 	_opt "$add" interval interval
 	_opt "$add" element_timeout element-timeout
 	_opt "$add" batch_lines batch-lines
 	_opt "$add" tx_rate tx-rate
 	_opt "$add" rcvbuf rcvbuf
-	_opt "$add" ct_mark ct-mark
-	_opt "$add" ct_mark_mask ct-mark-mask
+	_opt "$add" mark mark
+	_opt "$add" max_flows max-flows
 	_opt "$add" max_copies max-copies
-	_opt "$add" max_copies_per_client max-copies-per-client
-	_opt "$add" client_prefix_len client-prefix-len
+	_opt "$add" udp_timeout udp-timeout
+	_opt "$add" tcp_timeout tcp-timeout
+	_opt "$add" tcp_syn_timeout tcp-syn-timeout
+	_opt "$add" tcp_close_timeout tcp-close-timeout
+	_opt "$add" other_timeout other-timeout
 	_opt "$add" resync_rate resync-rate
 	_list "$add" proto proto
 	_list "$add" skip_server_port skip-server-port
@@ -83,8 +98,8 @@ start_service() {
 	procd_open_instance
 	procd_set_param command "$PROG"
 	render_options procd_append_param_command
-	# root only until the sockets are open, then user flowsync with
-	# CAP_NET_ADMIN only (the package creates the user)
+	# root only until the programs are loaded and the sockets open, then
+	# user flowsync with CAP_NET_ADMIN only (the package creates the user)
 	procd_append_param command --user flowsync run
 	# the daemon takes its config from the command line: restart on change
 	procd_set_param file /etc/config/flowsync
@@ -132,4 +147,34 @@ announce() {
 	ARGS=""
 	append_arg "$@"
 	eval "$PROG" "$opts" announce "$ARGS"
+}
+
+# the lifetimes these print are computed from the configured timeouts
+flows() {
+	render_options append_arg
+	eval "$PROG" "$ARGS" flows "$@"
+}
+
+flow() {
+	local opts
+
+	render_options append_arg
+	opts="$ARGS"
+	ARGS=""
+	append_arg "$@"
+	eval "$PROG" "$opts" flow "$ARGS"
+}
+
+bypass() {
+	render_options append_arg
+	eval "$PROG" "$ARGS" bypass "$@"
+}
+
+# stopping the service leaves the programs on the uplink and the tables in
+# place (replies keep passing across a restart); this takes them away, and
+# forwarded IPv6 is conntrack's again
+detach() {
+	stop
+	render_options append_arg
+	eval "$PROG" "$ARGS" detach
 }

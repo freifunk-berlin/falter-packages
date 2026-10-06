@@ -59,6 +59,9 @@ static int apply_option(const char *name, const char *val)
 	if (!strcmp(name, "debug")) {
 		cfg.debug = !strcmp(val, "1") || !strcmp(val, "on") ||
 			    !strcmp(val, "true") || !strcmp(val, "yes");
+	} else if (!strcmp(name, "bypass")) {
+		cfg.bypass = !strcmp(val, "1") || !strcmp(val, "on") ||
+			     !strcmp(val, "true") || !strcmp(val, "yes");
 	} else if (!strcmp(name, "bind_address")) {
 		cfg.bind_set = false;
 		if (!*val)
@@ -86,16 +89,29 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 1, 1000000, &cfg.tx_rate, 10);
 	} else if (!strcmp(name, "rcvbuf")) {
 		return opt_uint(name, val, 4096, INT_MAX / 2, &cfg.rcvbuf, 10);
-	} else if (!strcmp(name, "ct_mark")) {
-		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark, 16);
-	} else if (!strcmp(name, "ct_mark_mask")) {
-		return opt_uint(name, val, 0, UINT32_MAX, &cfg.ct_mark_mask, 16);
+	} else if (!strcmp(name, "uplink")) {
+		if (!*val || strlen(val) >= sizeof(cfg.uplink)) {
+			logmsg(LOG_ERR, "option %s: invalid device name '%s'", name, val);
+			return -1;
+		}
+		strcpy(cfg.uplink, val);
+	} else if (!strcmp(name, "mark")) {
+		return opt_uint(name, val, 1, UINT32_MAX, &cfg.mark, 16);
+	} else if (!strcmp(name, "max_flows")) {
+		return opt_uint(name, val, 1024, 16777216, &cfg.max_flows, 10);
 	} else if (!strcmp(name, "max_copies")) {
-		return opt_uint(name, val, 0, 100000000, &cfg.max_copies, 10);
-	} else if (!strcmp(name, "max_copies_per_client")) {
-		return opt_uint(name, val, 0, 100000000, &cfg.max_copies_client, 10);
-	} else if (!strcmp(name, "client_prefix_len")) {
-		return opt_uint(name, val, 1, 64, &cfg.client_prefix_len, 10);
+		return opt_uint(name, val, 1024, 16777216, &cfg.max_copies, 10);
+	} else if (!strcmp(name, "udp_timeout")) {
+		return opt_uint(name, val, 1, 86400, &cfg.t_udp, 10);
+	} else if (!strcmp(name, "tcp_timeout")) {
+		return opt_uint(name, val, 1, 864000, &cfg.t_tcp, 10);
+	} else if (!strcmp(name, "tcp_syn_timeout")) {
+		return opt_uint(name, val, 1, 86400, &cfg.t_tcp_syn, 10);
+	} else if (!strcmp(name, "tcp_close_timeout")) {
+		return opt_uint(name, val, 1, 86400, &cfg.t_tcp_close, 10);
+	} else if (!strcmp(name, "other_timeout")) {
+		return opt_uint(name, val, 1, 86400, &cfg.t_other, 10);
+
 	} else if (!strcmp(name, "resync_rate")) {
 		return opt_uint(name, val, 0, 4000000, &cfg.resync_rate, 10);
 	} else if (!strcmp(name, "proto")) {
@@ -132,7 +148,10 @@ static int apply_option(const char *name, const char *val)
 	return 0;
 }
 
-/* short option, long option, UCI name, argument name for the help text */
+/* short option (from 256: none), long option, UCI name, argument name for
+ * the help text */
+enum { OPT_UDP_T = 256, OPT_TCP_T, OPT_TCP_SYN_T, OPT_TCP_CLOSE_T, OPT_OTHER_T,
+       OPT_BPF_OBJECT, OPT_PIN_DIR, OPT_FW_TABLE, OPT_BYPASS };
 static const struct {
 	int c;
 	const char *name;
@@ -142,22 +161,28 @@ static const struct {
 } options[] = {
 	{ 'b', "bind",             "bind_address",     "ADDR",  "local address (default: any)" },
 	{ 'I', "interface",        "interface",        "DEV",   "accept sync datagrams on this device only" },
+	{ 'U', "uplink",           "uplink",           "DEV",
+	  "the device to the Internet, where the programs attach (interface)" },
 	{ 'p', "port",             "port",             "N",     "UDP port (3780)" },
 	{ 'i', "interval",         "interval",         "SEC",   "refresh and log interval (30)" },
-	{ 't', "element-timeout",  "element_timeout",  "SEC",   "timeout of injected entries (90)" },
+	{ 't', "element-timeout",  "element_timeout",  "SEC",   "lifetime of a peer's flow after its last announcement (90)" },
 	{ 'l', "batch-lines",      "batch_lines",      "N",     "records per datagram, 1..34 (30)" },
 	{ 'r', "tx-rate",          "tx_rate",          "N",     "refresh datagrams per second per peer (500)" },
 	{ 'R', "resync-rate",      "resync_rate",      "N",
 	  "the same for a round that answers a resync request, 0: 4 x tx_rate (0)" },
 	{ 'B', "rcvbuf",           "rcvbuf",           "BYTES", "socket receive buffers (8388608)" },
-	{ 'm', "ct-mark",          "ct_mark",          "HEX",   "mark set on injected entries (0x01000000)" },
-	{ 'M', "ct-mark-mask",     "ct_mark_mask",     "HEX",   "mask of that mark (0x01000000)" },
-	{ 'C', "max-copies",       "max_copies",       "N",     "most copies held, 0: nf_conntrack_max/4 (0)" },
-	{ 'c', "max-copies-per-client", "max_copies_per_client", "N",
-	  "most copies per client prefix, 0: no limit (0)" },
-	{ 'L', "client-prefix-len", "client_prefix_len", "N",
-	  "length of a client prefix for that limit, 1..64 (64)" },
-	{ 'P', "proto",            "proto",            "NAME",  "synced protocol, repeatable (udp tcp)" },
+	{ 'm', "mark",             "mark",             "HEX",   "packet mark of accepted packets (0x01000000)" },
+	{ 'F', "max-flows",        "max_flows",        "N",     "most local flows (131072)" },
+	{ 'C', "max-copies",       "max_copies",       "N",     "most flows held for the peers (131072)" },
+	{ OPT_UDP_T, "udp-timeout", "udp_timeout",     "SEC",   "local flow lifetime after its last packet out: UDP (180)" },
+	{ OPT_TCP_T, "tcp-timeout", "tcp_timeout",     "SEC",   "TCP (7440)" },
+	{ OPT_TCP_SYN_T, "tcp-syn-timeout", "tcp_syn_timeout", "SEC", "TCP, only SYNs so far (120)" },
+	{ OPT_TCP_CLOSE_T, "tcp-close-timeout", "tcp_close_timeout", "SEC",
+	  "TCP, after the client's FIN or RST (120)" },
+	{ OPT_OTHER_T, "other-timeout", "other_timeout", "SEC", "other protocols (600)" },
+	{ 'P', "proto",            "proto",            "NAME",
+	  "synced protocol, repeatable: tcp udp sctp esp gre ipip ip6ip6 l2tp or a number "
+	  "(udp tcp esp gre ipip ip6ip6 l2tp)" },
 	{ 'S', "skip-server-port", "skip_server_port", "N",     "server port never synced, repeatable (53)" },
 	{ 'e', "peer",             "peer",             "ADDR",  "other gateway, repeatable" },
 	{ 'x', "prefix",           "prefix",           "CIDR",  "synced client prefix, repeatable" },
@@ -165,7 +190,12 @@ static const struct {
 	{ 'D', "exclude-dst",      "exclude_dst",      "CIDR",  "server prefix not synced, repeatable" },
 	{ 's', "status-file",      NULL,               "PATH",  "status file (" STATUS_FILE ")" },
 	{ 'u', "user",             NULL,               "NAME",  "run as this user, CAP_NET_ADMIN only" },
-	{ 'd', "debug",            "debug",            NULL,    "log every record and injection" },
+	{ OPT_BYPASS, "bypass",    "bypass",           NULL,
+	  "forward accepted TCP and UDP packets from tc, past netfilter" },
+	{ OPT_BPF_OBJECT, "bpf-object", NULL,          "PATH",  "the tc programs (" BPF_OBJECT ")" },
+	{ OPT_PIN_DIR, "pin-dir",  NULL,               "PATH",  "where the maps are pinned (" PIN_DIR ")" },
+	{ OPT_FW_TABLE, "fw-table", NULL,              "NAME",  "the firewall's inet table (" FW_TABLE ")" },
+	{ 'd', "debug",            "debug",            NULL,    "log every record sent and received" },
 	{ 'h', "help",             NULL,               NULL,    "this text" },
 };
 #define N_OPTIONS (sizeof(options) / sizeof(options[0]))
@@ -178,12 +208,21 @@ void usage(FILE *out)
 		"usage: flowsync [options] <command>\n"
 		"  run                                        run the daemon\n"
 		"  check                                      print the parsed configuration\n"
-		"  status                                     print counters, peers, conntrack count\n"
+		"  status                                     print counters, peers, packet counters\n"
 		"  announce <client> <cport> <server> <sport> [proto] send one record to all peers\n"
+		"  flows [local|remote]                       list the flow tables\n"
+		"  flow <client> <cport> <server> <sport> [proto] look one flow up in both tables\n"
+		"  bypass [on|off]                            show or switch the bypass of the running programs\n"
+		"  detach                                     take the programs, maps and rules away\n"
 		"options (defaults in parentheses):\n");
-	for (i = 0; i < N_OPTIONS; i++)
-		fprintf(out, "  -%c, --%-18s %-6s %s\n", options[i].c, options[i].name,
+	for (i = 0; i < N_OPTIONS; i++) {
+		if (options[i].c < 256)
+			fprintf(out, "  -%c, ", options[i].c);
+		else
+			fprintf(out, "      ");
+		fprintf(out, "--%-18s %-6s %s\n", options[i].name,
 			options[i].arg ? options[i].arg : "", options[i].help);
+	}
 }
 
 /* parse the command line into cfg; returns the index of the command or -1 */
@@ -201,9 +240,17 @@ int parse_args(int argc, char **argv)
 	cfg.batch_lines = MAX_BATCH;
 	cfg.tx_rate = 500;
 	cfg.rcvbuf = 8388608;
-	cfg.ct_mark = 0x01000000;
-	cfg.ct_mark_mask = 0x01000000;
-	cfg.client_prefix_len = 64;
+	cfg.mark = 0x01000000;
+	cfg.max_flows = 131072;
+	cfg.max_copies = 131072;
+	cfg.t_udp = 180;
+	cfg.t_tcp = 7440;
+	cfg.t_tcp_syn = 120;
+	cfg.t_tcp_close = 120;
+	cfg.t_other = 600;
+	cfg.bpf_object = BPF_OBJECT;
+	cfg.pin_dir = PIN_DIR;
+	cfg.fw_table = FW_TABLE;
 
 	memset(longopts, 0, sizeof(longopts));
 	*s++ = ':';
@@ -211,6 +258,8 @@ int parse_args(int argc, char **argv)
 		longopts[i].name = options[i].name;
 		longopts[i].has_arg = options[i].arg ? required_argument : no_argument;
 		longopts[i].val = options[i].c;
+		if (options[i].c >= 256)
+			continue;
 		*s++ = options[i].c;
 		if (options[i].arg)
 			*s++ = ':';
@@ -230,6 +279,18 @@ int parse_args(int argc, char **argv)
 			cfg.user = optarg;
 			continue;
 		}
+		if (c == OPT_BPF_OBJECT) {
+			cfg.bpf_object = optarg;
+			continue;
+		}
+		if (c == OPT_PIN_DIR) {
+			cfg.pin_dir = optarg;
+			continue;
+		}
+		if (c == OPT_FW_TABLE) {
+			cfg.fw_table = optarg;
+			continue;
+		}
 		if (c == ':' || c == '?') {
 			/* optopt is 0 for long options; argv[optind-1] has the text */
 			logmsg(LOG_ERR, "%s: %s", c == ':' ? "missing argument" :
@@ -242,9 +303,14 @@ int parse_args(int argc, char **argv)
 	}
 
 	if (!cfg.n_proto) {
-		cfg.proto[IPPROTO_UDP] = true;
-		cfg.proto[IPPROTO_TCP] = true;
-		cfg.n_proto = 2;
+		/* what clients use across the gateways: everything on TCP and
+		 * UDP, IPsec without UDP encapsulation, and plain tunnels */
+		static const char *const def[] = { "udp", "tcp", "esp", "gre", "ipip", "ip6ip6",
+						   "l2tp" };
+
+		for (i = 0; i < sizeof(def) / sizeof(def[0]); i++)
+			cfg.proto[proto_num(def[i])] = true;
+		cfg.n_proto = i;
 	}
 	if (!cfg.n_skip_port) {
 		cfg.skip_port[53 / 8] |= 1 << (53 % 8);
@@ -253,22 +319,16 @@ int parse_args(int argc, char **argv)
 	if (!cfg.resync_rate)
 		cfg.resync_rate = 4 * cfg.tx_rate;
 
-	if (!cfg.ct_mark_mask || !cfg.ct_mark || (cfg.ct_mark & ~cfg.ct_mark_mask)) {
-		logmsg(LOG_ERR, "ct_mark 0x%08lx / ct_mark_mask 0x%08lx: mark must be "
-		       "non-zero and inside the mask", cfg.ct_mark, cfg.ct_mark_mask);
-		ret = -1;
-	}
-	if (cfg.ct_mark_mask & ~cfg.ct_mark)
-		logmsg(LOG_WARNING, "ct_mark_mask 0x%08lx has bits outside ct_mark 0x%08lx: "
-		       "native entries carrying them are left out of the refresh dumps",
-		       cfg.ct_mark_mask, cfg.ct_mark);
-	/* a copy is refreshed by our own dump once per interval and only after an
-	 * announcement since the last look, and a copy created or refreshed less
-	 * than interval/2 ago waits for the next round: with 2 x interval a single
-	 * lost datagram expires it */
+	/* the tc programs go where the forwarded traffic leaves; by default the
+	 * device the sync datagrams come in on, which is the uplink too */
+	if (!cfg.uplink[0])
+		strcpy(cfg.uplink, cfg.ifname);
+	/* a peer's flow lives element_timeout after its last announcement, and a
+	 * flow is announced once per interval: with 2 x interval a single lost
+	 * datagram expires it just before the next one */
 	if (cfg.element_timeout < 3 * cfg.interval) {
 		logmsg(LOG_ERR, "element_timeout %lu must be at least 3 x interval %lu: with "
-		       "less, one lost datagram expires copies before the next refresh",
+		       "less, one lost datagram expires peers' flows before the next refresh",
 		       cfg.element_timeout, cfg.interval);
 		ret = -1;
 	}

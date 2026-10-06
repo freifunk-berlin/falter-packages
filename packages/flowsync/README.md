@@ -1,827 +1,470 @@
 # flowsync
 
-Scoped conntrack flow announcer for the Freifunk Berlin active-active IPv6
-gateways. Replaces conntrackd (Mode NOTRACK) + samplicator.
+Flow tables for the Freifunk Berlin active-active IPv6 gateways, without
+conntrack. Replaces conntrackd (Mode NOTRACK) + samplicator.
 
 Outbound traffic of a mesh client may leave through gateway A while the reply
-enters through gateway B. B runs a stateful fw4 firewall towards the mesh and
-only accepts the reply if it has a conntrack entry for the flow. `flowsync` on A
-announces the flow to all other gateways; they inject it into their conntrack
-table, and fw4's existing `ct state established,related` rule accepts the reply.
+enters through gateway B. Both run a stateful firewall towards the mesh: a
+packet from the Internet is forwarded only if it belongs to a flow a client
+started. With flowsync that state is not a conntrack entry:
+
+- **Forwarded IPv6 bypasses conntrack** (`notrack`). conntrack stays in charge
+  of what the gateway itself sends and receives, and of IPv4.
+- **Two tc programs on the uplink device** keep and consult two BPF maps.
+  *Egress*: every forwarded IPv6 packet leaving through the uplink keeps its
+  flow alive in the **local** map. *Ingress*: a packet from the uplink whose
+  flow is alive in the local or the **remote** map gets a packet mark.
+- **The firewall accepts the mark** (one rule in fw4's forward chain) and
+  treats everything else from the uplink as before: the stateless rules, then
+  reject.
+- **The daemon** announces the local flows to the other gateways and writes
+  what they announce into the remote map.
+
+Only the uplink is looked at. Traffic that reaches a gateway through a tunnel
+from another gateway passed that gateway's uplink, and was checked there.
+
+It was tested on x86_64 with kernel 7.3 in a VM (see "Source layout and
+tests"); it has not run on OpenWrt or on the gateways' hardware yet, and the
+OpenWrt package build is untested (see "Open points"). The conntrack-injection
+design it replaces is on branch `flowsync-conntrack`.
 
 ## Design
 
-- **Soft state.** A record means "this flow exists now". Injected entries carry
-  their own timeout (`element_timeout`) and expire locally. No sequence numbers,
-  acks or caches. Lost datagrams are repaired by the next periodic refresh; a
-  gateway that lost state (restart, reboot, flush) asks its peers for a round
-  at once (see "Liveness and resync").
-- **No DESTROY propagation.** DESTROY events do not say why an entry died; on a
-  gateway that never sees the flow it is a plain timeout. Nothing is sent on
-  expiry.
-- **Inject into conntrack**, no nftables set or extra rule.
-- **Only what needs it.** IPv6, UDP and TCP, client inside a configured `prefix`.
-  Protocols are configured per gateway (`list proto`); the default is UDP and
-  TCP.
-- **N-way fan-out:** one datagram per configured peer.
-- **Nothing lives on announcements alone.** A peer can never refresh an entry a
-  gateway did not create, a copy announces only with evidence of a packet since
-  the last round, and ownership of copies is re-learned from the kernel every
-  round. See "Loop prevention".
-- **Filter in the kernel.** A BPF filter on the event socket and status, mark and
-  protocol filters on the table dumps keep IPv4 and TCP-when-not-wanted entries
-  from reaching user space; on the event socket also foreign-prefix entries.
-- **One thread, no blocking.** Events, datagrams, injection replies and the
-  refresh dump are all driven from one `poll()` loop; the dump is read one chunk
-  at a time, paced by `tx_rate`.
-- **Binary UDP transport, no keys.** See "Known limits".
+- **No shared state.** The local map is written by the egress program only,
+  the remote map by the daemon only. There is no entry both sides write, so
+  there is no ownership to track, nothing to tell apart and nothing that can
+  keep itself alive: only the local map is announced, and only packets write
+  it.
+- **Soft state.** An announcement means "this flow exists now". A peer holds
+  it for `element_timeout` after the last announcement; every flow is
+  announced when it starts and again every `interval`. No sequence numbers,
+  acks or close messages. A lost datagram is repaired by the next round, and a
+  gateway that may have missed announcements asks its peers for a round at
+  once (see "Liveness and resync").
+- **The client keeps a flow alive, nobody else.** Only packets going out
+  refresh a flow. Packets from the server do not: a server cannot hold its own
+  way in open once the client has fallen silent.
+- **Every forwarded flow is local state, a configured subset is synced.** The
+  local map holds every flow the gateway forwarded out of its uplink,
+  whatever its addresses and protocol (it replaces conntrack for them). What
+  is announced to the peers and accepted from them is decided by the policy
+  below.
+- **The datapath outlives the daemon.** The maps are pinned in the BPF file
+  system and the programs stay attached when the daemon stops. Flows on a
+  symmetric path keep working, peers' flows until they expire. A restart
+  loads the programs anew, reuses the maps and replaces the filters in place.
+- **Fail closed.** Without the programs nothing is marked, and everything
+  from the uplink meets the stateless rules and the reject, as unsolicited
+  traffic does.
+- **One thread, no blocking.** New-flow events, datagrams and the map walks
+  are driven from one `poll()` loop.
 
-### Loop prevention
+### What is a flow
 
-Copies are injected with `SEEN_REPLY` already set (never `ASSURED`). The UDP
-tracker (`nf_conntrack_proto_udp.c`) sets `ASSURED` on the first packet it sees
-in *either* direction once `SEEN_REPLY` is set; the TCP tracker
-(`nf_conntrack_proto_tcp.c`) on the first ACK or data segment the copy's
-`ESTABLISHED` state accepts (with `be_liberal`, any; a SYN/ACK, FIN or RST
-does not set it). So the kernel itself tells us whether a gateway sees the
-flow:
+The key is client address, server address, protocol, client port, server
+port. TCP, UDP and SCTP have ports; every other protocol (ESP, GRE, IP in IP,
+L2TP, ...) is one flow per pair of addresses. ICMPv6 has no flows: the
+firewall handles it statelessly (fw4's `Allow-ICMPv6-Forward`), errors about
+a flow included.
 
-| entry | status | announced |
+Protocols by what clients actually use across a gateway:
+
+| | handled as | synced by default |
 |---|---|---|
-| native, replies take another gateway | `!SEEN_REPLY` | yes |
-| native, symmetric path | `SEEN_REPLY`, `ASSURED` | yes |
-| copy, this gateway forwards or sees replies | `SEEN_REPLY`, `ASSURED` | only with a packet since the last round |
-| copy, this gateway sees nothing | `SEEN_REPLY` only | **no** |
+| TCP, UDP (with QUIC, WireGuard, WebRTC, ... on top) | ports | yes |
+| ESP: IPsec without UDP encapsulation, as phones (WiFi calling) and VPN clients send it where there is no NAT | address pair | yes |
+| GRE, IPv4 in IPv6, IPv6 in IPv6, L2TPv3: plain tunnels | address pair | yes |
+| SCTP: hardly seen natively (WebRTC carries it inside UDP) | ports | no (`proto sctp`) |
+| anything else | address pair | no (`proto <number>`) |
+| ICMPv6 | no flow, stateless in the firewall | - |
 
-Three rules make sure that no set of entries can keep itself alive once the
-real traffic has stopped:
+There is nothing like conntrack's helpers (FTP, SIP, H.323): they read
+unencrypted control connections to let in a second connection the outside
+starts. The gateways have never loaded any, and what is in use today either
+starts every flow from the client or is encrypted.
 
-1. **A peer never refreshes an entry this gateway did not create.** Every
-   announcement for a tuple that is not a copy of our own is injected with
-   `NLM_F_EXCL`; if an entry exists the kernel answers EEXIST and leaves it
-   alone. A native entry therefore lives on packets only, and its existence is
-   its liveness.
-2. **A copy announces only with evidence of traffic.** A refresh sets the
-   timeout to exactly `element_timeout`; a packet sets it to the protocol's
-   natural value (OpenWrt: UDP 60 s, UDP stream 180 s, TCP unacknowledged
-   300 s, established 7440 s). A copy is announced when it is `ASSURED` and its
-   remaining timeout deviates from what plain decay since the last known value
-   would leave, in either direction, which only a packet can cause (a natural
-   timeout below `element_timeout`, such as an unacknowledged segment cutting
-   an established copy, counts as well). The last known value is
-   the later of what the previous dump saw and what our own create or refresh
-   set. A copy without a known value (after a restart or a lost table slot)
-   is not announced in that round; it can show evidence from the next one.
-3. **Ownership comes from the kernel.** Every round the table dump includes our
-   marked entries; the daemon learns from it which copies it owns (so refreshes
-   go through) and forgets the ones that are gone. A daemon restart, a slot
-   eviction or a `conntrack -F` heal within one round. Any DESTROY event of a
-   copy, expired or not, drops the ownership at once, so the next
-   announcement creates the copy again; a dump chunk that the kernel
-   generated before that DESTROY (one waits in the dump socket while the
-   daemon parses the previous one) does not make it ours again. A packet that
-   creates a native entry for a tuple we believed to hold a copy of drops the
-   ownership too (the NEW event), so a peer's next announcement is an EXCL
-   create that leaves the native alone (`rx_own_lost`).
+A local flow lives for a timeout after its last packet out:
 
-Every refresh thus traces back to a packet within the last round on some
-gateway. When the traffic stops, natives expire on their natural timeouts,
-announcements stop within a round, and all copies without traffic of their
-own expire within `element_timeout` plus one `interval`. Without these rules two gateways that each forwarded one
-direction of a flow would refresh each other's entries forever.
+| | option | default |
+|---|---|---|
+| UDP | `udp_timeout` | 180 s |
+| TCP, only SYNs seen so far | `tcp_syn_timeout` | 120 s |
+| TCP, after any other segment from the client | `tcp_timeout` | 7440 s |
+| TCP, after the client's FIN or RST | `tcp_close_timeout` | 120 s |
+| other protocols | `other_timeout` | 600 s |
 
-A side effect worth knowing: copies without traffic stay non-`ASSURED`, so a
-full table may evict them (`early_drop` takes a non-`ASSURED` entry from the
-buckets near the new entry's, for creates through ctnetlink only from the first
-few buckets), like any other non-`ASSURED` entry, not before them.
+That is all the TCP state there is: two flags per flow, set from the client's
+segments (a new SYN on the tuple clears them). There is no window tracking and
+nothing is learned from the server's segments, which on an asymmetric path
+the forwarding gateway does not see anyway. A segment in the middle of a
+connection (after a reboot, or when the path moved here) makes an established
+flow.
+
+### Fragments and extension headers
+
+tc programs see packets before the kernel's reassembly and have to find the
+transport header themselves.
+
+- The programs walk hop-by-hop, routing, destination-options, AH and fragment
+  headers (up to 6) to the transport header.
+- Only the first fragment of a packet has the ports. *Egress* refreshes the
+  flow from it and ignores the others. *Ingress* marks the first fragment
+  only, and the kernel's reassembly, which runs before the firewall's forward
+  chain, builds the reassembled packet on the first fragment's packet header:
+  the packet the firewall sees carries its mark. That is how
+  `inet_frag_reasm_prepare()` works (`skb_morph(skb, head)`), not a documented
+  interface, and no scenario of the current test suite exercises it (see
+  "Source layout and tests").
+- Reassembly is hooked in as long as any rule in the ruleset uses conntrack
+  (fw4's input chain does). The daemon's own table contains such a rule in a
+  chain that is never run, so that this does not depend on the firewall.
+
+### The rules
+
+Two things in nftables, both kept in place by the daemon (it is told when the
+ruleset changes, and looks every `interval`):
+
+1. **Table `inet flowsync`**, the daemon's own, untouched by `fw4 reload`:
+
+       chain prerouting {
+           type filter hook prerouting priority raw; policy accept;
+           meta nfproto ipv6 fib daddr type unicast notrack
+       }
+
+   `unicast` is what will be forwarded: routed, not one of the gateway's
+   addresses, not multicast. At the first start it is installed one
+   `interval` after the programs were attached: by then the flows that were
+   running under conntrack have sent a packet and are in the local map, and
+   until then conntrack still accepts their replies.
+
+2. **One rule in fw4's `forward` chain**:
+
+       meta nfproto ipv6 meta mark & 0x01000000 == 0x01000000 accept comment "flowsync"
+
+   An accept in the daemon's own table would not do: fw4's chain still sees
+   the packet and rejects it. The package ships the rule as an fw4 include
+   (`/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft`), so it is part
+   of every ruleset fw4 loads. If it is missing all the same, the daemon
+   inserts it (`fw_repaired`, and a warning the second time).
+
+   Its place in the chain matters. bbb-configs clamps the MSS of every
+   forwarded IPv6 SYN with a rule it prepends to the same chain, and a
+   SYN/ACK from the uplink must pass that rule before it is accepted on its
+   mark. fw4 renders the includes from its own configuration (the clamp)
+   before the ones it finds in `/usr/share/nftables.d` (this rule), and the
+   daemon inserts a missing rule right before fw4's `ct state` rule, behind
+   every prepended include, not at the top.
+
+The ingress program clears the mark bit on every IPv6 packet from the uplink
+before it decides, so nothing can bring the mark in from outside.
+
+With conntrack out of the forward path, fw4's `ct state established,related`
+rule no longer matches forwarded IPv6. What the gateways' ruleset does besides
+that is stateless already (zone forwardings, `inbound_allow`, the ICMPv6
+rule, the MSS clamp, the ACK/RST budget) and works as before.
+
+### Bypass
+
+Optional (`bypass`, off by default). With it the ingress program does not
+only mark an accepted packet, it forwards it: route lookup, hop limit minus
+one, and out through the neighbour layer of the outgoing device
+(`bpf_fib_lookup`, `bpf_redirect_neigh`). Such a packet passes neither
+nftables, nor conntrack's hooks, nor the kernel's IPv6 forwarding path. It
+covers the direction from the uplink to the mesh only, which is where the
+programs sit and where most bytes go.
+
+Bypassed is only what needs none of the above; everything else keeps its mark
+and takes the normal path:
+
+| not bypassed | because |
+|---|---|
+| packets without a flow | the firewall decides: stateless rules, reject |
+| anything but TCP and UDP directly behind the IPv6 header | fragments must be reassembled before the firewall; extension headers and other protocols are rare |
+| TCP segments with SYN, FIN or RST | the firewall clamps the MSS on SYNs |
+| hop limit 0 or 1 | the stack sends the ICMPv6 error |
+| too big for the outgoing device (GSO segments included) | the stack sends "packet too big" |
+| no route, or the route leads back out of the uplink or to the gateway itself | not ours to forward here |
+
+What it costs:
+
+- **A change of the firewall's rules does not reach flows that are in the
+  tables.** A rule added to block a destination applies to new flows and to
+  the packets on the normal path; packets of a running flow keep bypassing it
+  until the flow ends. `flowsync bypass off` puts everything back through the
+  firewall at once.
+- **nftables counters, tracing and tcpdump on the uplink's ingress see the
+  packets, the forward chain does not.** `dp_in_bypass` counts them.
+- **The size check is against the outgoing device's MTU**, not a route or
+  path MTU below it.
+- **The uplink must be an Ethernet-like device** (the daemon checks and leaves
+  the bypass off otherwise): the helper takes a link-layer header off the
+  packet. The outgoing device may be anything with a neighbour layer; tunnel
+  devices have not been tried.
+- The egress side of the outgoing device (its qdisc and tc filters) is passed
+  as usual.
+
+The switch is a map entry the programs read per packet, so it can be changed
+while they run: `flowsync bypass on|off` (or `/etc/init.d/flowsync bypass
+...`), which lasts until the daemon attaches the programs again and applies
+its configuration.
+
+Measured in the same VM as the other numbers (pktgen on one CPU, 10k flows,
+from the uplink to the client): about 0.72 µs per packet with the bypass,
+0.79 µs with conntrack, 0.96 µs with the tables and no bypass, 0.64 µs with
+an empty ruleset. The other direction is unchanged.
 
 ### Filter policy
 
-Applied identically on TX and RX, on the original tuple (client -> server):
+Which flows are synced; applied identically on TX and RX:
 
-- L3 is IPv6 and L4 protocol is in `proto` (default `udp`, `tcp`)
+- IPv6, and the protocol is in `proto` (default `udp`, `tcp`, `esp`, `gre`,
+  `ipip`, `ip6ip6`, `l2tp`); never ICMPv6
 - client is inside at least one `prefix` and inside no `exclude`
 - server is inside no `exclude_dst` (the mesh prefix, no default)
 - for UDP, the server port is not in `skip_server_port` (default `53`)
-- both ports are 1..65535
+- TCP, UDP and SCTP: both ports are 1..65535; every other protocol: no ports
+- both addresses routable (not unspecified, loopback, multicast, link-local
+  or v4-mapped)
 
-Both addresses must be routable (not unspecified, loopback, multicast,
-link-local or v4-mapped), and on RX the server must not be one of the
-receiving gateway's own addresses (a flow to the gateway itself is never
-asymmetric, and a copy would let it in as established on any interface; put
-networks behind the gateways into `exclude_dst`).
+A flow that does not pass is still a local flow on the gateway that forwards
+it: its replies pass there and nowhere else.
 
 A spoofed sender can therefore at most create entries for (client inside our
 prefixes) x (server outside the mesh), each living `element_timeout` seconds.
+An entry of a protocol without ports lets everything of that protocol from
+that server to that client in, not one port.
 
 ### TX
 
-- Subscribes to conntrack NEW events. The subscription carries a kernel-side BPF
-  filter (built with libnetfilter_conntrack) that drops everything but the
-  configured protocols, IPv6, and clients inside the configured prefixes (up to
-  20 prefixes; with more, prefixes are checked in user space only), and drops
-  the events of our own copies (our mark): every copy we inject comes back as a
-  NEW event, and while a resync answer re-creates thousands of them those
-  echoes would overrun the socket and take real flows' events with them. `exclude`,
-  `exclude_dst` and ports are always checked in user space. Every wanted native
-  entry that is announceable (see above) is sent immediately to all peers.
-- Every `interval` seconds the IPv6 table is dumped per configured protocol in
-  four kernel-filtered phases: native entries with `status & SEEN_REPLY == 0`
-  (for TCP: without `ASSURED`, see below), native entries with `ASSURED`,
-  offloaded native entries that are
-  `SEEN_REPLY` but not `ASSURED` (see "Flow offloading"; UDP only, and only
-  while the `nf_flow_table` module is loaded or an offloaded entry was seen:
-  every phase walks the whole table with softirqs off), and our marked
-  copies whatever their status
-  (`CTA_MARK`/`CTA_MARK_MASK` and `CTA_FILTER` on the protocol). Natives are
-  announced; copies are announced only with traffic evidence (rule 2) and
-  re-learned as ours (rule 3). The dump is streamed: one 32 KiB chunk is read
-  per loop iteration and only while the send queue has room for it. Queued
-  entries are announced at `tx_rate` datagrams per second per peer. A round
-  whose entries are not all sent when the next `interval` comes is not
-  restarted and nothing is dropped; the next round is delayed instead and
-  starts as soon as the previous one is sent, the interval counting from
-  there (`refresh_overrun`, raise `tx_rate`). Only a dump that delivers no chunk for
-  `2 x interval` while it has room in the queue is considered stuck and
-  started over (`refresh_errors`); a round held back by its own send queue is
-  slow, not stuck.
-- A TCP native that is `SEEN_REPLY` but still `SYN_SENT` is promoted: its
-  client's SYN passed this gateway, the SYN/ACK took another one, and then the
-  reply path moved here. The tracker ignores the server's segments in
-  `SYN_SENT` (accepted as established, but not refreshed), so the busy
-  connection would die at the SYN_SENT timeout (120 s after the SYN) and its
-  next server segment would be reset. The entry is set to `ESTABLISHED` with
-  `be_liberal`, in place (no `NLM_F_CREATE`, mark and timeout untouched), the
-  next packet makes it `ASSURED` and the next round announces it as a
-  symmetric native (`tx_promoted`). It is the gateway changing its own native,
-  not a peer's announcement; the rest of the class, handshakes in progress, is
-  left alone.
-- UPDATE events are ignored; DESTROY events of our own copies are read for
-  ownership and resync (see "Liveness and resync"). On ENOBUFS the kernel drops
-  events until the socket queue has been read empty, without reporting the
-  overrun again; what is queued is intact and is processed (`ev_overruns`).
-  Once the queue is empty, the next round is pulled forward to one second from
-  then instead of waiting up to `interval`, at most once per interval; a round
-  that starts during the overrun does not count as the repair, because the
-  kernel may still drop the events of flows created after its dump walked past
-  them. Other socket errors reopen the subscription. An announcement that a
-  full send buffer could not take for some peer pulls the same round.
+- The egress program reports the first packet of every flow through a ring
+  buffer; a wanted one is announced to all peers at once. In the tests a
+  reply that takes 1 ms to come back already finds the flow on the reply
+  gateway.
+- Every `interval` the local map is walked (512 entries per system call, a
+  few batches per loop iteration, only while the send queue has room). An
+  entry past its timeout is deleted, every other wanted one is announced
+  again, at `tx_rate` datagrams per second per peer. Then the remote map is
+  walked for what has expired. A round that is not sent when the next
+  `interval` comes is not restarted and nothing is dropped; the next round
+  starts as soon as it is through (`refresh_overrun`, raise `tx_rate`).
+- Events that did not fit the ring (`ev_overruns`), and announcements a full
+  send buffer could not take, are repaired by a round pulled forward to one
+  second from then, at most once per interval.
 
 ### RX
 
-- UDP socket on `bind_address`:`port`, bound to the `interface` device. The
-  kernel binds a socket to the device's index, so the daemon looks every
-  `interval` whether the device still has that index and reopens the socket
-  if not (netifd deletes and re-creates a VLAN, bridge or bond device on every
-  `ifup` of its interface; the old socket would receive nothing and fail every
-  send), then asks its peers for a resync. A device that does not exist yet
-  at startup is waited for the same way, and the bind address may be missing
-  too (`IPV6_FREEBIND`). Datagrams from addresses not listed as `peer` are
-  dropped (logged with their source, rate limited), and so are IPv6
-  datagrams whose source is a v4-mapped address (the IPv6 stack lets them
-  through, and to a dual-stack socket they look exactly like IPv4 datagrams
-  from that address; only real IPv4 datagrams carry `IP_PKTINFO`).
-- Records are decoded and checked against the policy. A per-tuple table
-  (131072 slots, linear probing) remembers when each tuple was last announced
-  and injected and whether its entry is a copy of ours. An announcement of a
-  tuple that is our copy is only noted; it is refreshed by our own dump (see
-  "refresh" below). A create for the same tuple from any peer within
-  `interval`/2 is applied once.
-- The socket is drained (up to 64 datagrams per loop iteration) and the burst is
-  injected in one netlink batch of `IPCTNL_MSG_CT_NEW` messages:
-  - **create** (tuple not known as our copy): `NLM_F_CREATE|NLM_F_EXCL`,
-    original tuple client -> server, reply tuple derived, `CTA_TIMEOUT` =
-    `element_timeout`, `CTA_STATUS` = `SEEN_REPLY|CONFIRMED`, `CTA_MARK` =
-    `ct_mark` / `CTA_MARK_MASK` = `ct_mark_mask`, and for TCP
-    `CTA_PROTOINFO_TCP` (see "TCP"). `CONFIRMED` must be echoed: the kernel sets
-    it on the new entry before it looks at `CTA_STATUS` and refuses any status
-    that differs in that bit with EBUSY. An existing entry answers EEXIST and is
-    left untouched (`inject_exists`).
-  - **refresh** (our copy, decided by our own dump, see below): neither
-    `NLM_F_EXCL` nor `NLM_F_CREATE`, both tuples and `CTA_TIMEOUT` only. The kernel applies the timeout and nothing
-    else, so a refresh can never change a copy's status, mark or TCP state.
-    ENOENT means the copy is gone (expired, flushed, evicted); it is counted
-    (`inject_gone`) and re-created at once. (With `NLM_F_CREATE` the
-    kernel would create an unmarked, unreplied entry without TCP state from the
-    refresh instead; it would look like a native and be announced as one.)
-- Every injected message is remembered by its netlink sequence number so the
-  kernel's error report, which arrives synchronously with the batch, can be
-  attributed to the record and to its table slot.
-- Other injection errors are counted and logged (rate limited), never retried.
-- Refreshes are decided by our own dump, which sees every copy of ours once
-  per round with its current remaining timeout. A copy is refreshed when a
-  peer has announced it since the dump last looked (one lost datagram costs
-  one refresh, `element_timeout` covers it) and its remaining timeout is at
-  most `element_timeout` plus one `interval`. Without announcements nothing
-  refreshes a copy and it expires; nothing keeps itself alive.
-- Once the gateway sees a packet of the flow, the entry is `ASSURED` and kept
-  alive from traffic (UDP stream timeout, TCP timeouts) independent of
-  announcements. A refresh sets the timeout to exactly `element_timeout`, it
-  does not extend it, so a copy with more time left is held, not refreshed
-  (`inject_held`): it lives on its own traffic like a native entry would, and
-  an idle TCP connection keeps its state on the reply gateway for the
-  established timeout instead of losing it when the forward gateway falls
-  silent. Deciding this when an announcement arrives would not work: a packet
-  may have raised the timeout since the last dump, and the refresh would cut
-  it.
-- A TCP create that hits EEXIST is looked up (once per tuple and
-  `element_timeout`). If the existing entry is the flow in reverse
-  (server -> client), unreplied and unmarked, it is a reply packet that came
-  before the copy and was let through by a stateless rule; the kernel picked
-  it up as a connection of its own, and it would block the copy for as long
-  as the server keeps sending. It is deleted by its id (the kernel refuses if
-  the entry was replaced by another one meanwhile, though not if the same
-  entry changed) and the copy created in the same batch
-  (`inject_replaced`). A server segment between the delete and the create (on
-  another CPU) makes a new pickup and the create fails with EEXIST; that is
-  looked up again at the next datagram or dump chunk, not an
-  `element_timeout` later (at tens of thousands of segments per second the
-  race is lost often). Every other existing entry stays untouched. UDP creates
-  that hit EEXIST are not looked up: there is nothing to replace.
-- There is no close propagation. When a flow ends, the announcements stop and
-  the peer copies expire within `element_timeout` plus one `interval` (the
-  last refresh can come from the dump after the last announcement); copies
-  that carried traffic expire on their own timeout.
+- UDP socket on `bind_address`:`port`, bound to the `interface` device and
+  reopened when that device is created anew (netifd does that to a VLAN on
+  every `ifup`). Datagrams from addresses not listed as `peer` are dropped,
+  and so are IPv6 datagrams whose source is a v4-mapped address.
+- Every record that passes the policy is written to the remote map, alive for
+  `element_timeout` from now; one system call per burst of datagrams. An
+  announcement of a flow that is there sets its time anew.
+- The remote map holds `max_copies` flows. When it is full, new flows are
+  refused (`rx_limited`) while the ones it has are still refreshed.
 
 ### Wire format
 
-Binary UDP. One datagram is a 4 byte header followed by `count` records of 40
-bytes, at most 34 records (1364 bytes) per datagram. The sender's default is 30
-records (`batch_lines`), 1252 bytes as an IPv6/UDP packet, so that a path
-which drops packets above the IPv6 minimum MTU of 1280 bytes loses no
-refresh; receivers accept up to 34:
+Unchanged from the conntrack version. Binary UDP; one datagram is a 4 byte
+header followed by `count` records of 40 bytes, at most 34 records per
+datagram, by default 30 (1252 bytes as an IPv6/UDP packet):
 
     header:  version(1)=1  count(1)  flags(1)  reserved(1)=0
     record:  proto(1)  flags(1)=0  cport(2)  sport(2)  reserved(2)=0
              client(16)  server(16)
 
-Ports in network byte order, addresses as in the packet. `proto` is the IP
-protocol number (17 for UDP, 6 for TCP). A datagram whose version byte is not 1 is counted
-as `rx_version` and dropped; one whose length does not match `count` is counted
-as `rx_parse`. The old text format started with the byte `'1'` (0x31), which
-shows up as `rx_version`. A datagram with `count` 0 is a heartbeat; header
-flag `0x01` asks the receiver for a round now (resync). Record `flags` and the
-reserved bytes are zero.
+A datagram with `count` 0 is a heartbeat; header flag `0x01` asks the
+receiver for a round now (resync).
 
 ### Liveness and resync
 
-- Every `interval` each daemon sends a heartbeat (a datagram without records)
-  to all peers (`tx_control`, `rx_control`). The status file shows per peer
-  when the last datagram came (`peer <address> rx <n> age <s>`), and a peer
-  silent for three intervals is logged (and logged again when it is back).
-- A gateway that lost copies asks its peers for a round instead of waiting up
-  to one `interval` for their next one (`tx_resync`): at startup (a restart or
-  reboot, the table may be gone and refreshes were missed while the daemon
-  was down) and when one of its copies is destroyed early. A DESTROY event
-  carries the remaining timeout only if the entry had time left, so a copy
-  destroyed with time left was flushed (`conntrack -F`), deleted or evicted,
-  never expired (`copies_lost`). The daemon subscribes to DESTROY events,
-  kernel-filtered on its mark; every one of them, expired or not, ends the
-  ownership of that copy, only those with time left ask for a round. The request goes out only once every queued
-  DESTROY event is read: an answer for a copy whose destruction is still
-  queued would be taken for a refresh of a copy we own and not re-create it.
-  If that socket overruns (a flush of many
-  copies), which copies are gone is unknown: the daemon assumes none of its
-  copies exists any more, every announcement becomes a create with EXCL, a
-  copy that does exist answers EEXIST and the next dump learns it again.
-- A peer serves a request (`rx_resync`) by starting its next round at once,
-  at most once per requesting peer per `interval`/4, and it pulls rounds
-  forward for requests at most twice per `interval` whoever asked (two in a
-  row, then the budget refills; a round started meanwhile serves every
-  request, and forged requests cannot keep a gateway in back-to-back rounds).
-  A requester asks at most once per `interval`/2; a lost request (a single
-  datagram) costs the wait for the peers' next regular round, and a request
-  that could not be sent at all (no socket while the interface is away, every
-  send failed) stays pending. If the peer is busy
-  with an overrunning round when the request comes, it is served by the round
-  after that one, not dropped. A round pulled forward for a request is sent at
-  `resync_rate` (default four times `tx_rate`), still bounded by the send
-  buffer: until it is through, the requester has no copy of those flows, and
-  their replies meet the firewall. The window is about the peer's announced
-  entries / (`resync_rate` x `batch_lines`): with the defaults 60000 records/s,
-  under two seconds for 100k entries.
-- The DESTROY socket can overrun too (`ds_overruns`, a flush of many copies):
-  then which copies are gone is unknown, and ownership of all of them is
-  dropped, once when the overrun is reported and again when the queue has
-  been read empty (the kernel drops events until then).
+- Every `interval` each daemon sends a heartbeat to all peers. The status
+  file shows per peer when the last datagram came, and a peer silent for
+  three intervals is logged.
+- A gateway asks its peers for a round at startup (after a reboot the remote
+  map is empty; after a restart the announcements from the downtime are
+  missing) and when its sync socket had to be reopened. A peer answers with
+  a round at `resync_rate` (default four times `tx_rate`), at most once per
+  requesting peer per `interval`/4 and twice per `interval` overall. In the
+  tests a rebooted gateway holds its peers' flows again within 1.5 s
+ .
 
 ## Configuration
 
-The daemon is configured on the command line only; it does not read any file.
-The init script renders `/etc/config/flowsync` (written by bbb-configs) into
-these options.
+The daemon is configured on the command line only. The init script renders
+`/etc/config/flowsync` (written by bbb-configs) into these options.
 
     flowsync [options] <command>
       run                                        run the daemon
       check                                      print the parsed configuration
-      status                                     print counters, peers, conntrack count
+      status                                     print counters, peers, packet counters
       announce <client> <cport> <server> <sport> [proto] send one record to all peers
+      flows [local|remote]                       list the flow tables
+      flow <client> <cport> <server> <sport> [proto] look one flow up in both tables
+      bypass [on|off]                            show or switch the bypass of the running programs
+      detach                                     take the programs, maps and rules away
 
 | option | UCI option | default | meaning |
 |---|---|---|---|
-| `-b, --bind ADDR` | `bind_address` | any | local address for receiving and sending; peers check the source address, so set it to the address the peers list. IPv4 or IPv6. |
-| `-I, --interface DEV` | `interface` | any | the uplink device: sync datagrams are accepted only when they arrive on it (`SO_BINDTODEVICE`). Peers are recognised by source address alone and the kernel accepts a datagram for any local address on any interface, so without it a host on the mesh side can send with a peer's address; the daemon warns at startup if it is unset. The UCI option may name the logical interface (`uplink`), the init script passes its device. A device that does not exist yet is waited for, a re-created one is followed (see "RX") |
+| `-b, --bind ADDR` | `bind_address` | any | local address of the sync socket; peers check the source address, so set it to the address the peers list |
+| `-I, --interface DEV` | `interface` | any | sync datagrams are accepted only when they arrive on this device. The UCI option may name the logical interface, the init script passes its device |
+| `-U, --uplink DEV` | `uplink` | `interface` | the device forwarded traffic leaves to the Internet on; the tc programs attach there. Waited for if it does not exist yet, followed when it is created anew |
+| `--bypass` | `bypass` | off | forward accepted TCP and UDP packets from the uplink's tc hook, past netfilter (see "Bypass") |
 | `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
-| `-i, --interval SEC` | `interval` | `30` | seconds between refresh rounds and counter logs |
-| `-t, --element-timeout SEC` | `element_timeout` | `90` | timeout of injected entries; must be at least `3 x interval` (the default) and should stay below the protocols' natural timeouts (UDP stream 120 s), see "Known limits" |
-| `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34; above 30 the path between the gateways must carry 1412 byte IPv6 packets |
+| `-i, --interval SEC` | `interval` | `30` | seconds between rounds and counter logs |
+| `-t, --element-timeout SEC` | `element_timeout` | `90` | lifetime of a peer's flow after its last announcement; at least `3 x interval` |
+| `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34 |
 | `-r, --tx-rate N` | `tx_rate` | `500` | refresh datagrams per second, per peer |
-| `-R, --resync-rate N` | `resync_rate` | `0` | the same for a round that answers a peer's resync request; `0`: four times `tx_rate` |
-| `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the UDP and the conntrack event socket; set with `SO_RCVBUFFORCE` (the daemon has `CAP_NET_ADMIN`), falling back to `SO_RCVBUF`, which `net.core.rmem_max` caps |
-| `-m, --ct-mark HEX` | `ct_mark` | `0x01000000` | mark set on created entries; must be non-zero and inside the mask. Hexadecimal with or without `0x`; all other numbers are decimal |
-| `-M, --ct-mark-mask HEX` | `ct_mark_mask` | `0x01000000` | mask of that mark |
-| `-C, --max-copies N` | `max_copies` | `0` | most copies this gateway holds; `0`: a quarter of `nf_conntrack_max` (unlimited if that is 0), at most 98304 (three quarters of the per-tuple table). Beyond it no new copy is created (`rx_limited`). A gateway holds copies of the synced flows of all other gateways, so this bounds the fleet's flows, not this gateway's |
-| `-c, --max-copies-per-client N` | `max_copies_per_client` | `0` | most copies of the flows of one client prefix (`client_prefix_len`); `0`: no limit. Beyond it no new copy is created for that prefix (`rx_limited_client`), so one client with thousands of flows (a scanner, P2P) cannot use up the pool for everybody. The limit refuses in arrival order, not by need; in a Freifunk network one /64 is a whole location's client network |
-| `-L, --client-prefix-len N` | `client_prefix_len` | `64` | the prefix length a client is counted by for `max_copies_per_client`, 1..64. A host can source from every /64 of its location's delegated prefix (the gateways do not filter sources), so a per-/64 limit stops a single client, not a location: count by the delegation (`56`) for that |
-| `-P, --proto NAME` | `proto` (list) | `udp`, `tcp` | repeatable; `udp` and `tcp` |
-| `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | repeatable; UDP server ports never synced (TCP to these ports is synced) |
-| `-e, --peer ADDR` | `peer` (list) | - | repeatable; the other gateways (max. 32) |
-| `-x, --prefix CIDR` | `prefix` (list) | - | repeatable; synced client prefixes |
-| `-X, --exclude CIDR` | `exclude` (list) | - | repeatable; client prefixes not synced |
-| `-D, --exclude-dst CIDR` | `exclude_dst` (list) | - | repeatable; server prefixes not synced |
+| `-R, --resync-rate N` | `resync_rate` | `0` | the same for a round that answers a resync request; `0`: four times `tx_rate` |
+| `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the sync socket |
+| `-m, --mark HEX` | `mark` | `0x01000000` | packet mark of accepted packets; the fw4 include must name the same value |
+| `-F, --max-flows N` | `max_flows` | `131072` | size of the local map. It is an LRU: when full, the flow that has been idle longest makes room. About 100 bytes per entry, allocated at start |
+| `-C, --max-copies N` | `max_copies` | `131072` | size of the remote map; when full, new flows are refused |
+| `--udp-timeout SEC` etc. | `udp_timeout`, `tcp_timeout`, `tcp_syn_timeout`, `tcp_close_timeout`, `other_timeout` | see above | lifetime of a local flow after its last packet out |
+| `-P, --proto NAME` | `proto` (list) | `udp`, `tcp`, `esp`, `gre`, `ipip`, `ip6ip6`, `l2tp` | synced protocols: these names, `sctp`, or a protocol number. Giving the option replaces the default list |
+| `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | UDP server ports never synced |
+| `-e, --peer ADDR` | `peer` (list) | - | the other gateways (max. 32) |
+| `-x, --prefix CIDR` | `prefix` (list) | - | synced client prefixes |
+| `-X, --exclude CIDR` | `exclude` (list) | - | client prefixes not synced |
+| `-D, --exclude-dst CIDR` | `exclude_dst` (list) | - | server prefixes not synced |
 | `-s, --status-file PATH` | - | `/var/run/flowsync/status` | where `run` writes its counters |
-| `-u, --user NAME` | - | - | after opening its sockets, run as this user with `CAP_NET_ADMIN` only (the init script passes `flowsync`, the package creates the user); without it the daemon stays root but drops every other capability |
-| `-d, --debug` | `debug` | off | log every record sent, received and injected |
+| `-u, --user NAME` | - | - | run as this user with `CAP_NET_ADMIN` only once everything is open |
+| `--bpf-object PATH` | - | `/lib/bpf/flowsync.o` | the tc programs |
+| `--pin-dir PATH` | - | `/sys/fs/bpf/flowsync` | where the maps are pinned |
+| `--fw-table NAME` | - | `fw4` | the firewall's `inet` table |
+| `-d, --debug` | `debug` | off | log every record sent and received |
 
-Giving a repeatable option replaces its default (`--proto tcp` alone would drop
-`udp`). There is no default for `exclude_dst`; the mesh prefix must be configured
-(`2001:bf7::/32` for Freifunk Berlin), otherwise mesh-internal flows are synced too.
-`element_timeout < 3 x interval` is refused: one lost datagram would expire
-entries before the next refresh. At startup the daemon warns if
-`nf_conntrack_udp_timeout_stream` or `nf_conntrack_tcp_timeout_unacknowledged`
-is not above `element_timeout + interval` (a copy that carries traffic would
-then be refreshed down to `element_timeout` every round instead of living on
-its own timeout), and
-logs an error if `nf_conntrack_events` is 0 (the kernel then sends no
-conntrack events at all: new flows wait for the next round, lost copies go
-unnoticed).
-
-Logging goes to syslog (tag `flowsync`) when the daemon is started by procd,
-and to the terminal with timestamps (`HH:MM:SS [level] message`) when
-`flowsync run` is started from a shell. `--debug` adds one line per record and
-per injection batch, which is a lot under load, and `syslog()` can block on a
-slow logd, so do not leave it on.
-
-### UCI (OpenWrt)
-
-`/etc/config/flowsync`, rendered by bbb-configs:
-
-    config flowsync 'main'
-        option enabled '1'
-        option debug '0'
-        option bind_address '<this gateway uplink IPv4>'
-        option interface '<the uplink device>'
-        option port '3780'
-        option interval '30'
-        option element_timeout '90'
-        option batch_lines '30'
-        option tx_rate '500'
-        option rcvbuf '8388608'
-        option ct_mark '0x01000000'
-        option ct_mark_mask '0x01000000'
-        option max_copies '0'
-        option max_copies_per_client '0'
-        option client_prefix_len '64'
-        option resync_rate '0'
-        list proto 'udp'
-        list proto 'tcp'
-        list skip_server_port '53'
-        list peer '<other gateway uplink IPv4>'    # one per peer
-        list prefix '2001:bf7:750::/44'            # one per prefix
-        list exclude_dst '2001:bf7::/32'
-        list exclude '<prefix filtered elsewhere>' # zero or more
-
-`enabled` is evaluated by the init script; unknown options are ignored. A config
-change restarts the daemon (procd reload trigger + file watch).
-`/etc/init.d/flowsync check` prints the configuration as the daemon parses it.
-The init script starts the daemon at `START=21`, right after the network and
-long before bird (70) attracts traffic, so that the copies are in place when
-replies arrive; the daemon waits for its interface by itself. A daemon that
-cannot start (bad configuration) is respawned at most 5 times an hour.
+Changing `max_flows` or `max_copies` makes new maps at the next start: the
+flows in the old ones are dropped (local flows are learned again from their
+next packet out, the peers' by the resync). The timeouts and the mark are
+part of the programs and take effect with a restart, the maps stay.
 
 ### Privileges
 
-The daemon starts as root (procd), opens its sockets and binds them, then
-drops every capability but `CAP_NET_ADMIN` (ctnetlink needs it for every
-message) and, with `--user`, switches to that user; `no_new_privs` is set.
-The UDP parser, the part exposed to the network, thus never runs with full
-root. The status file lives in `/var/run/flowsync/`, which the daemon creates
-for that user before it switches (and hands over if root owns it).
-
-### Development builds
-
-The package targets OpenWrt. For development it builds on any Linux with
-libnetfilter_conntrack and libmnl (Debian: `libnetfilter-conntrack-dev
-libmnl-dev`), see "Source layout and tests".
+The daemon starts as root, loads the programs, attaches them and opens its
+sockets, then drops every capability but `CAP_NET_ADMIN` and, with `--user`,
+switches to that user. `CAP_NET_ADMIN` is what attaching the programs again,
+reopening the sync socket and `nft` need; the maps and the event ring are
+used through descriptors that are open by then (on kernel 6.12 and later that
+needs no `CAP_BPF`).
 
 ## Operation
 
-On a gateway: `/etc/init.d/flowsync status|check|announce ...` (the init script
-renders the UCI options). `flowsync status` needs no configuration, it reads the
-status file.
+`/etc/init.d/flowsync status|check|flows|flow|announce|bypass|detach`.
 
-Every `interval` the daemon logs its counters to syslog (tag `flowsync`) and
-writes them to `/var/run/flowsync/status`:
+Stopping the service leaves the programs on the uplink and the maps in place.
+`/etc/init.d/flowsync detach` takes everything away (programs, maps, the
+table, the rule): forwarded IPv6 is conntrack's again from the next packet,
+and flows that were running have no conntrack entry until their client sends
+again.
 
-| counter | meaning |
+The status file (`flowsync status`), written every `interval`:
+
+| | meaning |
 |---|---|
-| `tx_events` | records announced from NEW events |
-| `tx_scanned` | entries returned by the refresh dumps (natives of other protocols and natives that are `SEEN_REPLY` but not `ASSURED` are filtered in the kernel and not counted) |
-| `tx_refresh` | records announced from the refresh dumps, natives and copies |
-| `tx_copies` | of these, copies announced because they saw a packet since the previous round |
-| `tx_promoted` | TCP natives stuck in `SYN_SENT` although replies pass them, set to `ESTABLISHED` (see "TX") |
-| `tx_datagrams` / `tx_errors` | datagrams with records sent / send errors (per peer, also in the peer lines). Sends never block: a refresh datagram that a full send buffer cannot take waits and the refresh with it (a slower round); an announcement of a new flow is lost then, counted, and a round is pulled forward to repair it |
-| `tx_control` / `tx_resync` | heartbeats and resync requests sent (per peer) / resync requests made |
-| `tx_refresh_dropped` | refresh entries dropped because the queue was full (should stay 0) |
-| `refresh_rounds` | completed refresh rounds |
-| `refresh_overrun` | interval ticks at which the previous round was still running (raise `tx_rate`) |
-| `refresh_errors` | dump socket or request errors; the round is aborted |
-| `ev_recv` | messages read from the event socket (after the kernel filter) |
-| `ev_own` | NEW events of our own injections that got past the kernel filter, ignored (0 while the filter is attached) |
-| `ev_overruns` | event socket overruns (ENOBUFS); events were lost, an early round after the overrun repairs |
-| `ds_overruns` | DESTROY event socket overruns (or reopens); ownership of all copies dropped, a resync request follows |
-| `rx_datagrams` | datagrams with records received |
-| `rx_control` / `rx_resync` | heartbeats and resync requests received / resync requests received |
-| `rx_records` | records accepted for injection |
-| `rx_bad_peer` | datagrams from a non-peer source (the source is logged, rate limited: a peer whose source address is not the configured one shows up here) |
-| `rx_policy` | records rejected by the policy |
-| `rx_parse` / `rx_version` | malformed datagrams or records / unknown format version |
-| `rx_dup` | records deduplicated |
-| `rx_evictions` | per-tuple table slots taken from a live tuple (table too small for the flow count) |
-| `rx_limited` | announcements of new flows refused because `max_copies` was reached (forged announcements, or a limit too low for the fleet) |
-| `rx_limited_client` | announcements of new flows refused because the client's prefix holds `max_copies_per_client` copies (a client with very many flows) |
-| `rx_own_lost` | copies replaced by a native entry (a packet created one after the copy was gone) |
-| `inject_created` | conntrack entries created |
-| `inject_refreshed` | timeouts of our own copies refreshed |
-| `inject_held` | refreshes skipped because the copy lives on its own traffic (a refresh would shorten it) |
-| `inject_exists` | creates refused because an entry exists that is not ours (a native, or a copy from before a restart); left untouched |
-| `inject_replaced` | reversed, unreplied entries (a reply that came before the copy) replaced by the copy |
-| `inject_gone` | refreshes of a copy that no longer existed; re-created at once |
-| `copies_lost` | our copies destroyed with time left (flush, delete, eviction); each triggers a resync request |
-| `inject_errors` | other conntrack failures |
+| `attached` | the programs are on the uplink |
+| `bypass` | the bypass is on |
+| `fw_ok` | both rules are in place |
+| `local` / `copies` | live flows in the local / remote map at the last round |
+| `tx_events` | flows announced from their first packet |
+| `tx_refresh` | records announced by the rounds |
+| `ev_recv` / `ev_overruns` | new-flow events read / lost because the ring was full |
+| `refresh_rounds`, `refresh_overrun`, `refresh_errors`, `refresh_ms`, `refresh_entries` | the rounds |
+| `rx_records`, `rx_policy`, `rx_bad_peer`, `rx_parse`, `rx_version` | what came from the peers |
+| `rx_limited` / `rx_errors` | flows the full remote map refused / other map errors |
+| `local_expired` / `remote_expired` | entries the rounds removed |
+| `dp_attached` | how often the programs were attached (1, plus one per re-created uplink or lost filter) |
+| `fw_repaired` | how often the accept rule had to be inserted |
+| `dp_out_pkts`, `dp_out_new`, `dp_out_skip` | the egress program: packets looked at, first of a flow, without a flow (ICMPv6, later fragments) |
+| `dp_in_pkts`, `dp_in_local`, `dp_in_remote`, `dp_in_miss`, `dp_in_skip` | the ingress program: looked at, accepted on a local / a peer's flow, no flow, not parsed |
+| `dp_in_bypass` | of the accepted packets, forwarded by the program itself |
+| `loop_max_ms` | longest time the loop spent between two polls in the last interval |
 
-and these gauges:
-
-| gauge | meaning |
-|---|---|
-| `refresh_running` | a refresh round is in progress |
-| `refresh_entries` | entries queued by the last complete round |
-| `refresh_ms` | wall time of the last complete round |
-| `loop_max_ms` | longest time the loop spent in handlers between two polls during the last interval; tens of milliseconds are fine, seconds mean a stall |
-| `copies` | our copies in the table at the last complete round |
-| `copies_live` | of these, with a packet since the previous round |
-| `copies_offloaded` | of these, in the flowtable (fw4 flow offloading); counted as live |
-| `owned` | our copies: per-tuple table slots that own one, kept up to date as copies are created and destroyed (what `max_copies` limits; `max_copies` and `max_copies_per_client` follow in the status file) |
-
-and one line per peer, `peer <address> rx <datagrams> age <seconds since the
-last one> tx_errors <n>` (`age never` if nothing came yet; `tx_errors` counts
-datagrams to that peer lost to send errors). Every peer sends a heartbeat
-each `interval`, so an `age` of more than a few intervals means the peer or
-the path to it is down.
-
-`flowsync status` (also part of `/etc/init.d/flowsync status`) replaces the old
-`conntrackd -s` health check. The status file is written once per `interval`,
-so counters lag by up to that.
-
-## Verification on a device
-
-1. `/etc/init.d/flowsync status; logread -e flowsync` shows counters, no errors,
-   and a `kernel filter` line with the number of prefixes installed.
-2. On gw A:
-   `/etc/init.d/flowsync announce 2001:bf7:750:3f00::1 50000 2a00:1450:4001:81a::200e 443`.
-   On gw B: `conntrack -L -f ipv6 -p udp --mark 0x01000000/0x01000000` shows the
-   entry with about 90 s left, neither `[UNREPLIED]` nor `[ASSURED]`; B's
-   `inject_created` went up by one. Re-run `announce` after 60 s: the entry is
-   refreshed by B's next dump round after that announcement (not when it
-   arrives), back to 90 s, and `inject_refreshed` went up by one. Without a
-   new announcement B does not refresh it and it expires. (Confirm the `--mark
-   value/mask` syntax of conntrack 1.4.8 on the device; the `conntrack` tool is
-   not in the gateway image by default.)
-   For TCP (with `list proto 'tcp'` on both gateways): `announce ... tcp` and
-   `conntrack -L -f ipv6 -p tcp --mark 0x01000000/0x01000000` on B shows the
-   entry `ESTABLISHED` with about 90 s left and no `[ASSURED]` until B forwards
-   a packet of it.
-3. Loop check: B's `tx_events`/`tx_refresh` must not increase for the injected
-   entry (the kernel filter keeps its NEW event from B's daemon; `ev_own`
-   counts one only if that filter could not be attached), and A's
-   `rx_records` must not increase.
-4. Real flow from a client in a synced prefix: `curl --http3 -6
-   https://www.google.com`, a WireGuard handshake to an external endpoint,
-   `ntpdate -q` to an IPv6 NTP server. On the gateways not on the outbound path,
-   `conntrack -L -f ipv6 -p udp -d <client>` shows the entry turn `[ASSURED]`
-   when replies take that path; that gateway then announces the flow as well
-   (`tx_copies` increases, A logs `inject_exists`, and A's own entry stays
-   unmarked). Flows to port 53 or to 2001:bf7::/32 are never injected.
-   Unsolicited inbound UDP from outside stays rejected.
-   For TCP, a long-lived asymmetric IPv6 TCP connection from a client in a
-   synced prefix is accepted on the reply gateway, whose entry turns `[ASSURED]`
-   once it forwards a packet.
-5. Stale flows: after a client's UDP flow has ended, every gateway's entry for
-   it must be gone within about `element_timeout` plus the kernel timeout of the
-   last native entry (a UDP stream dies 120 s after its last packet). Watch
-   `copies` and `nf_conntrack_count` over a quiet period; both must come down.
-6. Load on the edgerouter-4 during a refresh: `top -d 5`, `netstat -su`
-   (`RcvbufErrors`), `conntrack -C`, and `refresh_ms` / `loop_max_ms` in the
-   status. `ev_recv` should track IPv6 NEW events of the configured protocols
-   only; compare with `conntrack -E -e NEW -f ipv6 | pv -l` if in doubt.
-7. Kill the daemon (procd respawns it); the copies on this gateway survive, the
-   restarted daemon re-learns them within one round (`owned` comes back,
-   `inject_exists` stays small, the peers' `rx_resync` counts the restart).
-   Do not test recovery with `conntrack -F` on a gateway that carries traffic:
-   it deletes the gateway's own entries too, and with the gateways' forward
-   policy REJECT every server segment of a connection without an entry is
-   answered with a TCP reset once the stateless budget is used up (see
-   "Known limits"). On a gateway drained of traffic (BGP down), `conntrack -F`:
-   `copies_lost` counts, the peers serve the resync request and the entries are
-   back within about (the peers' announced entries) / (`resync_rate` x
-   `batch_lines`) seconds.
-
-## Migration from conntrackd
-
-flowsync and conntrackd (with samplicator) both use UDP port 3780 and cannot
-read each other's datagrams (conntrackd counts flowsync's as bad size,
-flowsync counts conntrackd's as `rx_version`). While the fleet is mixed, every
-asymmetric flow whose forward and reply gateway run different daemons has no
-entry on the reply gateway: UDP replies are rejected, TCP lives on the
-stateless budget. With k of n gateways migrated that is 2k(n-k)/(n(n-1)) of
-those flows, 33 % for one of six, 60 % for three of six. So never run a
-canary or a rollout over days:
-
-- **One window:** build all images in one change and flash the gateways back
-  to back (`sysupgrade` reboots, so there is no conntrack state to clean up),
-  or in two halves within minutes.
-- **Or a scripted flip:** ship an image with both packages, conntrackd active
-  and flowsync configured with `enabled '0'`; then stop and disable conntrackd
-  and samplicator and start flowsync on all gateways within seconds. Rollback
-  is the reverse. A later image drops conntrackd.
-
-Render all peers from the start; a peer still running conntrackd shows as
-`age never` in `flowsync status`. Keep the stateless ACK/RST accept and the
-sync firewall rule.
+and one line per peer, `peer <address> rx <datagrams> age <seconds> tx_errors <n>`.
 
 ## Known limits
 
-- The race between a fast reply and the announcement is RTT dominated and
-  inherent to any sync design. QUIC and WireGuard retransmit, TCP retransmits
-  the SYN/ACK.
-- Sync is unauthenticated. The flow headers already cross transit networks
-  unencrypted, and the impact of a spoofed record is bounded by the receiver's
-  policy (a 90 s entry for one external address towards one UDP or TCP port of
-  one client in a synced prefix), the same exposure conntrackd had. An outbound
-  TCP SYN from a synced prefix creates a 90 s ESTABLISHED copy on every peer,
-  just like any UDP packet does, within the same policy bound. Anybody who can
-  send from a peer's uplink address (UDP needs no handshake) can make a
-  gateway create copies. Set `interface` to the uplink: otherwise that is any
-  host on the mesh side too (the kernel delivers a datagram for any local
-  address on any interface, rp_filter is off by default, and Falter's freifunk
-  zone accepts input). Without a bound about 2 Mbit/s of forged records
-  would fill `nf_conntrack_max` (524288) and drop new flows of the gateway's
-  own clients. `max_copies` bounds this: beyond it new copies are refused
-  (`rx_limited`) while refreshes of existing copies go on, so a forger can
-  degrade the sync but not the gateway. The GRE mesh between the gateways
-  shares the trust model (GRE is accepted from any source).
-- **`interface` does not keep the mesh out where the gateways masquerade.**
-  A gateway that masquerades mesh traffic to its uplink (bbb-configs does,
-  for IPv4) rewrites the source of a mesh host's datagram to its uplink
-  address, which is exactly the peer address the other gateways accept, and
-  forwards it out of the uplink: it arrives on the receivers' sync device from
-  a valid peer. Any IPv4 client on the mesh can thus send announcements and
-  resync requests to every gateway but its own exit, without spoofing. The
-  daemon cannot tell such a datagram from its peer's. Only the firewall can:
-  drop forwarded traffic towards the peers' sync port (or exclude the peers'
-  addresses from masquerading) on every gateway.
-- **The copy limits do not tell need from abuse.** `max_copies` and
-  `max_copies_per_client` refuse new copies in arrival order. A host that opens
-  unanswered flows by the hundred per second (each lives the SYN_SENT or UDP
-  timeout plus `element_timeout` as a copy) can keep the pool full, and then
-  legitimate flows get no copy on the gateways that hold it; set
-  `max_copies_per_client` with `client_prefix_len` at the delegation size
-  (`56`) to confine that to the host's own location.
-- Adding or removing a gateway requires re-rendering all gateways (peer lists).
-- ct mark bit `0x01000000` is free on the gateways today (qosify is not installed
-  there). It is configurable; it marks the entries created by flowsync and is
-  what tells copies from native entries, so nothing else may set or clear it on
-  synced flows.
-- Loop prevention relies on the UDP and TCP trackers setting `ASSURED`
-  regardless of direction once `SEEN_REPLY` is set (kernel 6.12; for UDP only
-  with 64-bit jiffies, so 64-bit kernels only: on 32-bit the stream check
-  against a zero timestamp fails for half of each jiffies wrap), and on a
-  packet changing the remaining timeout visibly. A natural timeout that equals
-  what a refresh would leave at that moment (`element_timeout` minus the time
-  since, e.g. TCP CLOSE_WAIT 60 s under continuous traffic with the defaults)
-  is invisible while the copy is refreshed every round. Natural timeouts above
-  `element_timeout + interval` keep a copy with traffic held rather than cut;
-  with the OpenWrt values (UDP stream 180 s, TCP unacknowledged 300 s) and the
-  defaults that holds.
-- A flow is announced by every gateway that sees its packets, so with an
-  asymmetric path two gateways announce it. Dedup on the receiver absorbs this;
-  refresh traffic is at most twice that of a single announcer.
-- A copy is announced from a packet only at the next round, so after a reroute
-  the new carrier is heard up to one `interval` later (two after a restart of
-  the carrier's daemon); third-party copies have
-  `element_timeout` to spare. A copy that saw a packet is announced in the round
-  after that packet and then falls silent; its own entry lives on until the
-  protocol's natural timeout runs out.
-- TCP entries live to the kernel's TCP timeouts when no close is seen, which on
-  asymmetric paths is the normal case. That is conntrack's behaviour on every
-  gateway already; OpenWrt sets `nf_conntrack_tcp_timeout_established` to
-  7440 s (upstream default 5 days), `nf_conntrack_udp_timeout` to 60 s and
-  `nf_conntrack_udp_timeout_stream` to 180 s.
-- A reply that is accepted on a gateway *without* a copy, by any stateless
-  rule (today's TCP accept for asymmetric replies, or an open port), creates a
-  native entry in the reverse direction there (with `tcp_loose`, server data
-  is picked up as `ESTABLISHED` with the server as the original side). For
-  TCP the next announcement replaces it with the copy (see "RX"); for UDP the
-  kernel refuses the copy with EEXIST as long as that entry lives
-  (`nf_conntrack_hash_check_insert` checks both tuples). Such a pickup never
-  gets `SEEN_REPLY`, so every one of its packets is `ct state new` and needs
-  the stateless rule until the copy has replaced it.
-- **The stateless ACK/RST accept is a hard budget, and the gateways reject.**
-  Every window in which a gateway has no copy for a flow whose replies it
-  carries (the first reply racing the announcement, a reboot or flush until the
-  resync is through, a sync outage) puts that flow's server segments on the
-  rate-limited stateless rule (5000 segments/s with a burst of 2500, for all
-  flows of the gateway together, about 60 Mbit/s). Beyond it they fall through
-  to the forward policy, which on the gateways is REJECT: the server gets a TCP
-  reset whose sequence number it accepts, and the download dies. A window of
-  T seconds with R uncovered segments/s rejects about
-  (R - 5000)^2 x T / (2R) - 2500 segments. Measured after a flush at 20000
-  server segments/s: 12000 copies were back in 0.9 s with about 1800 resets,
-  40000 copies in 3 s with about 16000 resets (before `resync_rate`). Making the
-  over-budget rules drop instead of falling through to REJECT turns that into
-  retransmissions; that is a firewall change (bbb-configs).
-- UDP replies in such a window get an ICMPv6 port unreachable (the only
-  stateless UDP rule is for DNS, which flowsync does not sync). QUIC and
-  WireGuard mostly ignore it, connected UDP sockets see ECONNREFUSED.
-- An idle asymmetric TCP connection keeps its state on the reply gateway for
-  `nf_conntrack_tcp_timeout_unacknowledged` (300 s) plus up to one
-  `element_timeout` after its last packet, not for the established timeout:
-  each gateway sees data whose ACKs take the other path, so the tracker caps
-  both the native and the copy at the unacknowledged timeout; the copy lives
-  on the last refresh after the native is gone. A server that pushes after a
-  longer silence (IMAP IDLE, SSH, push notifications) relies on the stateless
-  rule; raising `nf_conntrack_tcp_timeout_unacknowledged` on the gateways
-  extends it, for natives too. A connection on which the client never sent
-  data (it only acknowledges) is not capped: its native lives on the
-  established timeout and keeps the copy (gwlab scenario `idle` shows the
-  limit end to end).
-- The `element_timeout >= 3 x interval` check is local. Every gateway's
-  `element_timeout` must cover every *peer's* `interval`; render the same values
-  everywhere. A copy that received a RST is in state
-  CLOSE but is kept at `element_timeout` by refreshes until its origin stops
-  announcing it.
-- If a refresh round takes longer than `interval` to dump and send (table too
-  large for `tx_rate`), rounds are delayed, not dropped: entries are still
-  refreshed, just less often. `element_timeout` of `3 x interval` tolerates one
-  delayed round; `refresh_overrun` counting up means `tx_rate` is too low for
-  the table.
-- Our copies are refreshed by our own dump, so the time between two refreshes
-  of a copy is up to `interval` plus the duration of a round (`refresh_ms`),
-  and it must stay below `element_timeout`. The copies phase walks every copy
-  each round (up to `max_copies`); with the defaults (90 s against 30 s plus
-  a round of a few seconds) the margin is wide, but watch `refresh_ms` on
-  slow hardware under load.
-- The kernel-side event filter checks at most 20 client prefixes. With more, all
-  IPv6 events of the configured protocols reach user space and are filtered
-  there.
-- The per-tuple table has 131072 slots (10 MiB) with a 64-slot probe window.
-  When a tuple's window is full of live tuples one of them is evicted
-  (`rx_evictions`) and misses a refresh until the next round re-learns it; a
-  full window stays full, so the same tuples can miss again, and three misses
-  in a row expire the copy, which is then re-created. Measured and simulated:
-  100k announced flows settle after a few dozen evictions in the first round,
-  110k after a few hundred, 120k keep evicting about a hundred per round. Never
-  a leak; for more flows raise `RX_TABLE_SIZE` in `flowsync.h`.
+- **A reply can be faster than the announcement.** It then meets the stateless
+  rules: for TCP the ACK/RST budget, which carries it; without that rule it is
+  rejected and the client's SYN retransmission finds the flow in place (test
+  `tcp_race`). In the tests a reply that takes 1 ms is never faster. Keep the
+  ACK/RST budget for this and for the seconds after a reboot.
+- **No TCP state on the reply side.** Any segment with the 5-tuple passes
+  while the flow lives. The conntrack version's copies were liberal too.
+- **Closed connections linger.** The reply gateway learns nothing from the
+  server's FIN or RST, and a client that vanishes without a FIN leaves its
+  flow for `tcp_timeout`. The local map is an LRU, so a full map evicts the
+  idlest flows first, but an evicted flow that was merely idle loses its way
+  back in.
+- **An idle connection lives `tcp_timeout`** after the client's last segment,
+  then the server's next push is reset. conntrack's
+  limit on an asymmetric path was `tcp_timeout_unacknowledged` (300 s).
+- **Sync is unauthenticated**, as before, and a gateway that masquerades mesh
+  traffic to its uplink address lets mesh hosts send to the peers' sync port
+  from a peer address (see the conntrack version's review, G-02): only the
+  firewall can stop that.
+- **`max_copies` refuses in arrival order**; there is no per-client limit
+  (the conntrack version had `max_copies_per_client`).
+- **Flow offloading** needs conntrack and cannot be used for forwarded IPv6
+  on a gateway that runs this.
+- **The first start cuts flows that stay silent**: a flow that sends no
+  packet out during the first `interval` is not in the local map when the
+  notrack table is installed, and its replies are rejected until its client
+  sends again.
+- Adding or removing a gateway requires re-rendering all gateways.
 
-## Flow offloading
+## Open points
 
-fw4 `flow_offloading` (software) and `flow_offloading_hw` (hardware) move a
-flow into the nf_flowtable after a few packets; from then on its packets
-bypass conntrack. The entry keeps `IPS_OFFLOAD` (and `IPS_HW_OFFLOAD`) while
-the flow is in the flowtable, the kernel keeps it alive (about a day for UDP
-and established TCP), and a dump shows no timeout for it. The flowtable lets a
-flow go after `nf_flowtable_udp_timeout` / `nf_flowtable_tcp_timeout` (30 s)
-without a packet, and hands the entry back with the protocol's timeout minus
-the flowtable timeout (6.12 and 6.18; 6.18 gives the full timeout only to a
-flow torn down for another reason, and CLOSE to a closing TCP flow).
+Not done or not verified in this prototype:
 
-- **Copies:** an offloaded copy carries traffic, so it is announced every
-  round while it is offloaded, and it is not refreshed (the kernel keeps it
-  alive). When the flowtable lets go, its first sighting is no evidence, so it
-  is not announced once more for a packet already accounted for. Gauge
-  `copies_offloaded`.
-- **Natives:** a symmetric flow can be offloaded before conntrack sets
-  `ASSURED` (UDP: from its second packet); conntrack then never sees the packet
-  that would set it. A fourth dump phase selects natives that are offloaded
-  and `SEEN_REPLY` but not `ASSURED`, so they are announced like the others.
-- Keep `nf_flowtable_*_timeout` at or below `interval`, so that "offloaded"
-  still means "a packet since the last round". `nf_conntrack_acct` is not
-  needed.
-
-## TCP
-
-TCP is synced with the same soft-state model as UDP (`list proto 'tcp'`, on
-by default). The policy, wire format, dump requests, loop prevention and
-the whole TX path are protocol-agnostic; the only TCP-specific code is the
-create, which adds `CTA_PROTOINFO_TCP` with state `ESTABLISHED` and a per-ct
-`be_liberal` flag on both directions. This makes each injected entry
-self-sufficient, so the global `net.netfilter.nf_conntrack_tcp_be_liberal=1`
-sysctl is not required; setting it anyway only adds tolerance for the gateways'
-own native half-visible TCP entries and is harmless.
-
-What conntrack makes of an asymmetric TCP connection, and why it still works:
-
-- The forward gateway sees the SYN and gets a `SYN_SENT` entry; it never sees
-  the SYN/ACK, so the client's following packets are `INVALID` to it (no state
-  change, no refresh) and it forwards them anyway (fw4 does not drop invalid
-  forward traffic by default). The entry is announced while it exists
-  (`nf_conntrack_tcp_timeout_syn_sent`, 120 s); when it expires, the next client
-  packet is picked up mid-stream as `ESTABLISHED` (`nf_conntrack_tcp_loose`) and
-  announced again.
-- The reply gateway holds the copy in `ESTABLISHED` with `be_liberal`; the
-  SYN/ACK and the server's data are accepted as established, the copy turns
-  `ASSURED` and is announced from its traffic. If the forward gateway has lost
-  its native entry in between, it receives the flow back as a copy and the
-  client's packets keep that copy alive.
-- A SYN/ACK that arrives before the copy exists passes the gateways'
-  stateless ACK accept (within its budget) and is picked up like any server
-  segment (below); beyond the budget it is rejected with a reset to the
-  server, and the client's SYN retransmission starts over. Without such a
-  rule it is dropped and retransmitted.
-- A server segment with ACK that arrives before the copy exists passes the
-  gateways' stateless ACK accept (below) and is picked up by the kernel as a
-  connection server -> client. The copy replaces it at the next announcement
-  (see "RX"), and the server's segments are established from then on.
-- An idle connection keeps its state on the reply gateway: once the copy saw
-  the server's traffic it is not cut back to `element_timeout` by refreshes.
-  It lives on the timeout the tracker gives it: established, as long as the
-  server sent no data the reply gateway saw unacknowledged, otherwise
-  `tcp_timeout_unacknowledged` (300 s, see "Known limits"). The forward
-  gateway's entry ends after `tcp_timeout_unacknowledged` without packets;
-  the client's next packet is picked up again.
-- If the reply path moves onto the forward gateway while its entry is still
-  `SYN_SENT` (the SYN/ACK took another gateway), the entry is promoted to
-  `ESTABLISHED` by the next round instead of dying 120 s after the SYN (see
-  "TX").
-
-There is deliberately no close propagation. A closed connection's peer copies
-expire within `element_timeout` plus one `interval` once nothing announces
-them (a copy that carried the connection's traffic lives on its own TCP
-timeout, as a native entry would). The alternative
-(subscribing to UPDATE events and shortening peer entries on RST/FIN) was
-considered and left out: on asymmetric paths each gateway sees only one
-direction, so the signal is unreliable, and the gain over a 90 s soft expiry is
-small.
-
-Keep the gateways' rate-limited stateless accept for IPv6 TCP segments with
-ACK or RST. It covers the gaps flowsync cannot close: the reply that beats
-the first announcement, and the moments between a lost table and the
-peers' resync round. Without it every such segment is rejected and the server
-gets a reset. With it those segments pass within its budget, and the copy
-takes over at the next announcement; beyond the budget they are rejected
-just the same (see "Known limits").
+- The OpenWrt package Makefile follows `bridger` (BPF toolchain, `/lib/bpf`)
+  but has not been built: no BPF toolchain was available here.
+- Nothing has run on kernel 6.12, on a big-endian target or on the
+  edgerouter-4. The per-packet cost of the programs is unmeasured.
+- The mark a reassembled packet inherits is kernel behaviour read from the
+  6.18 source and tested on 7.3.
+- The notrack rule covers all forwarded IPv6, also between mesh interfaces;
+  bbb-configs' own `NOTRACK` rules become redundant, and its ruleset should be
+  read once more for anything that still expects conntrack state there.
+- The bypass has forwarded to veth devices only. Forwarding into GRE or
+  WireGuard devices, which is where the gateways' mesh traffic goes, is
+  untested, and so is its gain on the gateways' hardware.
+- A device that is both uplink and carries tunnel traffic sees the tunnel's
+  outer packets only; inner packets are looked at where they leave an uplink.
 
 ## Source layout and tests
 
-`src/`, plain C on libmnl, built by `src/Makefile`. libnetfilter_conntrack is
-used only to build the BPF filter for the event socket.
+`src/`, plain C on libbpf; the tc programs in `src/bpf/flowsync.bpf.c`.
 
 | file | content |
 |---|---|
-| `flowsync.h` | constants, `struct config`/`flow`/`ct_entry`/`rx_ent`, counters, gauges, prototypes |
-| `util.c` | logging, time, address and prefix helpers |
-| `policy.c` | `wanted()`, `is_copy()`, `copy_live()`: the rules applied on TX and RX |
-| `config.c` | command line options (named after the UCI options) |
-| `ctnl.c` | ctnetlink message parsing and building |
-| `wire.c` | the binary record format |
-| `udp.c` | UDP socket, peers, datagram assembly and fan-out |
-| `tx.c` | conntrack NEW and DESTROY events (with the kernel filter), the four-phase streaming refresh, promotion of stuck TCP natives |
+| `dp.h` | map keys and values, shared by the programs and the daemon |
+| `bpf/flowsync.bpf.c` | the egress and ingress programs |
+| `dp.c` | loading, attaching, pinned maps, events, map walks |
+| `fw.c` | the two nftables rules, kept in place |
+| `tx.c` | new-flow events and the rounds |
+| `rx.c` | datagram handling |
 | `resync.c` | heartbeats, resync requests, peer liveness |
-| `inject.c` | conntrack injection: batches, error attribution, re-create after ENOENT, replacement of reversed entries |
-| `rx.c` | datagram handling, the per-tuple table (dedup, ownership, held refreshes) and the copy limit |
-| `status.c` | counters, gauges, status file, `status` command |
-| `main.c` | main loop and subcommands |
-| `test_flowsync.c` | unit test: prefixes, policy, wire format, ctnetlink messages, RX table, injection bookkeeping (`make test`) |
+| `policy.c`, `config.c`, `wire.c`, `udp.c`, `status.c`, `util.c`, `main.c` | as named |
+| `test_flowsync.c` | unit test: prefixes, policy, wire format, options, lifetimes |
 
 `test/gwlab` holds the data path tests, documented in
 [test/gwlab/README.md](test/gwlab/README.md): a lab of clients, gateways and
-servers with per-link latency in unprivileged network namespaces (Python
-stdlib, no root), real traffic over every pair of gateways, judged by what the
-endpoints see. It knows no implementation: the same scenarios run against
-flowsync, conntrackd + samplicator and others (`test/gwlab/impl`).
+servers with per-link latency in network namespaces, real traffic over every
+pair of gateways, judged by what the endpoints see. It knows no
+implementation; the adapter for this daemon is `test/gwlab/impl/flowsync.py`,
+and `flowsync_conntrack`, `conntrackd` and `none` are there to compare
+against. BPF programs cannot be loaded from a user namespace, so the lab
+needs real root for this daemon: `make itest` runs it directly as root and
+otherwise in a throwaway VM on the host's kernel (virtme-ng, `VNG=`).
 
     make -C src test                                  # unit test
-    make -C src itest                                 # scenario steady, all fleets (~2 min)
+    make -C src itest                                 # scenario steady, all fleets
     make -C src itest S=symasym FLEET=strict          # another scenario, one fleet
     make -C src check                                 # both
 
-Cross-compiling against an OpenWrt staging dir and running the unit test under
-qemu-user:
-
-    export STAGING_DIR=<openwrt>/staging_dir/target-<arch>_musl
-    export PATH=<openwrt>/staging_dir/toolchain-<arch>_gcc-*_musl/bin:$PATH
-    make -C src CC=<arch>-openwrt-linux-musl-gcc PKG_CONFIG=false \
-        CFLAGS="-I$STAGING_DIR/usr/include" LDFLAGS="-L$STAGING_DIR/usr/lib" \
-        LDLIBS="-lnetfilter_conntrack -lnfnetlink -lmnl" \
-        TEST_RUNNER="qemu-<arch> -L <toolchain dir> -E LD_LIBRARY_PATH=$STAGING_DIR/usr/lib" \
-        all test
+gwlab judges delivery end to end. What is specific to this design is not in
+it yet: fragments and extension headers, the bypass, the place of the accept
+rule behind the MSS clamp, the rules and programs being put back, protocols
+without ports, the first start. The scenarios that covered those ran on the
+suite gwlab replaced; they are on branch `flowsync-bpf` (`test/fstest`).

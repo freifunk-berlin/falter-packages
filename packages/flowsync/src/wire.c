@@ -68,7 +68,7 @@ int wire_get(const uint8_t *src, struct flow *f)
 	memset(f, 0, sizeof(*f));
 	f->proto = src[0];
 	/* record flags and reserved bytes are zero in version 1 */
-	if (!proto_name(f->proto) || src[1] || src[6] || src[7])
+	if (!f->proto || src[1] || src[6] || src[7])
 		return PARSE_ERR;
 	memcpy(&be, src + 2, 2);
 	f->cport = ntohs(be);

@@ -23,7 +23,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEST = os.path.dirname(os.path.dirname(HERE))       # packages/flowsync/test
 
-NAMES = ("none", "flowsync", "conntrackd", "flowsync_bpf")
+NAMES = ("none", "flowsync", "flowsync_conntrack", "conntrackd")
 
 
 class Impl:

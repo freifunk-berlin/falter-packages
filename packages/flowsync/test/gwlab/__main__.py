@@ -1,7 +1,7 @@
 """python3 -m gwlab SCENARIO --impl NAME [options]
 
   SCENARIO            a module in gwlab/scenarios (steady)
-  --impl NAME         none | flowsync | conntrackd | flowsync_bpf
+  --impl NAME         none | flowsync | flowsync_conntrack | conntrackd
   --set KEY=VALUE     an option of the implementation, repeatable (bin=..., see impl/*.py)
   --fleet NAME ..     only these fleets of the scenario (default: all, in parallel)
   --flow TEXT         only flows whose name contains TEXT (e.g. 'tcp_talk:A>gw1>B>gw2')

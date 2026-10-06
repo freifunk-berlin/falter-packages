@@ -1,5 +1,5 @@
 """The gateways' stateful firewall on conntrack, shared by the implementations
-that keep conntrack as the state (none, flowsync, conntrackd).
+that keep conntrack as the state (none, flowsync_conntrack, conntrackd).
 
 The forward chain as fw4 renders it on the gateways: policy reject, established
 accept, the mesh may go anywhere; per policy the rate-limited stateless accept

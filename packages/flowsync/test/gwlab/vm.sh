@@ -3,7 +3,7 @@
 # implementations that need real root, or to have all of them in the same
 # environment.
 #
-#   VNG=/path/to/vng gwlab/vm.sh OUT_DIR steady --impl flowsync_bpf --set bin=... [...]
+#   VNG=/path/to/vng gwlab/vm.sh OUT_DIR steady --impl flowsync [--set bin=... ...]
 #
 # OUT_DIR (on the host) receives the results; everything after it goes to
 # `python3 -m gwlab`. Paths in --set must be absolute.

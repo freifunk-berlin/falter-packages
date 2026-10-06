@@ -1,34 +1,30 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * flowsync - scoped conntrack flow announcer for active-active gateways
+ * flowsync - flow tables for active-active gateways without conntrack
  *
- * TX: announce new (and, every interval, all) wanted IPv6 conntrack entries
- *     to all peers as binary UDP records.
- * RX: inject announced flows into the local conntrack table with a timeout
- *     and a ct mark bit, so fw4's "ct state established" accepts the reply.
+ * Forwarded IPv6 bypasses conntrack. Two tc programs on the uplink keep and
+ * consult two BPF maps instead (dp.h): the flows this gateway forwarded out
+ * (written by the packet path) and the flows the other gateways announced
+ * (written by this daemon). A packet from the uplink whose flow is in either
+ * gets a mark, and the firewall accepts the mark.
  *
- * Soft state only: no acks, no sequence numbers, no DESTROY propagation.
+ * TX: announce new (and, every interval, all) wanted local flows to all
+ *     peers as binary UDP records.
+ * RX: put announced flows into the remote map with element_timeout.
  *
- * Three rules keep stale flows from propagating forever:
- *  1. a peer never refreshes an entry this gateway did not create (NLM_F_EXCL
- *     for everything but our own copies), so native entries live on packets
- *     alone;
- *  2. a native entry is announced while it exists, a copy only with evidence
- *     of a packet since the last round: its remaining timeout deviates from
- *     plain decay, which only a packet can cause (a refresh sets exactly
- *     element_timeout);
- *  3. ownership of copies is re-learned from the kernel every refresh round
- *     (the mark), so restarts, evictions and flushes heal themselves.
+ * Soft state only: no acks, no sequence numbers, no close propagation. Only
+ * the local map is announced and only packets write it, so nothing can keep
+ * itself alive.
  *
  * util.c     logging, time, address and prefix helpers
- * policy.c   the filter applied identically on TX and RX
+ * policy.c   which flows are synced, applied identically on TX and RX
  * config.c   command line options (named after the UCI options)
- * ctnl.c     ctnetlink message parsing and building (libmnl)
  * wire.c     the binary record format
  * udp.c      UDP socket, peers, datagram assembly and fan-out
- * tx.c       conntrack events and the streaming refresh dumps
- * inject.c   conntrack injection over netlink
- * rx.c       datagram handling and the per-tuple table
+ * dp.c       the datapath: tc programs, maps, new-flow events
+ * fw.c       the nftables rules the datapath needs, kept in place
+ * tx.c       new-flow events and the refresh rounds
+ * rx.c       datagram handling
  * resync.c   heartbeats, resync requests, peer liveness
  * status.c   counters, gauges, status file
  * main.c     main loop and subcommands
@@ -44,8 +40,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <syslog.h>
-
-struct nlmsghdr;
 
 /* wire format, see wire.c */
 #define WIRE_VERSION	1
@@ -64,37 +58,18 @@ struct nlmsghdr;
 
 #define MAX_PEERS	32
 #define MAX_PREFIXES	256
-/*
- * Per-tuple RX table: slots (power of two, 80 bytes each) and the linear
- * probing window. A tuple whose window is full of live tuples evicts one,
- * which then misses a refresh; three misses in a row expire the copy. A full
- * window stays full, so a short window churns the same tuples every round
- * (measured: 8 probes lose copies at 100k flows, 32 still a couple). With 64
- * probes 131072 slots settle at 100k flows after the first round; 120k flows
- * keep churning. Raise RX_TABLE_SIZE for more.
- */
-#define RX_TABLE_SIZE	(1 << 17)
-#define RX_PROBES	64
-/* injection: netlink sequence -> record ring for error reports, and the
- * re-creates after ENOENT per flush: one receive pass can carry DRAIN_MAX
- * full datagrams, and after a flush every record in it may be a refresh of a
- * copy that is gone, so the retry list holds a whole pass */
-#define INJ_RING	4096
+/* refresh queue, how many map entries one walk step reads, and how many
+ * steps one loop iteration takes at most */
+#define Q_SIZE		4096
+#define WALK_BATCH	512
+#define WALK_STEPS	16
 #define DRAIN_MAX	64
-#define INJ_RETRY	(DRAIN_MAX * WIRE_MAX_RECORDS)
-/*
- * Refresh queue. A dump chunk is at most 32 KiB (kernel cap) and an IPv6 UDP
- * entry serializes to about 200 bytes, so a chunk holds at most ~170 entries.
- * A chunk is only read when Q_CHUNK_RESERVE entries are free.
- */
-#define Q_SIZE		2048
-#define Q_CHUNK_RESERVE	512
-#define INJECT_BATCH	(32 * 1024)
-#define NL_BUF_SIZE	(32 * 1024)
-#define DUMP_RCVBUF	(256 * 1024)
 #define LOG_INTERVAL_MS	10000
 #define EARLY_ROUND_MS	1000	/* delay of the round pulled forward after lost events */
 #define STATUS_FILE	"/var/run/flowsync/status"
+#define BPF_OBJECT	"/lib/bpf/flowsync.o"
+#define PIN_DIR		"/sys/fs/bpf/flowsync"
+#define FW_TABLE	"fw4"
 
 struct prefix {
 	struct in6_addr addr;
@@ -108,15 +83,19 @@ struct prefix_list {
 
 struct config {
 	bool debug;
+	bool bypass;			/* forward accepted packets from tc, past netfilter */
 	bool bind_set;
 	struct in6_addr bind;
 	char ifname[IFNAMSIZ];		/* the sync socket's device, "" for any */
-	const char *user;		/* run as this user once the sockets are open */
+	char uplink[IFNAMSIZ];		/* the device the tc programs attach to */
+	const char *user;		/* run as this user once everything is open */
+	const char *bpf_object, *pin_dir, *fw_table;
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
-	unsigned long ct_mark, ct_mark_mask;
-	unsigned long max_copies;	/* 0: derived at startup, see rx_limit_init() */
-	unsigned long max_copies_client;	/* per client prefix; 0: no limit */
-	unsigned long client_prefix_len;	/* that prefix's length, 1..64 */
+	unsigned long mark;		/* packet mark of accepted packets */
+	unsigned long max_flows;	/* local map entries */
+	unsigned long max_copies;	/* remote map entries */
+	/* lifetime of a local flow after its last packet out, seconds */
+	unsigned long t_udp, t_tcp, t_tcp_syn, t_tcp_close, t_other;
 	unsigned long resync_rate;	/* tx_rate of a round answering a resync request */
 	bool proto[256];
 	unsigned int n_proto;
@@ -127,62 +106,20 @@ struct config {
 	struct prefix_list prefix, exclude, exclude_dst;
 };
 
-/* original tuple, client -> server; ports in host byte order */
+/* client -> server; ports in host byte order */
 struct flow {
 	struct in6_addr c, s;
 	uint16_t cport, sport;
 	uint8_t proto;
 };
 
-/* what the TX side reads from a conntrack entry */
-struct ct_entry {
-	struct flow f;
-	uint32_t status;	/* IPS_* */
-	uint32_t mark;
-	uint32_t timeout;	/* remaining seconds */
-	uint32_t id;		/* CTA_ID, network order as the kernel sent it */
-	uint8_t tcp_state;	/* TCP_CONNTRACK_*, CT_NO_TCP_STATE if none */
-};
-#define CT_NO_TCP_STATE	0xff
-
-/*
- * Per-tuple RX state. t_rx is the last announcement received for the tuple
- * (0: empty slot), t_inject the last create we sent for it (the duplicate
- * filter's clock, 0: none to filter against). own says that the entry in the
- * kernel table is a copy created by us; only then is a refresh sent,
- * everything else is a create with NLM_F_EXCL. own is set (rx_own) on create,
- * tentatively, and by our dump of marked entries; it is cleared by the
- * injection error (EEXIST, ENOENT) and by any DESTROY of the copy, and revoked
- * by the sweep after a complete round that started after own_since and did
- * not see the copy (seen_round).
- */
-struct rx_ent {
-	struct flow f;
-	uint32_t t_rx;
-	uint32_t t_ann;		/* last announcement of the tuple from a peer */
-	uint32_t t_inject;
-	uint32_t seen_round;
-	uint32_t seen_at;	/* when the dump last saw the copy ... */
-	uint32_t seen_timeout;	/* ... and its remaining timeout then */
-	uint32_t checked_at;	/* when an EEXIST for it was last looked up */
-	uint32_t own_since;	/* when own was last set */
-	uint32_t gone_gen;	/* dump generation at the copy's last DESTROY, 0: none */
-	bool own;
-};
-
-enum rx_class { RX_DUP, RX_NOTED, RX_CREATE };
-enum refresh_do { REFRESH_NO, REFRESH_HELD, REFRESH_YES };
-enum inj_kind { INJ_CREATE, INJ_REFRESH, INJ_CHECK, INJ_DELETE, INJ_PROMOTE };
-enum inj_acct { ACCT_OK, ACCT_RETRY, ACCT_ERROR };
-
 #define COUNTERS(X) \
-	X(tx_events) X(tx_scanned) X(tx_refresh) X(tx_copies) X(tx_promoted) X(tx_datagrams) X(tx_errors) \
-	X(tx_refresh_dropped) X(tx_control) X(tx_resync) X(refresh_rounds) X(refresh_overrun) X(refresh_errors) \
-	X(ev_recv) X(ev_own) X(ev_overruns) X(ds_overruns) \
+	X(tx_events) X(tx_refresh) X(tx_datagrams) X(tx_errors) X(tx_control) X(tx_resync) \
+	X(refresh_rounds) X(refresh_overrun) X(refresh_errors) \
+	X(ev_recv) X(ev_overruns) \
 	X(rx_datagrams) X(rx_control) X(rx_resync) X(rx_records) X(rx_bad_peer) X(rx_policy) \
-	X(rx_parse) X(rx_version) X(rx_dup) X(rx_evictions) X(rx_own_lost) X(rx_limited) X(rx_limited_client) \
-	X(inject_created) X(inject_refreshed) X(inject_held) X(inject_exists) X(inject_replaced) X(inject_gone) X(inject_errors) \
-	X(copies_lost)
+	X(rx_parse) X(rx_version) X(rx_limited) X(rx_errors) \
+	X(local_expired) X(remote_expired) X(dp_attached) X(fw_repaired)
 
 struct counters {
 #define X(name) uint64_t name;
@@ -193,13 +130,14 @@ struct counters {
 /* snapshots, not counters: written to the status file and the interval log */
 struct gauges {
 	uint64_t refresh_ms;		/* wall time of the last complete refresh round */
-	uint64_t refresh_entries;	/* entries queued by the last complete round */
+	uint64_t refresh_entries;	/* flows announced by the last complete round */
 	uint64_t loop_max_ms;		/* longest handler run between two polls, per interval */
-	uint64_t copies;		/* our copies in the table, last complete round */
-	uint64_t copies_live;		/* of these, with traffic since their last refresh */
-	uint64_t copies_offloaded;	/* of these, in the flowtable (fw4 flow offloading) */
-	uint64_t owned;			/* our copies: slots that own one (live, the limit) */
+	uint64_t local;			/* live local flows, last complete round */
+	uint64_t copies;		/* live remote flows, last complete round */
 	bool refresh_running;
+	bool attached;			/* the tc programs are on the uplink */
+	bool bypass;			/* the bypass is on */
+	bool fw_ok;			/* the nftables rules are in place */
 };
 
 extern struct config cfg;
@@ -226,27 +164,15 @@ int read_sysctl(const char *path, unsigned long *v);
 
 /* policy.c */
 const char *proto_name(uint8_t proto);
+const char *proto_str(uint8_t proto, char *buf, size_t len);
 int proto_num(const char *s);
+bool proto_ports(uint8_t proto);
 bool skip_port(unsigned int port);
 bool wanted(const struct flow *f);
-bool is_copy(uint32_t mark);
-bool copy_live(uint32_t status, uint32_t remaining, uint32_t prev_remaining, uint32_t prev_at,
-	       uint32_t now);
 
 /* config.c */
 int parse_args(int argc, char **argv);
 void usage(FILE *out);
-
-/* ctnl.c */
-int ct_parse(const struct nlmsghdr *nlh, struct ct_entry *e);
-void ct_build_new(struct nlmsghdr *nlh, const struct flow *f, bool create);
-void ct_build_get(struct nlmsghdr *nlh, const struct flow *f);
-void ct_build_delete(struct nlmsghdr *nlh, const struct flow *orig, uint32_t id);
-void ct_build_promote(struct nlmsghdr *nlh, const struct flow *f);
-void flow_reverse(struct flow *r, const struct flow *f);
-bool flow_eq(const struct flow *a, const struct flow *b);
-void ct_build_dump(struct nlmsghdr *nlh, uint8_t proto, uint32_t status, uint32_t status_mask,
-		   uint32_t mark, uint32_t mark_mask);
 
 /* wire.c */
 enum { PARSE_OK, PARSE_ERR, PARSE_VERSION };
@@ -273,60 +199,60 @@ bool dgram_held(void);
 bool dgram_resend(void);
 unsigned int dgram_control(uint8_t flags);
 
+/* dp.c */
+struct fs_stats;
+struct dp_walk;
+enum dp_map { DP_LOCAL, DP_REMOTE };
+/* one entry: for DP_LOCAL the time since its last packet and the lifetime
+ * that leaves, for DP_REMOTE the time left; left 0: expired */
+struct dp_ent {
+	struct flow f;
+	uint32_t age, left;
+	uint8_t flags;
+};
+int dp_open(bool load);
+bool dp_tick(void);
+int dp_detach(void);
+int dp_events_fd(void);
+void dp_handle_events(void (*cb)(const struct flow *f));
+uint32_t dp_now(void);
+struct dp_walk *dp_walk_start(enum dp_map which);
+int dp_walk_next(struct dp_walk *w, struct dp_ent *out, unsigned int max, bool *done);
+void dp_walk_end(struct dp_walk *w);
+int dp_delete(enum dp_map which, const struct flow *f);
+void dp_remote_add(const struct flow *f);
+void dp_remote_flush(void);
+int dp_get(enum dp_map which, const struct flow *f, struct dp_ent *out);
+int dp_stats(struct fs_stats *sum);
+int dp_set_bypass(bool on);
+int dp_get_bypass(void);
+
+/* fw.c */
+int fw_open(void);
+int fw_fd(void);
+void fw_handle(void);
+void fw_tick(void);
+void fw_remove(void);
+
 /* tx.c */
-int ev_open(void);
-int events_fd(void);
-void handle_events(void);
-void ev_filter(int fd, bool copies);
-int refresh_fd(void);
-bool refresh_wants_read(void);
+void tx_event(const struct flow *f);
+void tx_events_done(void);
 int refresh_start(void);
 void refresh_close(void);
-void handle_refresh(void);
 void refresh_tick(void);
 void refresh_fast(bool fast);
 size_t refresh_pending(void);
 bool events_lost(void);
-void events_reopened(void);
 int refresh_pace_ms(void);
 
-/* inject.c */
-int inj_open(void);
-int inject_fd(void);
-unsigned int inject_portid(void);
-void inj_drain(void);
-void inj_flush(void);
-void inj_add(const struct flow *f, struct rx_ent *e, enum inj_kind kind);
-void inj_add_promote(const struct flow *f);
-enum inj_acct inj_account(enum inj_kind kind, int err, struct rx_ent *e);
-
 /* rx.c */
-int rx_init(unsigned int size);
 void handle_rx(void);
-struct rx_ent *rx_find(const struct flow *f);
-struct rx_ent *rx_insert(const struct flow *f, uint32_t now);
-enum rx_class rx_classify(struct rx_ent *e, uint32_t now);
-enum refresh_do refresh_due(const struct rx_ent *e, uint32_t remaining, uint32_t prev_seen,
-			    uint32_t now);
-struct rx_ent *rx_seed(const struct flow *f, uint32_t round, uint32_t now);
-void rx_sweep(uint32_t round, uint32_t round_start);
-void rx_disown_all(void);
-void rx_own(struct rx_ent *e, uint32_t now);
-void rx_disown(struct rx_ent *e);
-void rx_limit_init(void);
-bool rx_admit(const struct flow *f);
-void rx_local_refresh(void);
 
 /* resync.c */
-int destroy_open(void);
-int destroy_fd(void);
-void handle_destroy(void);
 void resync_request(void);
-void resync_destroys_pending(bool pending);
 void resync_from(int peer);
 bool resync_round_wanted(void);
 void resync_round_pulled(void);
-bool resync_own_round_wanted(void);
 void resync_round_started(void);
 void resync_tick(void);
 void resync_init(void);
