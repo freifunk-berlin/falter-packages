@@ -131,10 +131,9 @@ def parse(spec):
 
 
 MATRICES = {
-    # production-like first; then offloading everywhere and mixed, then the
-    # pure stateful firewall, and two gateways
-    "default": ["g3 plain ack", "g3 offload ack", "g3 mixed ack", "g3 plain noack",
-                "g3 mixed noack", "g2 plain ack"],
+    # production-like first (the stateless ACK budget), then without it, and
+    # two gateways. Flow offloading needs conntrack and is not part of this.
+    "default": ["g3 plain ack", "g3 plain noack", "g2 plain ack"],
     "quick": ["g3 plain ack"],
 }
 

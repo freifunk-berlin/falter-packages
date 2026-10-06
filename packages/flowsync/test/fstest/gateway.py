@@ -1,5 +1,5 @@
-"""A gateway: profile-driven fw4-like ruleset, the flowsync daemon, conntrack
-queries and controls on the sync path."""
+"""A gateway: an fw4-like ruleset, the flowsync daemon with its tc programs
+on the uplink (wan0), flow table queries and controls on the sync path."""
 import os
 import re
 import sys
@@ -12,6 +12,21 @@ PREFIX = "2001:db8:100::/44"        # synced client prefix
 XDST = "2001:db8::/32"              # the mesh: never synced as a server
 SERVER_NET = "2a00:1450:4001::/48"  # where the test's servers live
 MARK = 0x01000000
+
+# what the daemon installs one interval after its first start (fw.c); the
+# tests put it there from the beginning, so that conntrack never accepts a
+# reply in the daemon's place
+OWN_TABLE = """
+table inet flowsync {
+	chain prerouting {
+		type filter hook prerouting priority raw; policy accept;
+		meta nfproto ipv6 fib daddr type unicast notrack
+	}
+	chain defrag {
+		ct state untracked accept
+	}
+}
+"""
 
 
 def children(pid):
@@ -31,45 +46,36 @@ def children(pid):
 
 
 class Entry:
-    """one conntrack entry as ctquery prints it, or none"""
-    RE = re.compile(r"timeout=(\d+)s (SEEN_REPLY|UNREPLIED)( ASSURED)?( OFFLOAD)? mark=0x([0-9a-f]+)"
-                    r"(?: tcp_state=(-?\d+))?")
+    """one flow in a gateway's tables, as `flowsync flow` prints it"""
 
     def __init__(self, text):
-        self.raw = text.strip()
-        m = self.RE.search(self.raw)
-        self.alive = m is not None
-        # the original tuple is the reverse of the one asked for
-        self.reversed = self.alive and self.raw.endswith(" reversed")
-        if not m and self.raw != "none":
-            # a failed query is not an absent entry (wait_for retries it)
-            raise RuntimeError("ctquery: %s" % (self.raw or "no output"))
-        if not m:
-            self.timeout, self.seen_reply, self.assured, self.offloaded = 0, False, False, False
-            self.mark, self.tcp_state = 0, None
-            return
-        self.timeout = int(m.group(1))
-        self.seen_reply = m.group(2) == "SEEN_REPLY"
-        self.assured = bool(m.group(3))
-        self.offloaded = bool(m.group(4))
-        self.mark = int(m.group(5), 16)
-        # -1: no protocol info in the dump (offloaded entries)
-        self.tcp_state = int(m.group(6)) if m.group(6) not in (None, "-1") else None
+        self.raw = " | ".join(text.split("\n"))
+        m = re.search(r"local left=(\d+) age=(\d+) flags=(\d+)", text)
+        self.local_left = int(m.group(1)) if m else 0
+        self.age = int(m.group(2)) if m else None
+        self.flags = int(m.group(3)) if m else 0
+        m = re.search(r"remote left=(\d+)", text)
+        self.remote_left = int(m.group(1)) if m else 0
+        if "local" not in text or "remote" not in text:
+            # a failed query is not an absent flow (wait_for retries it)
+            raise RuntimeError("flowsync flow: %s" % (text.strip() or "no output"))
 
     @property
-    def is_copy(self):
-        return self.alive and bool(self.mark & MARK)
+    def local(self):
+        """alive in the local table: this gateway forwarded it out"""
+        return self.local_left > 0
 
     @property
-    def is_native(self):
-        return self.alive and not self.mark & MARK
+    def remote(self):
+        """alive in the remote table: a peer announced it"""
+        return self.remote_left > 0
 
-    def carries_traffic(self, element_timeout):
-        """saw a packet: ASSURED, and offloaded or above what a refresh sets"""
-        return self.alive and self.assured and (self.offloaded or self.timeout > element_timeout)
+    @property
+    def alive(self):
+        return self.local or self.remote
 
     def __str__(self):
-        return self.raw or "none"
+        return self.raw
 
 
 class Gateway:
@@ -80,6 +86,7 @@ class Gateway:
         self.addr = "10.0.0.%d" % (idx + 1)
         self.proc = None
         self.opts = []
+        self.pin = "/sys/fs/bpf/fstest-%d-g%d" % (os.getpid(), idx)
         self.bind(env)
 
     def bind(self, env):
@@ -93,42 +100,25 @@ class Gateway:
 
     # ------------------------------------------------------------- setup
     def setup(self):
-        self.sysctls()
+        self.node.sysctl(**{"net.ipv6.conf.all.forwarding": 1})
         self.node.nft(self.ruleset())
+        self.node.nft(OWN_TABLE)
 
-    def sysctls(self):
-        """the scaled timers (scenarios may change them; reset() restores)"""
-        t = self.env.timers
-        self.node.sysctl(**{
-            "net.ipv6.conf.all.forwarding": 1,
-            "net.netfilter.nf_conntrack_udp_timeout": t["udp"],
-            "net.netfilter.nf_conntrack_udp_timeout_stream": t["udp_stream"],
-            "net.netfilter.nf_conntrack_tcp_timeout_syn_sent": t["tcp_syn_sent"],
-            "net.netfilter.nf_conntrack_tcp_timeout_unacknowledged": 300,
-            "net.netfilter.nf_conntrack_tcp_timeout_established": 432000,   # kernel default
-            "net.netfilter.nf_conntrack_checksum": 0,
-        })
-        ft = "/proc/sys/net/netfilter/nf_flowtable_udp_timeout"
-        if self.p.offload:
-            for proto in ("udp", "tcp"):
-                self.node.sh("f=/proc/sys/net/netfilter/nf_flowtable_%s_timeout; "
-                             "[ -w $f ] && echo %d > $f || true" % (proto, t["flowtable"]))
-        self.ft_idle = int(self.node.read(ft) or 30) if self.p.offload else 0
-
-    def ruleset(self):
-        off = self.p.offload
-        ack = self.p.ack
+    def ruleset(self, accept_rule=True):
+        """fw4 as on the gateways: forward policy reject, established accept
+        (conntrack sees nothing forwarded once the daemon's table is in), the
+        mesh may go anywhere, optionally the stateless budget for TCP
+        segments with ACK or RST. The accept rule for marked packets is the
+        one the package ships as an fw4 include."""
         return """
 table inet fw {
-	counter fwd_inv {}
+	counter fwd_mark {}
 	counter fwd_est {}
 	counter fwd_ack {}
 	counter fwd_rej {}
-%(ft)s
 	chain forward {
 		type filter hook forward priority 0; policy drop;
-%(offload)s
-		ct state invalid counter name fwd_inv
+%(accept)s
 		ct state established,related counter name fwd_est accept
 		iifname "mesh0" accept
 %(ack)s
@@ -143,19 +133,28 @@ table inet sync {
 	}
 }
 """ % {
-            "ft": "\tflowtable ft {\n\t\thook ingress priority 0; devices = { mesh0, wan0 };\n\t}"
-                  if off else "",
-            "offload": "\t\tmeta l4proto { tcp, udp } flow offload @ft" if off else "",
+            "accept": ('\t\tmeta nfproto ipv6 meta mark & 0x%08x == 0x%08x counter name fwd_mark '
+                       'accept comment "flowsync"' % (MARK, MARK)) if accept_rule else "",
             "ack": ("\t\tmeta nfproto ipv6 tcp flags & ack == ack limit rate 5000/second "
                     "burst 2500 packets counter name fwd_ack accept\n"
                     "\t\tmeta nfproto ipv6 tcp flags & rst == rst limit rate 1000/second "
-                    "burst 500 packets accept") if ack else "",
+                    "burst 500 packets accept") if self.p.ack else "",
         }
 
     # ------------------------------------------------------------ daemon
+    def base_opts(self):
+        """what every flowsync command on this gateway needs: where the maps
+        are, and the timeouts (the flow commands compute lifetimes from them)"""
+        t = self.env.timers
+        return ["-U", "wan0", "--fw-table", "fw", "--pin-dir", self.pin,
+                "--bpf-object", self.env.bpf_object,
+                "--udp-timeout", t["udp"], "--tcp-timeout", t["tcp"],
+                "--tcp-syn-timeout", t["tcp_syn"], "--tcp-close-timeout", t["tcp_close"],
+                "--other-timeout", t["other"]]
+
     def start(self, *opts, debug=True):
         """start flowsync with the standard options plus opts (later options win);
-        debug=False for scenarios that inject thousands of records a second"""
+        debug=False for scenarios with thousands of records a second"""
         env = self.env
         if self.proc:
             self.stop()
@@ -171,14 +170,15 @@ table inet sync {
                 peers += ["-e", g.addr]
         argv = [sys.executable, env.ptyrun, env.flowsync, "-b", self.addr, "-I", "eth0"] + peers + [
             "-x", PREFIX, "-D", XDST, "-i", env.I, "-t", env.E, "-s", self.status
-        ] + (["-d"] if debug else []) + self.opts + ["run"]
+        ] + self.base_opts() + (["-d"] if debug else []) + self.opts + ["run"]
         log = open(self.logpath, "a")
         self.proc = self.node.spawn(*argv, stdout=log, stderr=log)
         log.close()
 
     def stop(self):
         """SIGTERM to flowsync itself (ptyrun's child, in a session of its own),
-        so it shuts down cleanly; then the wrapper"""
+        so it shuts down cleanly; then the wrapper. The programs stay on the
+        uplink and the maps pinned."""
         if self.proc:
             for pid in children(self.proc.pid):
                 try:
@@ -197,6 +197,14 @@ table inet sync {
     def restart(self, *opts):
         self.stop()
         self.start(*(opts or self.opts), debug=getattr(self, "debug", True))
+
+    def cmd(self, *args, check=False):
+        """a flowsync subcommand on this gateway's maps"""
+        return self.node.run(self.env.flowsync, *self.base_opts(), *args, check=check)
+
+    def detach(self):
+        """programs off the uplink, maps gone, rules gone: as after a reboot"""
+        self.cmd("detach")
 
     def up(self):
         return os.path.exists(self.status)
@@ -244,33 +252,25 @@ table inet sync {
             time.sleep(0.05)
         return False
 
-    # --------------------------------------------------------- conntrack
-    def ct(self, flow, proto=None, sport=None):
-        out = self.node.run(self.env.ctquery, "get", proto or flow.proto, flow.c, flow.cport,
-                            flow.s, sport or flow.sport, check=False)
-        return Entry(out)
+    # ------------------------------------------------------- flow tables
+    def ft(self, flow, proto=None, sport=None):
+        return self.ft_tuple(proto or flow.proto, flow.c, flow.cport, flow.s, sport or flow.sport)
 
-    def ct_tuple(self, proto, c, cport, s, sport):
-        """the entry for an arbitrary original tuple"""
-        return Entry(self.node.run(self.env.ctquery, "get", proto, c, cport, s, sport, check=False))
+    def ft_tuple(self, proto, c, cport, s, sport):
+        return Entry(self.cmd("flow", c, cport, s, sport, proto))
 
-    def set_sysctl(self, **kv):
-        """net.netfilter.nf_conntrack_<key>=value for short keys, e.g. udp_timeout=300"""
-        self.node.sysctl(**{"net.netfilter.nf_conntrack_" + k: v for k, v in kv.items()})
-
-    def count(self, proto, which="all"):
-        out = self.node.run(self.env.ctquery, "count", proto, which, check=False)
-        m = re.search(r"count=(\d+)", out)
-        return int(m.group(1)) if m else -1
-
-    def flush(self):
-        self.node.run(self.env.ctquery, "flush", check=False)
+    def flows(self, which):
+        """lines of `flowsync flows local|remote`"""
+        out = self.cmd("flows", which)
+        return [ln for ln in out.split("\n") if ln.startswith(which)]
 
     def ct_count(self):
+        """conntrack entries on the gateway (the sync socket's own included)"""
         return int(self.node.read("/proc/sys/net/netfilter/nf_conntrack_count") or 0)
 
     def fwc(self, name):
-        """a forward chain counter: inv, est, ack, rej (not for offloaded packets)"""
+        """a forward chain counter: mark (accepted on a flow), est (accepted
+        by conntrack), ack (stateless budget), rej"""
         out = self.node.run("nft", "list", "counter", "inet", "fw", "fwd_" + name, check=False)
         m = re.search(r"packets (\d+)", out)
         return int(m.group(1)) if m else 0
@@ -294,27 +294,17 @@ table inet sync {
     def unblock_sync(self):
         self.node.run("nft", "flush", "chain", "inet", "sync", "in")
 
-    # ---------------------------------------------------- forwarded traffic
-    def hold(self, flow):
-        """drop the server's packets of a flow before conntrack sees them (TCP
-        retransmits them), e.g. until the copy is in place"""
-        self.node.nft("table inet hold {\n\tchain pre {\n\t\ttype filter hook prerouting "
-                      "priority -400;\n\t\tip6 saddr %s ip6 daddr %s drop\n\t}\n}\n"
-                      % (flow.s, flow.c))
-
-    def release(self):
-        self.node.sh("nft delete table inet hold 2>/dev/null", check=False)
-
     def reset(self):
-        """back to the state after setup(), for the next scenario"""
+        """back to the state after setup(), for the next scenario: no daemon,
+        no programs, empty maps, the rules as built"""
         self.stop()
-        self.unblock_sync()
-        self.release()
-        self.node.run("nft", "reset", "counters", "table", "inet", "fw", check=False)
-        self.flush()
-        self.sysctls()
+        self.detach()
+        self.node.sh("nft delete table inet fw; nft delete table inet sync; "
+                     "nft delete table inet flowsync", check=False)
         self.node.sh("ip link del dum0 2>/dev/null", check=False)
+        self.setup()
         self.opts = []
 
     def close(self):
         self.stop()
+        self.detach()

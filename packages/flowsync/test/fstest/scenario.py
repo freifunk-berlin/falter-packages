@@ -8,9 +8,8 @@ profiles, returns None to run or a reason to skip; once: profile-independent,
 runs in the first combination of a run only; tags: for selection ("slow" is
 left out unless named, and so is "repro": a reproducer of a known defect
 that fails until its fix lands; "heavy" runs alone, one at a time); depends: the
-gateway properties the scenario's outcome depends on, of "offload" and "ack"
-(default: offload, and the ACK rule for scenarios tagged "tcp", the only
-traffic it applies to). A combination equal to an earlier one in those
+gateway properties the scenario's outcome depends on (default: the ACK rule
+for scenarios tagged "tcp", the only traffic it applies to, nothing else). A combination equal to an earlier one in those
 properties is not run again for the scenario.
 """
 
@@ -26,7 +25,7 @@ class Scenario:
         self.tags = set(tags)
         self.once = once
         self.depends = set(depends if depends is not None else
-                           {"offload", "ack"} if "tcp" in self.tags else {"offload"})
+                           {"ack"} if "tcp" in self.tags else set())
         self.doc = (fn.__doc__ or "").strip()
 
     def skip_reason(self, combo, first):

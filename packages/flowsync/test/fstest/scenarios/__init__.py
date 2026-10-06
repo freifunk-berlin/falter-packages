@@ -1,2 +1,2 @@
 """All scenario modules; importing them registers the scenarios."""
-from . import abuse, basic, firewall, load, netdev, restart, tcp  # noqa: F401
+from . import basic, frag, load, ops, tcp  # noqa: F401

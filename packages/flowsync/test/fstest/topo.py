@@ -93,7 +93,6 @@ class Topology:
             for p in n.spawned:
                 kill(p)
             n.spawned = []
-            n.run(self.env.ctquery, "flush", check=False)
             n.sh("nft delete table inet ep 2>/dev/null", check=False)
             n.nft("table inet ep {\n\tchain in {\n\t\ttype filter hook input priority 0;\n\t}\n}\n")
         for g in self.g:

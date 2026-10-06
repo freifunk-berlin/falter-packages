@@ -1,4 +1,4 @@
-"""python3 -m fstest --flowsync PATH --ctquery PATH [options]
+"""python3 -m fstest --flowsync PATH --bpf-object PATH [options]     (as root)
 
   --matrix NAME       default | quick | full (default: default)
   --profile SPEC      one combination instead of a matrix, repeatable
@@ -24,7 +24,7 @@ from .scenario import load
 def main():
     ap = argparse.ArgumentParser(prog="fstest", usage=__doc__)
     ap.add_argument("--flowsync")
-    ap.add_argument("--ctquery")
+    ap.add_argument("--bpf-object", dest="bpf_object")
     ap.add_argument("--matrix", default="default")
     ap.add_argument("--profile", dest="profile_list", action="append", default=[])
     ap.add_argument("--scenarios", nargs="*", default=[])
@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--verbose", "-v", action="store_true")
     ap.add_argument("--quiet", "-q", action="store_true")
     ap.add_argument("--list", action="store_true")
-    # child mode, started by the parent inside unshare -Urn
+    # child mode, started by the parent inside unshare -n
     ap.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--first", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--lockdir", help=argparse.SUPPRESS)
@@ -54,8 +54,10 @@ def main():
             print("matrix %s: %s" % (name, "; ".join(specs)))
         print("matrix full: %d combinations" % len(matrix.full()))
         return 0
-    if not args.flowsync or not args.ctquery:
-        ap.error("--flowsync and --ctquery are required")
+    if not args.flowsync or not args.bpf_object:
+        ap.error("--flowsync and --bpf-object are required")
+    if os.geteuid():
+        ap.error("needs root: BPF programs cannot be loaded from a user namespace")
     return runner.parent(args)
 
 

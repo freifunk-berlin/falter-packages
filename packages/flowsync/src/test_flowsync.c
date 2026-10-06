@@ -14,13 +14,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libmnl/libmnl.h>
-#include <linux/netfilter/nfnetlink.h>
-#include <linux/netfilter/nfnetlink_conntrack.h>
-#include <linux/netfilter/nf_conntrack_common.h>
-#include <linux/netfilter/nf_conntrack_tcp.h>
 
 #include "flowsync.h"
+#include "dp.h"
+
+/* config.c sets it; status.c, which defines it, needs the datapath */
+const char *status_path;
 
 static unsigned int checks, failures;
 
@@ -68,6 +67,12 @@ static struct flow mkflow(uint8_t proto, uint16_t cport, uint16_t sport)
 	f.sport = sport;
 	f.proto = proto;
 	return f;
+}
+
+static bool flow_eq(const struct flow *a, const struct flow *b)
+{
+	return a->proto == b->proto && a->cport == b->cport && a->sport == b->sport &&
+	       IN6_ARE_ADDR_EQUAL(&a->c, &b->c) && IN6_ARE_ADDR_EQUAL(&a->s, &b->s);
 }
 
 static void test_prefix(void)
@@ -128,8 +133,7 @@ static void setup_cfg(void)
 	cfg.interval = 30;
 	cfg.element_timeout = 90;
 	cfg.batch_lines = MAX_BATCH;
-	cfg.ct_mark = 0x01000000;
-	cfg.ct_mark_mask = 0x01000000;
+	cfg.mark = 0x01000000;
 	cfg.proto[IPPROTO_UDP] = true;
 	cfg.proto[IPPROTO_TCP] = true;
 	cfg.n_proto = 2;
@@ -181,34 +185,6 @@ static void test_policy(void)
 	CHECK(!wanted(&g));
 	g = f; g.s = a6("::");
 	CHECK(!wanted(&g));
-
-	/* mark and traffic evidence */
-	CHECK(!is_copy(0));
-	CHECK(is_copy(0x01000000));
-	CHECK(is_copy(0x01000001));			/* other bits do not matter */
-	CHECK(!is_copy(0x00000001));
-	/* no baseline (restart, evicted slot): no evidence, however long the timeout */
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 91, 0, 0, 1000));
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 7000, 0, 0, 1000));
-	/* baseline from our own create/refresh 10 s ago (90 s): a packet since */
-	CHECK(copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 120, 90, 990, 1000));
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 90, 90, 1000, 1000));	/* exactly a refresh */
-	CHECK(!copy_live(IPS_SEEN_REPLY, 120, 90, 990, 1000));		/* never saw a packet */
-	/* seen 30 s ago with 120 left: plain decay leaves 90, a packet resets to 120 */
-	CHECK(copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 120, 120, 970, 1000));
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 91, 120, 970, 1000));
-	/* a TCP copy with days left is alive only if the timeout stopped decaying */
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 431970, 432000, 970, 1000));
-	CHECK(copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 432000, 432000, 970, 1000));
-	/* a packet that lowers the timeout is evidence too: an established TCP
-	 * copy (days) capped to unacknowledged (300 s) by a server segment */
-	CHECK(copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 300, 432000, 990, 1000));
-	CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 431989, 432000, 990, 1000));	/* decay, rounding */
-	/* previous sighting already decayed to nothing */
-	CHECK(copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 100, 5, 900, 1000));
-	cfg.ct_mark = 0;
-	CHECK(!is_copy(0x01000000));
-	cfg.ct_mark = 0x01000000;
 }
 
 static void test_wire(void)
@@ -286,488 +262,45 @@ static void test_wire(void)
 	CHECK(flow_eq(&f, &g) && g.proto == IPPROTO_TCP);
 }
 
-static int attr_cb(const struct nlattr *attr, void *data)
+/* the lifetimes the tc programs and the daemon both compute */
+static void test_ttl(void)
 {
-	uint64_t *seen = data;
+	struct fs_cfg c = { .t_udp = 180, .t_tcp_syn = 120, .t_tcp_est = 7440, .t_tcp_close = 60,
+			    .t_other = 600 };
 
-	if (mnl_attr_get_type(attr) < 64)
-		*seen |= (uint64_t)1 << mnl_attr_get_type(attr);
-	return MNL_CB_OK;
+	CHECK(fs_ttl(&c, IPPROTO_UDP, 0) == 180);
+	CHECK(fs_ttl(&c, IPPROTO_UDP, FS_F_EST | FS_F_CLOSING) == 180);
+	CHECK(fs_ttl(&c, IPPROTO_TCP, 0) == 120);
+	CHECK(fs_ttl(&c, IPPROTO_TCP, FS_F_EST) == 7440);
+	CHECK(fs_ttl(&c, IPPROTO_TCP, FS_F_EST | FS_F_CLOSING) == 60);
+	CHECK(fs_ttl(&c, IPPROTO_TCP, FS_F_CLOSING) == 60);
+	CHECK(fs_ttl(&c, 47, 0) == 600);
+	/* the map key has no padding the compiler chose */
+	CHECK(sizeof(struct fs_key) == 40);
+	CHECK(sizeof(struct fs_local) == 8);
 }
 
-#define SEEN(mask, attr) (((mask) >> (attr)) & 1)
-
-static uint64_t attrs_of(const struct nlmsghdr *nlh)
-{
-	uint64_t seen = 0;
-
-	mnl_attr_parse(nlh, sizeof(struct nfgenmsg), attr_cb, &seen);
-	return seen;
-}
-
-/* extract the nested TCP proto-info a TCP create emits */
-struct tcp_pi { int state; bool forig, freply, present; };
-
-static int tcp_state_cb(const struct nlattr *attr, void *data)
-{
-	struct tcp_pi *pi = data;
-
-	switch (mnl_attr_get_type(attr)) {
-	case CTA_PROTOINFO_TCP_STATE:          pi->state = mnl_attr_get_u8(attr); break;
-	case CTA_PROTOINFO_TCP_FLAGS_ORIGINAL: pi->forig = true; break;
-	case CTA_PROTOINFO_TCP_FLAGS_REPLY:    pi->freply = true; break;
-	}
-	return MNL_CB_OK;
-}
-
-static int protoinfo_cb(const struct nlattr *attr, void *data)
-{
-	if (mnl_attr_get_type(attr) == CTA_PROTOINFO_TCP) {
-		((struct tcp_pi *)data)->present = true;
-		mnl_attr_parse_nested(attr, tcp_state_cb, data);
-	}
-	return MNL_CB_OK;
-}
-
-static int top_protoinfo_cb(const struct nlattr *attr, void *data)
-{
-	if (mnl_attr_get_type(attr) == CTA_PROTOINFO)
-		mnl_attr_parse_nested(attr, protoinfo_cb, data);
-	return MNL_CB_OK;
-}
-
-static void get_tcp_pi(const struct nlmsghdr *nlh, struct tcp_pi *pi)
-{
-	memset(pi, 0, sizeof(*pi));
-	pi->state = -1;
-	mnl_attr_parse(nlh, sizeof(struct nfgenmsg), top_protoinfo_cb, pi);
-}
-
-static void test_ctnl(void)
-{
-	char buf[8192] __attribute__((aligned(8)));
-	struct flow f = mkflow(IPPROTO_UDP, 50000, 443), t = mkflow(IPPROTO_TCP, 51000, 80);
-	struct ct_entry c;
-	struct nlmsghdr *nlh;
-	struct nfgenmsg *nfh;
-	struct tcp_pi pi;
-	uint64_t seen;
-
-	/* a create: EXCL, everything set, and it parses back */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_new(nlh, &f, true);
-	nlh->nlmsg_seq = 7;
-	CHECK(nlh->nlmsg_type == ((NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_NEW));
-	CHECK((nlh->nlmsg_flags & (NLM_F_REQUEST | NLM_F_CREATE | NLM_F_EXCL)) ==
-	      (NLM_F_REQUEST | NLM_F_CREATE | NLM_F_EXCL));
-	CHECK(nlh->nlmsg_len < 256);
-	CHECK(ct_parse(nlh, &c) == 0);
-	CHECK(flow_eq(&f, &c.f));
-	CHECK(c.status == (IPS_SEEN_REPLY | IPS_CONFIRMED));	/* CONFIRMED echoed, never ASSURED */
-	CHECK(c.mark == 0x01000000);
-	CHECK(c.timeout == 90);
-	seen = attrs_of(nlh);
-	CHECK(SEEN(seen, CTA_TUPLE_ORIG) && SEEN(seen, CTA_TUPLE_REPLY) && SEEN(seen, CTA_TIMEOUT));
-	CHECK(SEEN(seen, CTA_STATUS) && SEEN(seen, CTA_MARK) && SEEN(seen, CTA_MARK_MASK));
-	CHECK(!SEEN(seen, CTA_FILTER));
-	CHECK(!SEEN(seen, CTA_PROTOINFO));	/* UDP carries no proto-info */
-
-	/* not IPv6: rejected before any attribute is looked at */
-	nfh = mnl_nlmsg_get_payload(nlh);
-	nfh->nfgen_family = AF_INET;
-	CHECK(ct_parse(nlh, &c) != 0);
-	nfh->nfgen_family = AF_INET6;
-	/* truncated: the tuple is cut off */
-	nlh->nlmsg_len = NLMSG_LENGTH(sizeof(*nfh)) + 8;
-	CHECK(ct_parse(nlh, &c) != 0);
-
-	/* a refresh: no EXCL, tuples and timeout only, so it can change nothing
-	 * else; it has no status, which is why ct_parse refuses it */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_new(nlh, &t, false);
-	/* a refresh must not create: the kernel would make an unmarked native */
-	CHECK(!(nlh->nlmsg_flags & (NLM_F_EXCL | NLM_F_CREATE)));
-	seen = attrs_of(nlh);
-	CHECK(SEEN(seen, CTA_TUPLE_ORIG) && SEEN(seen, CTA_TUPLE_REPLY) && SEEN(seen, CTA_TIMEOUT));
-	CHECK(!SEEN(seen, CTA_STATUS) && !SEEN(seen, CTA_MARK) && !SEEN(seen, CTA_MARK_MASK));
-	CHECK(!SEEN(seen, CTA_PROTOINFO));
-	CHECK(ct_parse(nlh, &c) != 0);
-
-	/* a TCP create carries CTA_PROTOINFO, state ESTABLISHED, both flag attrs */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_new(nlh, &t, true);
-	CHECK(ct_parse(nlh, &c) == 0);
-	CHECK(flow_eq(&t, &c.f) && c.f.proto == IPPROTO_TCP);
-	CHECK(c.status == (IPS_SEEN_REPLY | IPS_CONFIRMED));
-	CHECK(SEEN(attrs_of(nlh), CTA_PROTOINFO));
-	get_tcp_pi(nlh, &pi);
-	CHECK(pi.present && pi.state == TCP_CONNTRACK_ESTABLISHED);
-	CHECK(pi.forig && pi.freply);
-
-	/* dump requests: status and mark filters are independent and optional */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_dump(nlh, IPPROTO_UDP, IPS_ASSURED, IPS_ASSURED, 0, cfg.ct_mark_mask);
-	CHECK(nlh->nlmsg_type == ((NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET));
-	CHECK((nlh->nlmsg_flags & NLM_F_DUMP) == NLM_F_DUMP);
-	seen = attrs_of(nlh);
-	CHECK(SEEN(seen, CTA_STATUS) && SEEN(seen, CTA_STATUS_MASK));
-	CHECK(SEEN(seen, CTA_MARK) && SEEN(seen, CTA_MARK_MASK));
-	CHECK(SEEN(seen, CTA_TUPLE_ORIG) && SEEN(seen, CTA_FILTER));
-	CHECK(!SEEN(seen, CTA_TUPLE_REPLY) && !SEEN(seen, CTA_TIMEOUT));
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_dump(nlh, IPPROTO_TCP, 0, 0, cfg.ct_mark, cfg.ct_mark_mask);
-	seen = attrs_of(nlh);
-	CHECK(!SEEN(seen, CTA_STATUS) && !SEEN(seen, CTA_STATUS_MASK));
-	CHECK(SEEN(seen, CTA_MARK) && SEEN(seen, CTA_MARK_MASK));
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_dump(nlh, IPPROTO_UDP, 0, 0, 0, 0);
-	seen = attrs_of(nlh);
-	CHECK(!SEEN(seen, CTA_STATUS) && !SEEN(seen, CTA_MARK) && SEEN(seen, CTA_FILTER));
-
-	/* the offloaded-native phase: offloaded and replied, but not ASSURED */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_dump(nlh, IPPROTO_UDP, IPS_OFFLOAD | IPS_SEEN_REPLY,
-		      IPS_OFFLOAD | IPS_SEEN_REPLY | IPS_ASSURED, 0, cfg.ct_mark_mask);
-	{
-		const struct nlattr *a;
-		uint32_t st = 0, mask = 0;
-
-		mnl_attr_for_each(a, nlh, sizeof(struct nfgenmsg)) {
-			if (mnl_attr_get_type(a) == CTA_STATUS)
-				st = ntohl(mnl_attr_get_u32(a));
-			else if (mnl_attr_get_type(a) == CTA_STATUS_MASK)
-				mask = ntohl(mnl_attr_get_u32(a));
-		}
-		CHECK(st == (IPS_OFFLOAD | IPS_SEEN_REPLY));
-		CHECK(mask == (IPS_OFFLOAD | IPS_SEEN_REPLY | IPS_ASSURED));
-		/* exactly the class the other native phases miss */
-		CHECK(((IPS_SEEN_REPLY | IPS_OFFLOAD) & mask) == st);			/* selected */
-		CHECK(((IPS_SEEN_REPLY | IPS_ASSURED | IPS_OFFLOAD) & mask) != st);	/* phase 2 */
-		CHECK(((IPS_OFFLOAD) & mask) != st);					/* phase 1 */
-	}
-
-	/* CTA_ID goes back to the kernel exactly as it came (network order) */
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_new(nlh, &f, true);
-	mnl_attr_put_u32(nlh, CTA_ID, htonl(0x0a0b0c0d));
-	CHECK(ct_parse(nlh, &c) == 0 && c.id == htonl(0x0a0b0c0d));
-	nlh = mnl_nlmsg_put_header(buf);
-	ct_build_delete(nlh, &f, c.id);
-	{
-		const struct nlattr *a;
-		uint32_t id = 0;
-
-		mnl_attr_for_each(a, nlh, sizeof(struct nfgenmsg))
-			if (mnl_attr_get_type(a) == CTA_ID)
-				id = mnl_attr_get_u32(a);
-		CHECK(id == htonl(0x0a0b0c0d));
-	}
-
-	/* the lookup after EEXIST compares the entry it got with the reversed
-	 * flow byte for byte (note_entry): flow_reverse must leave no byte
-	 * undefined, whatever the target held before */
-	{
-		struct flow r = f, rev;
-
-		r.c = f.s;
-		r.s = f.c;
-		r.cport = f.sport;
-		r.sport = f.cport;
-		nlh = mnl_nlmsg_put_header(buf);
-		ct_build_new(nlh, &r, true);
-		CHECK(ct_parse(nlh, &c) == 0);
-		memset(&rev, 0xa5, sizeof(rev));
-		flow_reverse(&rev, &f);
-		CHECK(flow_eq(&rev, &c.f));
-		CHECK(memcmp(&rev, &c.f, sizeof(rev)) == 0);
-	}
-}
-
-/* the per-tuple table: lookup, probing, expiry reuse and eviction */
-static void test_rxtable(void)
-{
-	struct flow f[12];
-	struct rx_ent *e;
-	unsigned int i, found;
-
-	CHECK(rx_init(8) == 0);
-	cnt.rx_evictions = 0;
-	for (i = 0; i < 12; i++)
-		f[i] = mkflow(IPPROTO_UDP, 1 + i, 443);
-
-	/* fill all eight slots, every tuple stays findable */
-	for (i = 0; i < 8; i++) {
-		CHECK(rx_find(&f[i]) == NULL);
-		e = rx_insert(&f[i], 1001 + i);
-		CHECK(e && flow_eq(&e->f, &f[i]) && e->t_rx == 1001 + i && !e->own);
-	}
-	for (i = 0; i < 8; i++)
-		CHECK(rx_find(&f[i]) != NULL);
-	CHECK(cnt.rx_evictions == 0);
-
-	/* a ninth live tuple evicts the oldest one */
-	e = rx_insert(&f[8], 1050);
-	CHECK(e && flow_eq(&e->f, &f[8]));
-	CHECK(cnt.rx_evictions == 1);
-	CHECK(rx_find(&f[0]) == NULL);
-	for (found = 0, i = 1; i < 9; i++)
-		found += rx_find(&f[i]) != NULL;
-	CHECK(found == 8);
-
-	/* once slots are older than element_timeout they are reused for free */
-	e = rx_insert(&f[9], 1200);
-	CHECK(e && flow_eq(&e->f, &f[9]));
-	CHECK(cnt.rx_evictions == 1);
-	CHECK(rx_find(&f[9]) != NULL);
-}
-
-/* what an announcement does to a slot */
-static void test_classify(void)
-{
-	struct flow f = mkflow(IPPROTO_UDP, 777, 443);
-	struct rx_ent *e;
-
-	CHECK(rx_init(8) == 0);
-	e = rx_insert(&f, 1000);
-	CHECK(rx_classify(e, 1000) == RX_CREATE);		/* unknown: create with EXCL */
-	CHECK(e->own && e->t_inject == 1000 && e->t_rx == 1000);
-	/* the create set the copy to element_timeout: the evidence baseline */
-	CHECK(e->seen_at == 1000 && e->seen_timeout == cfg.element_timeout);
-	/* our copy: only noted, our dump refreshes it */
-	CHECK(rx_classify(e, 1010) == RX_NOTED);
-	CHECK(e->t_inject == 1000 && e->t_rx == 1010 && e->t_ann == 1010);
-	e->own = false;						/* the kernel said EEXIST */
-	CHECK(rx_classify(e, 1012) == RX_DUP);			/* within interval/2: once */
-	CHECK(rx_classify(e, 1014) == RX_DUP);
-	CHECK(rx_classify(e, 1015) == RX_CREATE);		/* interval/2 exactly */
-	e->own = false;
-	CHECK(rx_classify(e, 1050) == RX_CREATE);
-	CHECK(e->own && e->t_ann == 1050);
-
-	/* the dump's refresh decision (element_timeout 90, interval 30) */
-	CHECK(refresh_due(e, 60, 1040, 1080) == REFRESH_YES);	/* announced since the last look */
-	CHECK(refresh_due(e, 60, 1060, 1080) == REFRESH_NO);	/* not announced since */
-	CHECK(refresh_due(e, 7000, 1040, 1080) == REFRESH_HELD);	/* lives on its own traffic */
-	CHECK(refresh_due(e, 120, 1040, 1080) == REFRESH_NO);	/* 90 + 30: fresh enough */
-	CHECK(refresh_due(e, 89, 1040, 1080) == REFRESH_NO);	/* created a moment ago */
-	CHECK(refresh_due(e, 75, 1040, 1080) == REFRESH_NO);	/* 75.x left: < interval/2 ago */
-	CHECK(refresh_due(e, 74, 1040, 1080) == REFRESH_YES);
-	e->t_ann = 0;						/* re-learned after a restart */
-	CHECK(refresh_due(e, 60, 0, 1080) == REFRESH_NO);	/* nobody announced it yet */
-}
-
-/* a peer's resync request pulls a round forward; at most two such rounds in
- * a row, then two per interval, whoever asked */
-static void test_resync(void)
-{
-	cfg.n_peer = 3;
-	resync_round_started();
-	resync_from(0);
-	CHECK(resync_round_wanted());
-	resync_round_pulled();
-	resync_round_started();				/* served */
-	resync_from(0);					/* again at once: ignored */
-	CHECK(!resync_round_wanted());
-	resync_from(1);					/* another peer: served too */
-	CHECK(resync_round_wanted());
-	resync_round_pulled();
-	resync_round_started();
-	resync_from(2);					/* a third at once: the budget */
-	CHECK(!resync_round_wanted());			/* waits */
-	resync_round_started();				/* a regular round serves it */
-	CHECK(!resync_round_wanted());
-	cfg.n_peer = 0;
-
-	/* our own request: not before the first round, not while DESTROY
-	 * events are queued, at most once per interval/2, and only once it
-	 * could be sent (one peer on loopback) */
-	{
-		uint64_t t0 = cnt.tx_resync, r0 = cnt.refresh_rounds;
-
-		cnt.refresh_rounds = 0;
-		resync_request();
-		resync_tick();
-		CHECK(cnt.tx_resync == t0);
-		cnt.refresh_rounds = 1;
-		resync_destroys_pending(true);
-		resync_tick();
-		CHECK(cnt.tx_resync == t0);
-		resync_destroys_pending(false);
-		resync_tick();
-		CHECK(cnt.tx_resync == t0);			/* no socket: still pending */
-		cfg.n_peer = 1;
-		cfg.peer[0] = in6addr_loopback;
-		cfg.port = 3780;
-		peers_init();
-		udp_fd = socket(AF_INET6, SOCK_DGRAM, 0);
-		CHECK(udp_fd >= 0);
-		resync_tick();
-		CHECK(cnt.tx_resync == t0 + 1);
-		resync_request();
-		resync_tick();
-		CHECK(cnt.tx_resync == t0 + 1);
-		close(udp_fd);
-		udp_fd = -1;
-		cfg.n_peer = 0;
-		cnt.refresh_rounds = r0;
-	}
-}
-
-/* ownership learned from the dump and revoked when the copy is gone */
-static void test_seed_sweep(void)
-{
-	struct flow f = mkflow(IPPROTO_UDP, 888, 443), g = mkflow(IPPROTO_UDP, 889, 443);
-	struct rx_ent *e, *e2;
-
-	CHECK(rx_init(8) == 0);
-	e = rx_seed(&f, 5, 1000);				/* seen in round 5, slot was unknown */
-	CHECK(e && e->own && e->seen_round == 5 && e->t_rx == 1000);
-	CHECK(e->t_inject == 1000 - 30);			/* not a duplicate, not swept early */
-	rx_sweep(6, 1001);					/* round 6 did not see it: gone */
-	CHECK(!e->own && gauge.owned == 0);
-	e = rx_seed(&f, 7, 1100);
-	CHECK(e->own && e->seen_round == 7 && e->t_rx == 1100);	/* a seen copy keeps its slot */
-	rx_sweep(7, 1090);					/* seen this round: kept */
-	CHECK(e->own && gauge.owned == 1);
-	e2 = rx_insert(&g, 1150);				/* created during round 8 */
-	CHECK(rx_classify(e2, 1150) == RX_CREATE && e2->own);
-	rx_sweep(8, 1120);
-	CHECK(e2->own);						/* too young to have been dumped */
-	CHECK(!e->own);						/* old and not seen in round 8 */
-	CHECK(gauge.owned == 1);
-
-	/* lost DESTROY events (overrun) disown everything; the next dump
-	 * re-learns a surviving copy in its existing slot. When that copy is
-	 * gone later, the sweep must revoke it like any other, or every
-	 * announcement of the tuple is only noted and it is never created again */
-	CHECK(rx_init(8) == 0);
-	e = rx_insert(&f, 2000);
-	CHECK(rx_classify(e, 2000) == RX_CREATE);
-	rx_disown_all();
-	e = rx_seed(&f, 10, 2030);
-	CHECK(e->own);
-	rx_sweep(10, 2029);					/* seen: kept */
-	rx_sweep(11, 2060);					/* rounds 11 and 12 */
-	rx_sweep(12, 2090);					/* did not see it */
-	CHECK(!e->own);
-	CHECK(rx_classify(e, 2100) == RX_CREATE);
-}
-
-/* copy limits: our copies are the slots that own one, counted in all and per
- * client /64 as ownership changes, and recounted by the sweep */
-static void test_limit(void)
-{
-	struct flow f = mkflow(IPPROTO_UDP, 1000, 443), g = mkflow(IPPROTO_UDP, 2000, 443);
-	uint64_t lim = cnt.rx_limited, limc = cnt.rx_limited_client;
-	struct rx_ent *e;
-	unsigned int i;
-
-	CHECK(rx_init(64) == 0);
-	CHECK(gauge.owned == 0);
-	cfg.max_copies = 6;
-	cfg.max_copies_client = 4;
-	g.c = a6("2001:db8:101::1");				/* another /64 */
-	for (i = 0; i < 4; i++) {
-		f.cport = 1000 + i;
-		CHECK(rx_admit(&f));
-		e = rx_insert(&f, 1000);
-		CHECK(rx_classify(e, 1000) == RX_CREATE);
-	}
-	CHECK(gauge.owned == 4);
-	f.cport = 1004;
-	CHECK(!rx_admit(&f) && cnt.rx_limited_client == limc + 1);	/* the /64 is full */
-	CHECK(rx_admit(&g));					/* another one is not */
-	for (i = 0; i < 2; i++) {
-		g.cport = 2000 + i;
-		e = rx_insert(&g, 1000);
-		rx_classify(e, 1000);
-	}
-	CHECK(gauge.owned == 6);
-	g.cport = 2002;
-	CHECK(!rx_admit(&g) && cnt.rx_limited == lim + 1);	/* the pool is full */
-	f.cport = 1000;
-	e = rx_find(&f);
-	inj_account(INJ_CREATE, -EEXIST, e);			/* not ours after all */
-	CHECK(!e->own && gauge.owned == 5);
-	f.cport = 1004;
-	CHECK(rx_admit(&f));
-	rx_sweep(1, 2000);			/* not seen, owned since before: revoked */
-	CHECK(gauge.owned == 0 && rx_admit(&g));
-
-	/* evicting a slot that owns a copy takes it off the count */
-	CHECK(rx_init(8) == 0);
-	cfg.max_copies = cfg.max_copies_client = 100;
-	for (i = 0; i < 9; i++) {
-		f.cport = 3000 + i;
-		e = rx_insert(&f, 3000 + i);
-		rx_classify(e, 3000 + i);
-	}
-	CHECK(gauge.owned == 8);
-	cfg.max_copies = cfg.max_copies_client = 0;
-}
-
-/* kernel answers to injected messages and what they do to the bookkeeping */
-static void test_account(void)
-{
-	struct rx_ent e;
-
-	memset(&cnt, 0, sizeof(cnt));
-	memset(&e, 0, sizeof(e));
-
-	cnt.inject_created = 2;
-	e.own = true;
-	CHECK(inj_account(INJ_CREATE, -EEXIST, &e) == ACCT_OK);	/* not ours: hands off */
-	CHECK(cnt.inject_created == 1 && cnt.inject_exists == 1 && !e.own);
-	e.own = true;
-	CHECK(inj_account(INJ_CREATE, -ENOMEM, &e) == ACCT_ERROR);
-	CHECK(cnt.inject_created == 0 && cnt.inject_errors == 1 && !e.own);
-	CHECK(inj_account(INJ_CREATE, -EEXIST, NULL) == ACCT_OK);	/* unattributed is fine */
-	CHECK(cnt.inject_exists == 2);
-
-	cnt.inject_refreshed = 3;
-	e.own = true;
-	CHECK(inj_account(INJ_REFRESH, -ETIME, &e) == ACCT_RETRY);	/* being destroyed */
-	CHECK(cnt.inject_refreshed == 2 && cnt.inject_gone == 1 && !e.own);
-	e.own = true;
-	CHECK(inj_account(INJ_REFRESH, -ENOENT, &e) == ACCT_RETRY);	/* gone: re-create now */
-	CHECK(cnt.inject_refreshed == 1 && cnt.inject_gone == 2 && !e.own);
-	e.own = true;
-	CHECK(inj_account(INJ_REFRESH, -EINVAL, &e) == ACCT_ERROR);
-	CHECK(cnt.inject_refreshed == 0 && cnt.inject_errors == 2 && !e.own);
-
-	/* a create that hit our existing copy (after a restart) set no timeout:
-	 * the baseline it assumed must go, or the copy's long, undisturbed
-	 * timeout reads as a packet at the next dump */
-	{
-		struct flow f = mkflow(IPPROTO_UDP, 999, 443);
-		struct rx_ent *p;
-
-		CHECK(rx_init(8) == 0);
-		p = rx_insert(&f, 2000);
-		CHECK(rx_classify(p, 2000) == RX_CREATE);
-		inj_account(INJ_CREATE, -EEXIST, p);
-		CHECK(!copy_live(IPS_SEEN_REPLY | IPS_ASSURED, 20, p->seen_timeout, p->seen_at, 2020));
-	}
-}
-
-/* numbers on the command line: decimal, the marks hexadecimal with or
- * without 0x (written as nft and conntrack print them); no octal */
+/* numbers on the command line: decimal, the mark hexadecimal with or without
+ * 0x (written as nft prints it); no octal */
 static void test_config(void)
 {
 	char *a1[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-m", "01000000",
-		       "-M", "0x01000000", "-i", "010", "-p", "03780", "check", NULL };
-	char *a2[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-m", "1000000",
-		       "-M", "1000000", "check", NULL };
+		       "-I", "eth0", "-i", "010", "-p", "03780", "check", NULL };
+	char *a2[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-m", "0x2000000",
+		       "-U", "wan", "-I", "eth0", "--tcp-timeout", "300", "check", NULL };
 	char *a3[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-i", "0x10",
 		       "check", NULL };
 
 	optind = 1;
 	CHECK(parse_args(14, a1) == 13);
-	CHECK(cfg.ct_mark == 0x01000000 && cfg.ct_mark_mask == 0x01000000);
+	CHECK(cfg.mark == 0x01000000);
 	CHECK(cfg.interval == 10 && cfg.port == 3780);
+	CHECK(!strcmp(cfg.uplink, "eth0"));		/* the sync device by default */
+	CHECK(cfg.t_udp == 180 && cfg.t_tcp == 7440);
 	optind = 1;
-	CHECK(parse_args(10, a2) == 9);
-	CHECK(cfg.ct_mark == 0x01000000 && cfg.ct_mark_mask == 0x01000000);
+	CHECK(parse_args(14, a2) == 13);
+	CHECK(cfg.mark == 0x02000000 && cfg.t_tcp == 300);
+	CHECK(!strcmp(cfg.uplink, "wan") && !strcmp(cfg.ifname, "eth0"));
 	optind = 1;
 	CHECK(parse_args(8, a3) < 0);				/* not a decimal number */
 	setup_cfg();
@@ -780,13 +313,7 @@ int main(void)
 	test_addr_port();
 	test_policy();
 	test_wire();
-	test_ctnl();
-	test_rxtable();
-	test_limit();
-	test_resync();
-	test_classify();
-	test_seed_sweep();
-	test_account();
+	test_ttl();
 	test_config();
 	printf("%s: %u checks, %u failures\n", failures ? "FAIL" : "ok", checks, failures);
 	return failures ? 1 : 0;

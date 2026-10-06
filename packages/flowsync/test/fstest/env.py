@@ -40,15 +40,17 @@ class Loop:
 
 
 class Env:
-    # scaled timers: refresh interval, element_timeout, conntrack and flowtable
+    # scaled timers: refresh interval, element_timeout, and the lifetimes of
+    # local flows after their last packet out (production: 180, 7440, 120,
+    # 120, 600 s)
     I = 3
     E = 9
-    timers = {"udp": 10, "udp_stream": 20, "tcp_syn_sent": 12, "flowtable": 3}
+    timers = {"udp": 12, "tcp": 40, "tcp_syn": 10, "tcp_close": 8, "other": 15}
 
     def __init__(self, combo, paths, workdir, checks, topo=None):
         self.combo = combo
         self.flowsync = paths["flowsync"]
-        self.ctquery = paths["ctquery"]
+        self.bpf_object = paths["bpf_object"]
         self.probe_path = paths["probe"]
         self.ptyrun = paths["ptyrun"]
         self.python = paths["python"]
@@ -122,15 +124,6 @@ class Env:
     @staticmethod
     def sleep(secs):
         time.sleep(secs)
-
-    # ------------------------------------------------ profile-aware times
-    def udp_life(self, g, replied=False):
-        """how long a UDP entry on g lives after its last packet (worst case)"""
-        t = self.timers["udp_stream" if replied else "udp"]
-        return t + (g.ft_idle if g.p.offload else 0) + 2
-
-    def any_offload(self):
-        return any(g.p.offload for g in self.g)
 
     def close(self, keep=False):
         """end the scenario: reset the topology for the next one (keep) or

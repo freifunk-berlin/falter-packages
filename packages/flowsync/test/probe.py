@@ -3,12 +3,13 @@
 namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
 
   probe.py recv  <addr> <port> <timeout>                     print RECV or NONE
-  probe.py send  <src> <sport> <dst> <dport>                 one UDP datagram
+  probe.py send  <src> <sport> <dst> <dport> [size]          one UDP datagram (of size bytes:
+                 above the MTU it leaves in fragments)
   probe.py burst <src> <dst> <dport> <count> <first_sport>   one datagram per source port
   probe.py flood <src> <dst> <dport> <count> <first_sport>   like burst, raw and fast: source
                  ports first_sport..65535, then the next source address (last group + 1)
-  probe.py xchg  <src> <sport> <dst> <dport> <timeout>       one datagram, then wait for a
-                 reply on the same socket: print RECV or NONE
+  probe.py xchg  <src> <sport> <dst> <dport> <timeout> [size] one datagram, then wait for a
+                 reply on the same socket: print "RECV <bytes>" or NONE
   probe.py echo  <addr> <port> <delay> <count>               UDP echo server, replies after
                  delay seconds, count times
   probe.py tcpsrv <addr> <port> <bytes>                      accept one connection, read bytes,
@@ -26,6 +27,11 @@ namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
   probe.py raw   <src> <sport> <dst> <dport> <count>         random garbage datagrams
   probe.py v6udp <src> <sport> <dst> <dport> <hex payload>   one UDP datagram in a hand-built
                  IPv6 header: any source, a v4-mapped one too
+  probe.py v6ext <src> <sport> <dst> <dport> <kind>          one UDP datagram behind extension
+                 headers: dstopt, hbh, atomic (a fragment header on an unfragmented
+                 packet), chain (hop-by-hop, destination options, fragment)
+  probe.py v6proto <src> <dst> <proto> <count>               packets of an IP protocol without
+                 ports (e.g. 47), 16 bytes of payload each
 
   probe.py --mark N <command> ...                            the same with SO_MARK N on every
                  socket, to pick a policy route (the test topology routes
@@ -65,10 +71,10 @@ def recv(addr, port, timeout):
         print("NONE")
 
 
-def send(src, sport, dst, dport):
+def send(src, sport, dst, dport, size="1"):
     s = sock(socket.AF_INET6, socket.SOCK_DGRAM)
     s.bind((src, int(sport)))
-    s.sendto(b"x", (dst, int(dport)))
+    s.sendto(b"x" * int(size), (dst, int(dport)))
     s.close()
 
 
@@ -95,14 +101,14 @@ def flood(src, dst, dport, count, first):
         s.sendto(struct.pack("!HHHH", sport, dport, 9, 0) + b"x", (dst, 0))
 
 
-def xchg(src, sport, dst, dport, timeout):
+def xchg(src, sport, dst, dport, timeout, size="1"):
     s = sock(socket.AF_INET6, socket.SOCK_DGRAM)
     s.bind((src, int(sport)))
-    s.sendto(b"x", (dst, int(dport)))
+    s.sendto(b"x" * int(size), (dst, int(dport)))
     s.settimeout(float(timeout))
     try:
-        s.recvfrom(64)
-        print("RECV")
+        d, _ = s.recvfrom(65535)
+        print("RECV %d" % len(d))
     except socket.timeout:
         print("NONE")
 
@@ -111,7 +117,7 @@ def echo(addr, port, delay, count):
     s = sock(socket.AF_INET6, socket.SOCK_DGRAM)
     s.bind((addr, int(port)))
     for _ in range(int(count)):
-        data, peer = s.recvfrom(2048)
+        data, peer = s.recvfrom(65535)
         time.sleep(float(delay))
         s.sendto(data, peer)
 
@@ -339,6 +345,47 @@ def v6udp(src, sport, dst, dport, payload):
     s.close()
 
 
+def _v6send(src, dst, nexthdr, body):
+    s6, d6 = socket.inet_pton(socket.AF_INET6, src), socket.inet_pton(socket.AF_INET6, dst)
+    ip6 = struct.pack("!IHBB", 6 << 28, len(body), nexthdr, 64) + s6 + d6
+    s = sock(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_RAW)
+    s.sendto(ip6 + body, (dst, 0))
+    s.close()
+
+
+def v6ext(src, sport, dst, dport, kind):
+    # one UDP datagram behind extension headers, each 8 bytes long
+    s6, d6 = socket.inet_pton(socket.AF_INET6, src), socket.inet_pton(socket.AF_INET6, dst)
+    data = b"x" * 8
+    ulen = 8 + len(data)
+    udp = struct.pack("!HHHH", int(sport), int(dport), ulen, 0) + data
+    c = _csum(s6 + d6 + struct.pack("!I3xB", ulen, 17) + udp) or 0xffff
+    udp = udp[:6] + struct.pack("!H", c) + udp[8:]
+    pad = bytes([1, 4, 0, 0, 0, 0])             # a PadN option filling the header
+
+    def opts(nxt):
+        return bytes([nxt, 0]) + pad
+
+    def frag(nxt):
+        return struct.pack("!BBHI", nxt, 0, 0, 0x1234)     # offset 0, no more fragments
+
+    if kind == "dstopt":
+        _v6send(src, dst, 60, opts(17) + udp)
+    elif kind == "hbh":
+        _v6send(src, dst, 0, opts(17) + udp)
+    elif kind == "atomic":
+        _v6send(src, dst, 44, frag(17) + udp)
+    elif kind == "chain":
+        _v6send(src, dst, 0, opts(60) + opts(44) + frag(17) + udp)
+    else:
+        raise SystemExit("unknown kind %s" % kind)
+
+
+def v6proto(src, dst, proto, count):
+    for _ in range(int(count)):
+        _v6send(src, dst, int(proto), b"p" * 16)
+
+
 def tcpflood(src, dst, fixport, first, count, direction, flags, rate, seconds):
     """raw TCP segments for count flows, cycling over them at rate per second for
     seconds (0: one pass). fwd: sport first+i -> dport fixport; rev: sport
@@ -385,4 +432,4 @@ if __name__ == "__main__":
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
      "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk,
      "tcppush": tcppush, "tcpread": tcpread, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
-     "v6udp": v6udp, "tcpflood": tcpflood}[cmd](*args)
+     "v6udp": v6udp, "v6ext": v6ext, "v6proto": v6proto, "tcpflood": tcpflood}[cmd](*args)

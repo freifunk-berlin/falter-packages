@@ -6,39 +6,39 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=flowsync
-PKG_VERSION:=1.0
+PKG_VERSION:=2.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Simon Polack <spolack+git@mailbox.org>
 PKG_LICENSE:=GPL-2.0-only
 
-include $(INCLUDE_DIR)/package.mk
+# the tc programs include kernel UAPI headers for the BPF target
+PKG_BUILD_DEPENDS:=bpf-headers
 
-# Build and runtime: the binary links libnetfilter_conntrack (BPF filter for
-# the event socket) and libmnl; their headers are all the build needs, so
-# there is no PKG_BUILD_DEPENDS. libnfnetlink comes in through
-# libnetfilter-conntrack and is not linked directly.
-#
-# Runtime only: ctnetlink in the kernel. Not a build dependency, so it goes
-# into EXTRA_DEPENDS (which does not order the build) with the kernel floor
-# the loop prevention relies on (UDP tracker semantics, see README).
+include $(INCLUDE_DIR)/package.mk
+include $(INCLUDE_DIR)/bpf.mk
+
+# libbpf loads the tc programs and talks to their maps; kmod-sched-core and
+# kmod-sched-bpf are the clsact qdisc and the BPF classifier they attach
+# with. The rules are read and written with nft, which firewall4 brings
+# (with kmod-nft-fib, for the notrack rule).
 define Package/flowsync
 	SECTION:=net
 	CATEGORY:=Network
-	TITLE:=Scoped conntrack flow announcer for active-active gateways
+	TITLE:=Flow tables for active-active gateways without conntrack
 	URL:=https://github.com/freifunk-berlin/falter-packages
-	DEPENDS:=+libnetfilter-conntrack +libmnl
-	EXTRA_DEPENDS:=kmod-nf-conntrack-netlink (>=6.12)
-	# the daemon drops to this user (CAP_NET_ADMIN only) once its sockets
-	# are open, see --user in the README
+	DEPENDS:=+libbpf +kmod-sched-core +kmod-sched-bpf +firewall4 $(BPF_DEPENDS)
+	# the daemon drops to this user (CAP_NET_ADMIN only) once the programs
+	# are loaded and its sockets open, see --user in the README
 	USERID:=flowsync=3780:flowsync=3780
 endef
 
 define Package/flowsync/description
-Announces new and existing IPv6 UDP and TCP conntrack entries of selected client
-prefixes to the other gateways, which inject them into their conntrack
-table with a short timeout, so that replies arriving on an asymmetric path
-pass the stateful firewall. Replaces conntrackd + samplicator.
+Forwarded IPv6 bypasses conntrack: two tc programs on the uplink keep the
+flows a gateway forwarded out in a BPF map and mark the replies; the daemon
+announces those flows to the other gateways, which accept the replies
+arriving on an asymmetric path the same way. Replaces conntrackd +
+samplicator.
 endef
 
 define Package/flowsync/conffiles
@@ -49,25 +49,39 @@ endef
 # the binary, local.mk) that the default cp -fpR would carry along, newer than
 # the sources, so that make would not rebuild them for the target
 define Build/Prepare
-	$(INSTALL_DIR) $(PKG_BUILD_DIR)
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)/bpf
 	$(CP) ./src/*.c ./src/*.h ./src/Makefile $(PKG_BUILD_DIR)/
+	$(CP) ./src/bpf/flowsync.bpf.c $(PKG_BUILD_DIR)/bpf/
 endef
 
 define Build/Configure
 endef
 
-# default Build/Compile: make -C $(PKG_BUILD_DIR) with the target CC/CFLAGS/LDFLAGS
-MAKE_FLAGS += LDLIBS="-lnetfilter_conntrack -lmnl"
+# the daemon with the target compiler (the default Build/Compile), the tc
+# programs with the BPF toolchain
+MAKE_FLAGS += LDLIBS="-lbpf"
+
+define Build/Compile
+	$(call CompileBPF,$(PKG_BUILD_DIR)/bpf/flowsync.bpf.c)
+	$(call Build/Compile/Default,flowsync)
+endef
 
 define Package/flowsync/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/flowsync $(1)/usr/sbin/flowsync
+
+	$(INSTALL_DIR) $(1)/lib/bpf
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/bpf/flowsync.bpf.o $(1)/lib/bpf/flowsync.o
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/flowsync.init $(1)/etc/init.d/flowsync
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/flowsync.config $(1)/etc/config/flowsync
+
+	# fw4 includes it at the top of its forward chain on every (re)load
+	$(INSTALL_DIR) $(1)/usr/share/nftables.d/chain-pre/forward
+	$(INSTALL_DATA) ./files/flowsync.nft $(1)/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft
 endef
 
 $(eval $(call BuildPackage,flowsync))

@@ -1,27 +1,51 @@
-"""Predicates shared by the scenarios."""
+"""Helpers shared by the scenarios."""
+import os
 
 
-def native_unreplied(e):
-    return e.is_native and not e.seen_reply
+def replies(env, f, n=3, gap=0.2, via=None):
+    """n packets server -> client; how many came through"""
+    d0 = f.delivered("rev")
+    for _ in range(n):
+        f.send("rev", via=via)
+        env.sleep(gap)
+    env.sleep(0.3)
+    return f.delivered("rev") - d0
 
 
-def gone(g, f):
-    return not g.ct(f).alive
+def rejects(env):
+    return sum(g.fwc("rej") for g in env.g)
 
 
-def all_gone(gs, f):
-    return lambda: all(gone(g, f) for g in gs)
+def has_remote(g, f):
+    return lambda: g.ft(f).remote
 
 
-def long_lived(e):
-    """a copy that saw traffic: ASSURED with a timeout well above a refresh's,
-    or in the flowtable"""
-    return e.alive and e.assured and (e.offloaded or e.timeout > 99)
+def synced(env, f, others=None, timeout=1):
+    """the flow's announcement reached the other gateways"""
+    for g in others or [g for g in env.g if g is not f.fw]:
+        env.wait_for("%s holds the flow of %s" % (g, f.fw), timeout, has_remote(g, f), step=0.05)
 
 
-def tcp_state(e, state):
-    """TCP state, or offloaded (the dump shows no state for those)"""
-    return e.alive and (e.tcp_state == state or (e.offloaded and e.tcp_state is None))
+def slow_server(env, ms=20):
+    """a server that is not next door: a reply never beats the announcement
+    by being faster than any network; returns the undo"""
+    for g in env.g:
+        env.sv.run("tc", "qdisc", "add", "dev", "w%d" % g.i, "root", "netem", "delay",
+                   "%dms" % ms)
+
+    def undo():
+        for g in env.g:
+            env.sv.run("tc", "qdisc", "del", "dev", "w%d" % g.i, "root", check=False)
+    return undo
 
 
-EST, SYN_SENT, CLOSE = 3, 1, 8
+def out(env, name):
+    return os.path.join(env.dir, name)
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            return f.read().strip() or "none"
+    except OSError:
+        return "none"

@@ -3,8 +3,8 @@
 The parent expands the matrix into runs, one per (scenario, combination),
 and spreads each combination's runs over a few workers, longest first
 (durations of earlier runs are kept in ~/.cache). A worker is a child process
-in user and network namespaces of its own (unshare -Urn), so workers never see
-each other; it builds its topology once and resets it between scenarios,
+in a network namespace of its own (unshare -n, as root: BPF programs cannot
+be loaded from a user namespace), so workers never see each other; it builds its topology once and resets it between scenarios,
 which keeps namespace churn (serialized in the kernel) low. "heavy" scenarios
 (floods of thousands of flows or records a second) take one of a few slots so
 that not too many run at the same time.
@@ -32,7 +32,7 @@ DURATIONS = os.path.expanduser("~/.cache/flowsync-fstest-durations.json")
 def paths(args):
     return {
         "flowsync": os.path.abspath(args.flowsync),
-        "ctquery": os.path.abspath(args.ctquery),
+        "bpf_object": os.path.abspath(args.bpf_object),
         "probe": os.path.join(HERE, "probe.py"),
         "ptyrun": os.path.join(HERE, "ptyrun.py"),
         "python": sys.executable,
@@ -55,7 +55,7 @@ def heavy_slot(lockdir, slots):
 
 # ------------------------------------------------------------------ child
 def child(args):
-    """a worker (inside unshare -Urn): run a list of scenarios in one
+    """a worker (inside unshare -n): run a list of scenarios in one
     combination on one topology, reset between scenarios; after a failure the
     topology is rebuilt, so a broken state never leaks into the next one"""
     combo = matrix.parse(args.profile)
@@ -230,9 +230,11 @@ def parent(args):
 
     def run_worker(load_s, k, combo, scl, w):
         out = os.path.join(root, "c%d" % k)
-        argv = ["unshare", "-Urn", sys.executable, "-m", "fstest", "--child",
+        # a network namespace only: loading BPF programs needs the
+        # capabilities of the initial user namespace
+        argv = ["unshare", "-n", sys.executable, "-m", "fstest", "--child",
                 "--profile", combo.spec(), "--out", out, "--flowsync", args.flowsync,
-                "--ctquery", args.ctquery, "--scenarios", *[s.name for s in scl],
+                "--bpf-object", args.bpf_object, "--scenarios", *[s.name for s in scl],
                 "--lockdir", root, "--heavy", str(args.heavy)]
         if args.log:
             argv += ["--log", args.log]
