@@ -67,7 +67,10 @@ jobs:
           FEEDNAME: packages_ci
 
       - name: Move created packages to project dir
-        run: cp bin/packages/${{ matrix.arch }}/packages_ci/*.ipk . || true
+        # .ipk up to OpenWrt 24.10, .apk from 25.12 on
+        run: |
+          cp bin/packages/${{ matrix.arch }}/packages_ci/*.ipk . || true
+          cp bin/packages/${{ matrix.arch }}/packages_ci/*.apk . || true
 
       - name: Collect metadata
         run: |
@@ -104,7 +107,7 @@ jobs:
           echo >> PKG-INFO
           echo Full file listing: >> PKG-INFO
           # shellcheck disable=SC2035
-          ls -al *.ipk >> PKG-INFO || true
+          ls -al *.ipk *.apk >> PKG-INFO || true
           cat PKG-INFO
 
       - name: Store packages
@@ -113,6 +116,7 @@ jobs:
           name: ${{env.ARCHIVE_NAME}}-packages
           path: |
             *.ipk
+            *.apk
             PKG-INFO
 
       - name: Store logs
