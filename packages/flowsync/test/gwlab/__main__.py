@@ -24,9 +24,56 @@ import time
 from . import expect, report
 from .impl import load
 from .lab import Lab
-from .scenario import span
+from .scenario import grid, span
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def traffic(lb, flows, out, tag, during=None):
+    """run the flows: one agent per endpoint. during(t0) may act while they
+    run (t0: the second the flows count from). Returns what each end saw."""
+    t0 = time.monotonic() + 4
+    agents, parts = [], []
+    for role, ends in (("server", lb.servers), ("client", lb.clients)):
+        for e in ends.values():
+            mine = [f for f in flows if f[role] == e.name]
+            if not mine:
+                continue
+            base = os.path.join(out, "%s.%s" % (e.node.name, tag))
+            with open(base + ".job.json", "w") as fh:
+                json.dump(dict(t0=t0, flows=mine), fh)
+            agents.append(e.node.spawn(sys.executable, os.path.join(HERE, "agent.py"), role,
+                                       base + ".job.json", base + ".jsonl", log=base + ".log"))
+            parts.append(base + ".jsonl")
+    if during:
+        during(t0)
+    for a in agents:
+        a.wait()
+    seen = {"client": {}, "server": {}}
+    for rf in parts:
+        for line in open(rf):
+            r = json.loads(line)
+            seen[r["role"]][r["id"]] = r
+    return seen
+
+
+def measure_sync(lb, out):
+    """the implementation's sync latency in this lab, seen from outside: new
+    flows over every asymmetric gateway pair whose server holds its first
+    answer back. Returns ms from a flow's first packet at the forward gateway
+    until the return gateway is sure to know it (an upper bound: the path's
+    own margin and the delay steps limit the resolution), or None if answers
+    never passed."""
+    c, s = next(iter(lb.clients)), next(iter(lb.servers))
+    flows = [f for f in grid(["ladder"], [c], [s], list(lb.gw), list(lb.gw)) if f["fwd"] != f["rev"]]
+    lb.place(flows)
+    for n, f in enumerate(flows):
+        f["start"] = 0.01 * n
+    seen = traffic(lb, flows, out, "sync")
+    lat = expect.sync_latency([dict(flow=f, client=seen["client"].get(f["id"])) for f in flows])
+    if not lat or lat["all_from_ms"] is None:
+        return None, lat
+    return flows[0]["margin_ms"] + lat["all_from_ms"], lat
 
 
 def lab(args, opts):
@@ -35,6 +82,7 @@ def lab(args, opts):
     impl = load(args.impl, opts)
     fleet = sc.FLEETS[args.fleet[0]]
     out = os.path.join(args.out, args.fleet[0])
+    alone, events = getattr(sc, "ALONE", False), getattr(sc, "EVENTS", [])
     lb = Lab(sc.TOPOLOGY, fleet, out)
     try:
         for g in lb.gw.values():
@@ -43,61 +91,47 @@ def lab(args, opts):
             impl.install(g)
         for g in lb.gw.values():
             impl.start(g)
+        time.sleep(2)                           # the implementations settle
+        # verdicts depend on how fast the implementation syncs: measure it first
+        sync_ms, ladder = (None, None) if alone else measure_sync(lb, out)
         flows = [dict(f) for f in sc.FLOWS if args.flow in f["id"]]
         lb.place(flows)
-        alone, at = getattr(sc, "ALONE", False), 0.0
+        at = 0.0
         for n, f in enumerate(flows):
             f["start"] = at if alone else 0.01 * n      # one after the other / not all in the same instant
             at += span(f["p"]) + 2
-        time.sleep(2)                           # the implementations settle
         cpu0 = {n: g.cpu_ms() for n, g in lb.gw.items()}
-        job = dict(t0=time.monotonic() + 4, grace=expect.GRACE)
-        agents, parts = [], []
-        for role, ends in (("server", lb.servers), ("client", lb.clients)):
-            for e in ends.values():
-                mine = [f for f in flows if f[role] == e.name]
-                jf = os.path.join(out, "%s.job.json" % e.node.name)
-                rf = os.path.join(out, "%s.jsonl" % e.node.name)
-                with open(jf, "w") as fh:
-                    json.dump(dict(job, flows=mine), fh)
-                agents.append(e.node.spawn(sys.executable, os.path.join(HERE, "agent.py"), role, jf, rf,
-                                           log=os.path.join(out, "%s.log" % e.node.name)))
-                parts.append(rf)
-        events = getattr(sc, "EVENTS", [])
-        todo = []                               # (seconds after t0, what happens)
-        for e in events:
-            g = lb.gw.get(e.get("gw"))
-            if e["do"] == "reroute":
-                todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"])))
-            elif e["do"] == "lose_state":
-                todo.append((e["at"], lambda g=g: impl.lose_state(g)))
-            elif e["do"] == "uplink_recreate":
-                todo.append((e["at"], lambda g=g: lb.uplink_recreate(g)))
-            elif e["do"] == "sync_blackout":
-                todo.append((e["at"], lambda g=g: lb.sync_blackout(g, True)))
-                todo.append((e["at"] + e["seconds"], lambda g=g: lb.sync_blackout(g, False)))
-            else:
-                raise SystemExit("unknown event %r" % e["do"])
-        for at, act in sorted(todo, key=lambda x: x[0]):
-            time.sleep(max(0, job["t0"] + at - time.monotonic()))
-            act()
         windows = {}
-        if alone:                               # CPU per gateway while each flow ran
-            for f in flows:
-                time.sleep(max(0, job["t0"] + f["start"] - time.monotonic()))
-                a = {n: (g.cpu_ms(), g.kernel_ms()) for n, g in lb.gw.items()}
-                time.sleep(max(0, job["t0"] + f["start"] + span(f["p"]) - time.monotonic()))
-                windows[f["id"]] = {
-                    n: dict(cpu=[round(x - y) for x, y in zip(g.cpu_ms(), a[n][0])] if a[n][0] else None,
-                            kernel=round(g.kernel_ms() - a[n][1]) if a[n][1] is not None else None)
-                    for n, g in lb.gw.items()}
-        for a in agents:
-            a.wait()
-        seen = {"client": {}, "server": {}}
-        for rf in parts:
-            for line in open(rf):
-                r = json.loads(line)
-                seen[r["role"]][r["id"]] = r
+
+        def during(t0):
+            todo = []                           # (seconds after t0, what happens)
+            for e in events:
+                g = lb.gw.get(e.get("gw"))
+                if e["do"] == "reroute":
+                    todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"])))
+                elif e["do"] == "lose_state":
+                    todo.append((e["at"], lambda g=g: impl.lose_state(g)))
+                elif e["do"] == "uplink_recreate":
+                    todo.append((e["at"], lambda g=g: lb.uplink_recreate(g)))
+                elif e["do"] == "sync_blackout":
+                    todo.append((e["at"], lambda g=g: lb.sync_blackout(g, True)))
+                    todo.append((e["at"] + e["seconds"], lambda g=g: lb.sync_blackout(g, False)))
+                else:
+                    raise SystemExit("unknown event %r" % e["do"])
+            for at, act in sorted(todo, key=lambda x: x[0]):
+                time.sleep(max(0, t0 + at - time.monotonic()))
+                act()
+            if alone:                           # CPU per gateway while each flow ran
+                for f in flows:
+                    time.sleep(max(0, t0 + f["start"] - time.monotonic()))
+                    a = {n: (g.cpu_ms(), g.kernel_ms()) for n, g in lb.gw.items()}
+                    time.sleep(max(0, t0 + f["start"] + span(f["p"]) - time.monotonic()))
+                    windows[f["id"]] = {
+                        n: dict(cpu=[round(x - y) for x, y in zip(g.cpu_ms(), a[n][0])] if a[n][0] else None,
+                                kernel=round(g.kernel_ms() - a[n][1]) if a[n][1] is not None else None)
+                        for n, g in lb.gw.items()}
+
+        seen = traffic(lb, flows, out, "flows", during)
         gws = {}
         for n, g in lb.gw.items():
             c1 = g.cpu_ms()
@@ -110,11 +144,11 @@ def lab(args, opts):
     res = []
     for f in flows:
         c, s = seen["client"].get(f["id"]), seen["server"].get(f["id"])
-        bad, retry = expect.judge(f, c, s, events)
+        bad, retry = expect.judge(f, c, s, events, sync_ms)
         res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,
-                       alone=alone, gateways=gws, flows=res), fh, indent=1)
+                       alone=alone, sync_ms=sync_ms, ladder=ladder, gateways=gws, flows=res), fh, indent=1)
     return 0
 
 
@@ -141,7 +175,7 @@ def main():
     fleets = args.fleet or list(sc.FLEETS)
     alone = getattr(sc, "ALONE", False)
     spans = [span(f["p"]) for f in sc.FLOWS if args.flow in f["id"]]
-    secs = (sum(spans) + 2 * len(spans) + 15) * len(fleets) if alone else max(spans) + 20
+    secs = (sum(spans) + 2 * len(spans) + 15) * len(fleets) if alone else max(spans) + 35
     print("%s on %s: fleets %s, about %d s; results in %s"
           % (args.scenario, args.impl, ", ".join(fleets), secs, args.out), flush=True)
     wrap = ["unshare", "-n"] if root else ["unshare", "-Urn"]

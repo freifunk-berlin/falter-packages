@@ -31,12 +31,25 @@ gateway. Implementations that need real root (BPF) run through `vm.sh`
 
 A flow is named `traffic:client>forward gateway>server>return gateway`.
 
-**The expectation** (`expect.py`): a flow through one gateway is clean from
-its first packet. A flow through two gateways may lose its first attempt (the
-server's answer can be faster than the gateways' sync); the endpoint's own
-retry has to repair that (the next UDP request, a TCP SYN retransmission), and
-after 1.5 s the flow has to be clean. Nothing may reset a connection. Results
-are pass or FAIL; how many flows needed the retry is a column.
+**The expectation** (`expect.py`) has no fixed allowance for loss. Every lab
+first measures how fast the implementation syncs, from outside: new flows
+over every gateway pair whose server holds its first answer back by 0 to
+1000 ms. From that and each path:
+
+- One gateway: clean from the first packet.
+- Two gateways, and the answer's detour to the server and back is at least
+  the sync latency: the race can be won, clean from the first packet.
+- Two gateways and a shorter detour: what the client sends in the first
+  (sync latency - detour) of a flow may go unanswered, and the endpoint's own
+  retry has to repair it: the first UDP request after that time, the first
+  TCP SYN retransmission (1, 3, 7 s) after it.
+- An event cannot be won while it lasts and until the sync has delivered
+  again: its duration + the sync latency, and one path RTT around it.
+- A reset or a stalled connection is never accepted. If no answer passed in
+  the measurement, nothing is accepted on a path through two gateways.
+
+Results are pass or FAIL; the measured sync latency is in the report's
+header, how many flows needed a retry is a column.
 
 **An implementation** gets a gateway (a namespace with `mesh0`, `wan0`, the
 peers' sync addresses on the uplink, a policy, a directory) and provides
@@ -96,9 +109,9 @@ cost a walk of the host's buckets.
 | `latency` | new flows to a server at distance 0 that holds its first answer back by 0 to 1000 ms | from which delay on every answer passes: the sync latency, seen from outside |
 | `perf` | one flow at a time, nothing else running, no link latency | numbers, below |
 
-An event may cost packets from its start until 5 s after its end (the lab's
-timers are about ten times shorter than production's); a TCP connect may wait
-an event out; a reset is never excused.
+What an event may cost follows from the measured sync latency (see the
+expectation above); a TCP connect may wait an event out with its SYN
+retries; a reset is never accepted.
 
 `perf` is a measurement (`ALONE = True`: labs and flows one after the other)
 on three gateways, each traffic over one gateway and over two:

@@ -1,6 +1,6 @@
 """gw2 is cut off from the sync from before the first flow until 2 s in: it
 misses the start of every flow. Whatever the implementation does to repair a
-lost announcement has to have worked by the end of the event's grace."""
+lost announcement has to work as fast as its sync does."""
 from ..scenario import grid
 from .gw5 import FLEETS, GW, TOPOLOGY  # noqa: F401
 

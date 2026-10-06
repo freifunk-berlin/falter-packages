@@ -3,7 +3,7 @@
 
   agent.py client|server <job.json> <out.jsonl>
 
-job.json: {"t0": <CLOCK_MONOTONIC second all flows count from>, "grace": <seconds>,
+job.json: {"t0": <CLOCK_MONOTONIC second all flows count from>,
            "flows": [{"id", "c", "s", "cport", "sport", "start", "p": {"kind", ...}}, ...]}
 out.jsonl: one line per flow with what this end saw.
 
@@ -90,7 +90,7 @@ def stream(s, peer, pps, seconds, deadline):
 
 
 # ---------------------------------------------------------------- client
-def c_udp_rr(f, p, t0, grace):
+def c_udp_rr(f, p, t0):
     s = sock(socket.SOCK_DGRAM, f["c"], f["cport"])
     s.connect((f["s"], f["sport"]))
     sleep_until(t0)
@@ -116,7 +116,7 @@ def c_udp_rr(f, p, t0, grace):
     return dict(answered=answered, rtt_min_ms=min(rtt) if rtt else None, refused=refused)
 
 
-def c_udp_stream(f, p, t0, grace):
+def c_udp_stream(f, p, t0):
     s = sock(socket.SOCK_DGRAM, f["c"], f["cport"])
     sleep_until(t0)
     got, sent, gap, refused = stream(s, (f["s"], f["sport"]), p["up_pps"], p["seconds"],
@@ -133,7 +133,7 @@ def retrans(s):
         return None
 
 
-def c_tcp_short(f, p, t0, grace):
+def c_tcp_short(f, p, t0):
     sleep_until(t0)
     conns = []
     for k in range(p["connections"]):
@@ -161,7 +161,7 @@ def c_tcp_short(f, p, t0, grace):
     return dict(conns=conns)
 
 
-def c_tcp_talk(f, p, t0, grace):
+def c_tcp_talk(f, p, t0):
     sleep_until(t0)
     s = sock(socket.SOCK_STREAM, f["c"], f["cport"])
     s.settimeout(p.get("timeout", 6))
@@ -190,7 +190,7 @@ def c_tcp_talk(f, p, t0, grace):
     return r
 
 
-def c_udp_ladder(f, p, t0, grace):
+def c_udp_ladder(f, p, t0):
     """one new flow (a new client port) per delay: the server holds its
     answer back that long. Is it let through?"""
     sleep_until(t0)
@@ -207,7 +207,7 @@ def c_udp_ladder(f, p, t0, grace):
     return dict(answered=answered)
 
 
-def s_udp_ladder(f, p, t0, grace):
+def s_udp_ladder(f, p, t0):
     """answer every datagram after the delay it asks for"""
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     end, due = t0 + sum(p["delays_ms"]) / 1000 + len(p["delays_ms"]) * 0.6 + 2, []
@@ -252,7 +252,7 @@ def flood(s, peer, size, until):
     return n
 
 
-def c_udp_flood(f, p, t0, grace):
+def c_udp_flood(f, p, t0):
     """dir=up: the client floods. dir=down: the client opens the flow and
     keeps it alive, the server floods back from 2 s on (the sync has had its
     time); the client counts."""
@@ -273,7 +273,7 @@ def c_udp_flood(f, p, t0, grace):
             return dict(delivered_pps=round((rx_packets() - rx0) / (now - ta)))
 
 
-def s_udp_flood(f, p, t0, grace):
+def s_udp_flood(f, p, t0):
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
     if p["dir"] == "up":
@@ -292,7 +292,7 @@ def s_udp_flood(f, p, t0, grace):
     return dict(sent=flood(s, peer, p["size"], t1 + 2 + p["seconds"]))
 
 
-def c_tcp_bulk(f, p, t0, grace):
+def c_tcp_bulk(f, p, t0):
     """the server sends as fast as it can for `seconds`"""
     sleep_until(t0)
     s = sock(socket.SOCK_STREAM, f["c"], f["cport"])
@@ -320,7 +320,7 @@ def udp_header(sport, dport, n):
     return struct.pack("!HHHH", sport, dport, 8 + n, 0)
 
 
-def c_udp_newflows(f, p, t0, grace):
+def c_udp_newflows(f, p, t0):
     """new flows at a rising rate: one datagram per new source port. The
     server answers each after reply_delay; an answer arrives only if the
     return gateway knows the flow by then."""
@@ -347,7 +347,7 @@ def c_udp_newflows(f, p, t0, grace):
     return dict(steps=steps)
 
 
-def s_udp_newflows(f, p, t0, grace):
+def s_udp_newflows(f, p, t0):
     import collections
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 << 20)
@@ -372,7 +372,7 @@ def s_udp_newflows(f, p, t0, grace):
 
 
 # ---------------------------------------------------------------- server
-def s_udp_rr(f, p, t0, grace):
+def s_udp_rr(f, p, t0):
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     end, n = t0 + p["requests"] * p["every"] + 2, 0
     while mono() < end:
@@ -387,13 +387,13 @@ def s_udp_rr(f, p, t0, grace):
     return dict(requests_seen=n)
 
 
-def s_udp_stream(f, p, t0, grace):
+def s_udp_stream(f, p, t0):
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     got, sent, gap, refused = stream(s, None, p["down_pps"], p["seconds"], t0 + p["seconds"] + 2.0)
     return dict(tx=sent, rx=len(got), lost=missing(got, p["up_pps"], p["seconds"]), refused=refused)
 
 
-def s_tcp(f, p, t0, grace):
+def s_tcp(f, p, t0):
     ls = sock(socket.SOCK_STREAM, f["s"], f["sport"])
     ls.listen(16)
     ls.settimeout(0.5)
@@ -455,7 +455,7 @@ def main():
 
     def run(f):
         try:
-            r = KINDS[role][f["p"]["kind"]](f, f["p"], job["t0"] + f["start"], job["grace"])
+            r = KINDS[role][f["p"]["kind"]](f, f["p"], job["t0"] + f["start"])
         except Exception as e:      # a flow that could not even run is a result, too
             r = dict(crashed="%s: %s" % (type(e).__name__, e))
         with lock:

@@ -1,42 +1,58 @@
-"""What "works" means for a flow. No implementation appears in this file.
+"""What "works" means for a flow. No implementation appears in this file,
+and no fixed allowance for loss: what is accepted follows from how fast the
+implementation syncs in this lab (measured before the flows, from outside)
+and from the protocols' own retry timers.
 
 One gateway for both directions (symmetric): clean from the first packet.
 
-Two gateways (asymmetric): the return gateway has to learn the flow from the
-forward one, and the server's first answer may be faster than that. So the
-start of a flow (of every connection, for TCP) may cost one attempt, which the
-endpoint's own retry repairs: the next UDP request is answered, a TCP client's
-SYN retransmission connects. After GRACE seconds the flow has to be clean.
+Two gateways (asymmetric): the return gateway learns the flow from the forward
+one. The sync and the server's answer travel the same uplinks; the answer
+additionally goes to the server and back (the path's margin). So:
+
+  sync latency <= margin   the race can be won: clean from the first packet
+  sync latency >  margin   it cannot: what the client sends in the first
+                           (sync latency - margin) of a flow gets no answer.
+                           That much loss is accepted, and the endpoint's own
+                           retry has to repair it: the first UDP request after
+                           that time is answered, the first TCP SYN
+                           retransmission after it connects.
 
 An event of the scenario (a reroute, a gateway losing its state, a sync
-blackout, an uplink re-created) may cost packets from its start until
-EVENT_GRACE seconds after its end, on any flow.
+blackout, an uplink re-created) cannot be won while it lasts and until the
+sync has delivered again: from its start until its end + the sync latency
+(and one path RTT around it, for what is on its way).
 
-Nothing may ever reset or stall a connection.
+Nothing ever excuses a reset or a stalled connection. If answers never passed
+in the measurement, nothing is accepted on an asymmetric path.
 
 judge() returns (what is wrong: a list, empty = pass; whether the flow needed
-a retry at its start: reported, not judged).
+a retry: reported, not judged).
 """
-GRACE = 1.5         # seconds: one TCP SYN retransmission (1 s) and some air
-EVENT_GRACE = 5     # seconds after an event; the lab's timers are about 10 x shorter than production's
+SYN_RETRIES = (1, 3, 7, 15)     # seconds after the first SYN at which Linux sends it again
+JITTER_MS = 300                 # timing noise of the lab in a connect time; well below a SYN retry
 
 
-def judge(f, c, s, events=()):
+def judge(f, c, s, events=(), sync_ms=None):
     """f: the flow, c / s: what the client's and the server's agent saw,
-    events: the scenario's, with "at" in seconds after the first flow's start"""
+    events: the scenario's ("at": seconds after the first flow's start),
+    sync_ms: the measured sync latency, None if answers never passed"""
     if c is None or s is None or "crashed" in c or "crashed" in s:
         return ["no result from the %s" % ("client" if c is None or "crashed" in (c or {})
                                            else "server")], False
-    win = [(e["at"] - f["start"], e["at"] + e.get("seconds", 0) + EVENT_GRACE - f["start"])
+    sync = (sync_ms or 0) / 1000
+    lost_start = max(0, sync - f["margin_ms"] / 1000) if f["asym"] and sync_ms is not None else 0
+    # an event also hits what is on its way: one path RTT before and after
+    rtt = f["rtt_ms"] / 1000
+    win = [(e["at"] - f["start"] - rtt, e["at"] + e.get("seconds", 0) + sync + rtt - f["start"])
            for e in events]
 
     def excused(t):
-        """may something go wrong t seconds into the flow? None, or why
-        ("start", "event") and until when"""
+        """may what the client sends t seconds into the flow go unanswered?
+        None, or why ("start", "event") and until when"""
         for a, b in win:
             if a <= t < b:
                 return "event", b
-        return ("start", GRACE) if f["asym"] and t < GRACE else None
+        return ("start", lost_start) if t < lost_start else None
     return RULES[f["p"]["kind"]](f, c, s, excused)
 
 
@@ -44,7 +60,7 @@ def udp_rr(f, c, s, excused):
     lost = [k for k, ok in enumerate(c["answered"]) if not ok]
     bad = [k for k in lost if not excused(k * f["p"]["every"])]
     return ((["request %s unanswered" % ", ".join(map(str, bad))] if bad else []),
-            any((excused(k * f["p"]["every"]) or [0])[0] == "start" for k in lost))
+            any(excused(k * f["p"]["every"]) for k in lost))
 
 
 def udp_stream(f, c, s, excused):
@@ -54,22 +70,22 @@ def udp_stream(f, c, s, excused):
     if up:
         bad.append("client>server lost %d, first at %.1f s" % (len(up), up[0] / p["up_pps"]))
     if down:
-        bad.append("server>client lost %d, first at %.1f s, longest gap %d ms"
+        bad.append("server>client lost %d, first at %.2f s, longest gap %d ms"
                    % (len(down), down[0] / p["down_pps"], c["outage_ms"]))
-    return bad, any((excused(k / p["down_pps"]) or [0])[0] == "start" for k in c["lost"])
+    return bad, any(excused(k / p["down_pps"]) for k in c["lost"])
 
 
 def connect_ok(f, r, t, excuse, what):
-    """a connection started t seconds into the flow came up: at once, or
-    (excused) by a SYN retransmission: the one after 1 s at the start of a
-    flow, the first one after an event's grace is over"""
+    """a connection started t seconds into the flow came up: at once, or, if
+    the race cannot be won until some time, by the first SYN retransmission
+    after that time"""
     if r["connect_ms"] is None:
         return "%s: %s" % (what, r.get("error", "no connection"))
-    limit = 700
-    if excuse:
-        limit = 1000 * (GRACE if excuse[0] == "start" else excuse[1] - t + 4) + 300
-    if r["connect_ms"] > f["rtt_ms"] + limit:
-        return "%s: connect took %d ms (path RTT %d ms)" % (what, r["connect_ms"], f["rtt_ms"])
+    retry = next((x for x in SYN_RETRIES if excuse and x >= excuse[1] - t), 0 if not excuse else 31)
+    if r["connect_ms"] > f["rtt_ms"] + 1000 * retry + JITTER_MS:
+        return "%s: connect took %d ms (path RTT %d ms, %s)" % (
+            what, r["connect_ms"], f["rtt_ms"],
+            "SYN retry expected after %d s" % retry if retry else "no retry expected")
     return None
 
 
@@ -80,15 +96,17 @@ def slow(f, r):
 def tcp_short(f, c, s, excused):
     bad, retry = [], False
     for k, r in enumerate(c["conns"]):
-        # every connection is a new flow: its own start
+        # every connection is a new flow with its own start: the event
+        # windows are in flow time, the start window is in connection time
         t = k * f["p"]["every"]
-        excuse = excused(t) or (("start", GRACE) if f["asym"] else None)
+        ev, st = excused(t), excused(0)
+        excuse = ev if ev and ev[0] == "event" else (("start", t + st[1]) if st and st[0] == "start" else None)
         e = connect_ok(f, r, t, excuse, "connection %d" % k)
         if not e and not r["ok"]:
             e = "connection %d: %s" % (k, r.get("error", "failed"))
         if e:
             bad.append(e)
-        retry |= slow(f, r) and bool(excuse)
+        retry |= slow(f, r)
     return bad, retry
 
 

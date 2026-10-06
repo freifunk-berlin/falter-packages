@@ -1,5 +1,5 @@
 """gw2 loses every flow it knows 20 s in (a flush, a reboot): the flows through
-it have to be back within the event's grace, and no connection may break."""
+it have to be back as fast as the implementation syncs, and no connection may break."""
 from ..scenario import grid
 from .gw5 import FLEETS, GW, TOPOLOGY  # noqa: F401
 

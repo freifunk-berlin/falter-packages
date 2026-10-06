@@ -232,11 +232,16 @@ class Lab:
         """give every flow its addresses, its path and its expected RTT"""
         ends = list(self.clients.values()) + list(self.servers.values())
         add = {e: [] for e in ends}
-        for n, f in enumerate(flows, 1):
+        first = getattr(self, "placed", 0) + 1
+        self.placed = first + len(flows) - 1
+        for n, f in enumerate(flows, first):
             c, s = self.clients[f["client"]], self.servers[f["server"]]
             fw, rv = self.gw[f["fwd"]], self.gw[f["rev"]]
             f["c"], f["s"] = "%s%x" % (c.prefix, n), "%s%x" % (s.prefix, n)
             f["asym"] = fw is not rv
+            # the sync travels the uplinks like the answer does: what the answer
+            # takes longer is the way to the server and back
+            f["margin_ms"] = 2 * s.ms
             f["rtt_ms"] = (2 * (c.ms + s.ms) + fw.mesh_ms + fw.uplink_ms + rv.uplink_ms + rv.mesh_ms)
             add[c] += ["addr add %s/128 dev lo nodad" % f["c"],
                        "route add %s/128 via %s" % (f["s"], fw.mesh6)]

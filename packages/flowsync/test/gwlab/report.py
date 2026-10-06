@@ -70,6 +70,11 @@ def render(run):
     out = ["== %s, %s, fleet %s: %d flows, %d FAIL =="
            % (run["scenario"], run["impl"], run["fleet"], len(run["flows"]),
               sum(1 for r in run["flows"] if r["bad"]))]
+    if run.get("ladder"):
+        ms = run["sync_ms"]
+        out.append("sync latency measured before the flows: %s" % (
+            "answers never passed: nothing is accepted on asymmetric paths" if ms is None else
+            "at most %g ms; a flow whose answer takes a shorter detour than that may lose its start" % ms))
     groups = {}
     for r in run["flows"]:
         f = r["flow"]
