@@ -4,7 +4,7 @@
  * wire format, the ctnetlink message builder/parser, the RX table with its
  * ownership rules and the injection bookkeeping. Build and run with
  * "make test" (TEST_RUNNER=qemu-... when cross compiling). The kernel-side
- * behaviour is covered by the integration tests in test/fstest.
+ * behaviour is covered by the data path tests in test/gwlab.
  */
 
 #define _GNU_SOURCE

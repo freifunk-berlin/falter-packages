@@ -37,41 +37,28 @@ $(TEST): $(TEST_OBJS)
 test: $(TEST)
 	$(TEST_RUNNER) ./$(TEST)
 
-# integration tests in network namespaces (../test/fstest, see
-# ../test/README.md): need iproute2, nft, python3 and util-linux, no root.
+# data path tests in network namespaces (../test/gwlab, see its README.md):
+# the daemon on a fleet of gateways with real traffic over every gateway pair,
+# judged by what the endpoints see. Need iproute2, tc, nft, python3 and
+# util-linux, no root.
 #
-#   make itest                                  default matrix, quiet
-#   make itest S="resync tcp_idle"              some scenarios
-#   make itest P="g3 off=01 ack=-" S=tcp_idle   one combination, named as printed
-#   make itest M=quick | M=full                 another matrix
-#   make itest T=tcp                            scenarios by tag
-#   make itest J=8 V=1 K=1                      jobs, every run printed, keep all logs
+#   make itest                                   scenario steady, all fleets
+#   make itest S=symasym                         another scenario (test/gwlab/scenarios)
+#   make itest S=steady FLEET=strict             one fleet
+#   make itest FLOW='tcp_talk:A>gw1>B>gw2'       only flows whose name contains this
+#   make itest S=longlived SCALE=10              timers and durations divided by 10
 #
-# Prints failures, the result table and the summary; exit status 1 on any
-# failure. Logs of failed runs stay in the directory the summary names, the
-# timestamped progress of every check is in LOG (tail -f it).
-# check: the unit test and the default matrix.
-CTQ = ../test/ctquery
-CTQ_OBJS = ctnl.o util.o policy.o config.o status.o wire.o udp.o
-M ?= default
-S ?=
-P ?=
-T ?=
-J ?=
-V ?=
-K ?=
-LOG ?= /tmp/flowsync-test.log
+# Exit status 1 if a flow failed; results and logs in the directory it names.
+# check: the unit test and the scenario steady.
+S ?= steady
+FLEET ?=
+FLOW ?=
+SCALE ?=
 
-$(CTQ): ../test/ctquery.c $(CTQ_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -I. -o $@ ../test/ctquery.c $(CTQ_OBJS) $(LDLIBS_TEST)
-
-itest: $(PROG) $(CTQ)
-	@cd ../test && { python3 -m unittest -q fstest.selftest >/dev/null 2>&1 || \
-		{ echo "fstest selftest failed: cd test && python3 -m unittest fstest.selftest"; exit 1; }; } && \
-	python3 -m fstest --flowsync ../src/$(PROG) --ctquery ctquery --log $(LOG) \
-		$(if $(P),--profile "$(P)",--matrix $(M)) $(if $(S),--scenarios $(S)) \
-		$(if $(T),--tags $(T)) $(if $(J),--jobs $(J)) $(if $(K),--keep) \
-		$(if $(V),-v,--quiet)
+itest: $(PROG)
+	@cd ../test && python3 -m gwlab $(S) --impl flowsync --set bin=../src/$(PROG) \
+		$(if $(FLEET),--fleet $(FLEET)) $(if $(FLOW),--flow '$(FLOW)') \
+		$(if $(SCALE),--scale $(SCALE))
 
 check: test itest
 
@@ -82,6 +69,6 @@ install: $(PROG)
 	install -m 755 $(PROG) $(DESTDIR)$(SBINDIR)/$(PROG)
 
 clean:
-	rm -f $(PROG) $(TEST) $(CTQ) $(OBJS) $(TEST_OBJS)
+	rm -f $(PROG) $(TEST) $(OBJS) $(TEST_OBJS)
 
 .PHONY: all test itest check install clean

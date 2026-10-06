@@ -663,8 +663,8 @@ sync firewall rule.
   rule; raising `nf_conntrack_tcp_timeout_unacknowledged` on the gateways
   extends it, for natives too. A connection on which the client never sent
   data (it only acknowledges) is not capped: its native lives on the
-  established timeout and keeps the copy (fstest `tcp_push_talk_idle`,
-  `tcp_push_idle`).
+  established timeout and keeps the copy (gwlab scenario `idle` shows the
+  limit end to end).
 - The `element_timeout >= 3 x interval` check is local. Every gateway's
   `element_timeout` must cover every *peer's* `interval`; render the same values
   everywhere. A copy that received a RST is in state
@@ -803,17 +803,16 @@ used only to build the BPF filter for the event socket.
 | `main.c` | main loop and subcommands |
 | `test_flowsync.c` | unit test: prefixes, policy, wire format, ctnetlink messages, RX table, injection bookkeeping (`make test`) |
 
-`test/` holds the integration tests, documented in [test/README.md](test/README.md)
-(topology, framework, every scenario, known issues): `test/fstest`, a small
-Python framework (stdlib only, no root) that runs the real daemon on two to
-four gateways in unprivileged network namespaces, with forwarded traffic
-between a client and a server namespace, across combinations of per-gateway
-profiles (flow offloading, stateless ACK rule).
+`test/gwlab` holds the data path tests, documented in
+[test/gwlab/README.md](test/gwlab/README.md): a lab of clients, gateways and
+servers with per-link latency in unprivileged network namespaces (Python
+stdlib, no root), real traffic over every pair of gateways, judged by what the
+endpoints see. It knows no implementation: the same scenarios run against
+flowsync, conntrackd + samplicator and others (`test/gwlab/impl`).
 
     make -C src test                                  # unit test
-    make -C src itest                                 # integration tests, default matrix (~3 min)
-    make -C src itest S="resync tcp_idle"             # some scenarios
-    make -C src itest P="g3 off=01 ack=-" S=tcp_idle  # one combination, named as printed
+    make -C src itest                                 # scenario steady, all fleets (~2 min)
+    make -C src itest S=symasym FLEET=strict          # another scenario, one fleet
     make -C src check                                 # both
 
 Cross-compiling against an OpenWrt staging dir and running the unit test under
