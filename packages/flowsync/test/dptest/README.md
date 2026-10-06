@@ -15,6 +15,7 @@ is specific to this one and cannot be judged from the endpoints.
 | the programs next to SQM's qdiscs (an ingress qdisc with an IFB redirect, a shaper as root), in either order | `ingress_qdisc` |
 | what fails: programs that cannot be attached, a daemon that cannot load them, a table of another size | `fail_open`, `load_failure`, `resize` |
 | limits, forged announcements, running without root's capabilities | `forged`, `unprivileged` |
+| a peer back after a gap longer than a heartbeat spacing is asked for a round at once | `peer_return` |
 | a burst of new flows (slow, not in the default run) | `scale` |
 
 Whether real connections survive latency, reroutes, loss on the sync path or

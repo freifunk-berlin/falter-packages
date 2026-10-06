@@ -203,6 +203,7 @@ bool dgram_send(bool hold);
 bool dgram_held(void);
 bool dgram_resend(void);
 unsigned int dgram_control(uint8_t flags);
+bool dgram_control_to(int peer, uint8_t flags);
 
 /* dp.c */
 struct fs_stats;
@@ -266,6 +267,7 @@ void handle_rx(void);
 /* resync.c */
 void resync_request(void);
 void resync_from(int peer);
+void resync_peer_back(int peer, uint32_t silence);
 bool resync_round_wanted(void);
 void resync_round_pulled(void);
 void resync_round_started(void);

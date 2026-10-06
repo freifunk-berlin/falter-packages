@@ -483,3 +483,33 @@ def ingress_qdisc(env):
     env.check("replies pass with SQM added under the programs (of 3)", replies(env, f1), 3)
     env.check("the programs stayed", hook_names(g1, "ingress") + hook_names(g1, "egress"),
               ["fs_ingress", "fs_egress"])
+
+
+@scenario(gateways=2)
+def peer_return(env):
+    """g0 is cut off from g1's datagrams for longer than a heartbeat spacing;
+    a flow g1 announced meanwhile is unknown to g0. With the first datagram
+    from g1 after the gap (here: a new flow's announcement) g0 sees that g1
+    was silent too long, asks it for a round, and holds the missed flow long
+    before g1's next regular round."""
+    g0, g1 = env.g[:2]
+    env.start()
+    g0.block_sync(src=g1)
+    env.sleep(1.5 * env.I + 0.5)        # more than a heartbeat spacing: g1 is "silent"
+    missed = env.flow("udp", fw=g1, rev=g0)
+    missed.send()
+    env.sleep(0.5)
+    env.check("g0 does not hold the flow announced while cut off", g0.ft(missed).remote, False)
+    r0, r1 = g0.st("tx_resync") or 0, g1.st("rx_resync") or 0
+    g0.unblock_sync()
+    trigger = env.flow("udp", fw=g1, rev=g0)
+    trigger.send()                      # g1's first datagram to g0 after the gap
+    env.wait_for("g0 asked g1 for a round (log)", 1,
+                 lambda: "asked it for a round" in g0.log(), step=0.05)
+    env.wait_for("and holds the missed flow within a second, not an interval", 1,
+                 lambda: g0.ft(missed).remote, step=0.05)
+    env.check("replies pass g0 (of 3)", replies(env, missed), 3)
+    g0.tick()
+    env.check("status: one resync request sent", (g0.st("tx_resync") or 0) - r0, 1)
+    g1.tick()
+    env.check("g1 counted the request", (g1.st("rx_resync") or 0) - r1, 1)

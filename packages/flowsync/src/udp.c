@@ -341,31 +341,37 @@ bool dgram_resend(void)
 	return !held.peers;
 }
 
-/* a datagram without records to all peers: heartbeat, or a resync request;
- * returns how many peers it was sent to */
-unsigned int dgram_control(uint8_t flags)
+/* a datagram without records to one peer: heartbeat, or a resync request;
+ * true if it was sent */
+bool dgram_control_to(int peer, uint8_t flags)
 {
 	static uint64_t last_log;
 	char abuf[INET6_ADDRSTRLEN];
 	uint8_t hdr[WIRE_HDR_LEN];
-	unsigned int i, sent = 0;
 
 	if (udp_fd < 0)
-		return 0;
+		return false;
 	wire_put_hdr(hdr, 0, flags);
-	for (i = 0; i < cfg.n_peer; i++) {
-		if (sendto(udp_fd, hdr, sizeof(hdr), MSG_DONTWAIT,
-			   (struct sockaddr *)&peer_sa[i], sizeof(peer_sa[i])) < 0) {
-			cnt.tx_errors++;
-			peer_tx_errors[i]++;
-			if (log_ok(&last_log))
-				logmsg(LOG_WARNING, "send to %s: %s",
-				       addr_str(&cfg.peer[i], abuf, sizeof(abuf)), strerror(errno));
-		} else {
-			cnt.tx_control++;
-			sent++;
-		}
+	if (sendto(udp_fd, hdr, sizeof(hdr), MSG_DONTWAIT,
+		   (struct sockaddr *)&peer_sa[peer], sizeof(peer_sa[peer])) < 0) {
+		cnt.tx_errors++;
+		peer_tx_errors[peer]++;
+		if (log_ok(&last_log))
+			logmsg(LOG_WARNING, "send to %s: %s",
+			       addr_str(&cfg.peer[peer], abuf, sizeof(abuf)), strerror(errno));
+		return false;
 	}
+	cnt.tx_control++;
+	return true;
+}
+
+/* the same to all peers; returns how many it was sent to */
+unsigned int dgram_control(uint8_t flags)
+{
+	unsigned int i, sent = 0;
+
+	for (i = 0; i < cfg.n_peer; i++)
+		sent += dgram_control_to(i, flags);
 	return sent;
 }
 

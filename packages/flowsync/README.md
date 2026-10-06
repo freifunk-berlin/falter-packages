@@ -364,8 +364,17 @@ receiver for a round now (resync).
   missing) and when its sync socket had to be reopened. A peer answers with
   a round at `resync_rate` (default four times `tx_rate`), at most once per
   requesting peer per `interval`/4 and twice per `interval` overall. In the
-  tests a rebooted gateway holds its peers' flows again within 1.5 s
- .
+  tests a rebooted gateway holds its peers' flows again within 1.5 s.
+- A peer that comes back is asked too. Every peer sends at least its
+  heartbeat per `interval`, so a datagram from a peer whose last one is more
+  than one and a half intervals old means the path was down or lost that
+  heartbeat, and with it the announcements made meanwhile: the receiver asks
+  that peer for a round at once (once per peer per `interval`/2) instead of
+  waiting for its next regular one. Both sides of a partition see the other
+  come back, so both ask. The repair starts with the first datagram after
+  the gap, which on a busy gateway is the next new flow; on a quiet one it
+  is the next heartbeat, so a partition shorter than an interval on a quiet
+  path is repaired by the regular round only.
 
 ## Configuration
 

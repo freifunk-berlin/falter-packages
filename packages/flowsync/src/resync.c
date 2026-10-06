@@ -16,6 +16,14 @@
  * twice per interval, whoever asked (a budget that refills): a round started
  * meanwhile serves them all, and forged requests from many peer addresses
  * cannot make it run rounds back to back.
+ *
+ * A peer that comes back: every peer sends at least a heartbeat per interval,
+ * so a datagram from a peer whose last one is more than one and a half
+ * intervals old means the path was down or lost at least that heartbeat, and
+ * with it whatever announcements the peer made meanwhile. That peer is asked
+ * for a round at once (one request per peer per interval/2), instead of
+ * waiting up to an interval for its next regular one. Both sides of a
+ * partition see the other come back, so both ask.
  */
 
 #define _GNU_SOURCE
@@ -50,6 +58,24 @@ void resync_from(int peer)
 		return;
 	peer_asked[peer] = now;
 	round_wanted = true;
+}
+
+/* rx: a datagram from a peer silent for longer than a heartbeat spacing
+ * (silence: seconds since its last one). Ask it for a round, paced per peer. */
+void resync_peer_back(int peer, uint32_t silence)
+{
+	static uint64_t asked_back[MAX_PEERS];
+	char abuf[INET6_ADDRSTRLEN];
+	uint64_t now = mono_ms();
+
+	if (asked_back[peer] && now - asked_back[peer] < cfg.interval * 1000 / 2)
+		return;
+	asked_back[peer] = now;
+	if (!dgram_control_to(peer, WIRE_F_RESYNC))
+		return;
+	cnt.tx_resync++;
+	logmsg(LOG_NOTICE, "peer %s: back after %u s without a datagram (a heartbeat was lost): "
+	       "asked it for a round", addr_str(&cfg.peer[peer], abuf, sizeof(abuf)), silence);
 }
 
 /* two rounds per interval, at most two in a row */

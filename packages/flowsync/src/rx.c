@@ -71,8 +71,15 @@ void handle_rx(void)
 		/* liveness from well-formed datagrams only: garbage with a peer's
 		 * address must not hide that the peer is gone */
 		if (rc == PARSE_OK) {
+			uint32_t now = now_s();
+
+			/* silent for more than a heartbeat spacing (and not since our
+			 * start, which asked everybody): it lost that heartbeat, and
+			 * whatever it announced meanwhile */
+			if (peer_last[p] && now - peer_last[p] > cfg.interval * 3 / 2)
+				resync_peer_back(p, now - peer_last[p]);
 			peer_rx[p]++;
-			peer_last[p] = now_s();
+			peer_last[p] = now;
 		}
 		if (rc == PARSE_OK && (flags & WIRE_F_RESYNC))
 			resync_from(p);
