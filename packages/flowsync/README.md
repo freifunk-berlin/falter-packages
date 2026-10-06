@@ -25,8 +25,7 @@ from another gateway passed that gateway's uplink, and was checked there.
 
 It was tested on x86_64 with kernel 7.3 in a VM (see "Source layout and
 tests"); it has not run on OpenWrt or on the gateways' hardware yet, and the
-OpenWrt package build is untested (see "Open points"). The conntrack-injection
-design it replaces is on branch `flowsync-conntrack`.
+OpenWrt package build is untested (see "Open points").
 
 ## Design
 
@@ -237,9 +236,7 @@ that server to that client in, not one port.
 ### TX
 
 - The egress program reports the first packet of every flow through a ring
-  buffer; a wanted one is announced to all peers at once. In the tests a
-  reply that takes 1 ms to come back already finds the flow on the reply
-  gateway.
+  buffer; a wanted one is announced to all peers at once.
 - Every `interval` the local map is walked (512 entries per system call, a
   few batches per loop iteration, only while the send queue has room). An
   entry past its timeout is deleted, every other wanted one is announced
@@ -260,12 +257,12 @@ that server to that client in, not one port.
 - Every record that passes the policy is written to the remote map, alive for
   `element_timeout` from now; one system call per burst of datagrams. An
   announcement of a flow that is there sets its time anew.
-- The remote map holds `max_copies` flows. When it is full, new flows are
+- The remote map holds `max_remote` flows. When it is full, new flows are
   refused (`rx_limited`) while the ones it has are still refreshed.
 
 ### Wire format
 
-Unchanged from the conntrack version. Binary UDP; one datagram is a 4 byte
+Binary UDP; one datagram is a 4 byte
 header followed by `count` records of 40 bytes, at most 34 records per
 datagram, by default 30 (1252 bytes as an IPv6/UDP packet):
 
@@ -319,7 +316,7 @@ The daemon is configured on the command line only. The init script renders
 | `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the sync socket |
 | `-m, --mark HEX` | `mark` | `0x01000000` | packet mark of accepted packets; the fw4 include must name the same value |
 | `-F, --max-flows N` | `max_flows` | `131072` | size of the local map. It is an LRU: when full, the flow that has been idle longest makes room. About 100 bytes per entry, allocated at start |
-| `-C, --max-copies N` | `max_copies` | `131072` | size of the remote map; when full, new flows are refused |
+| `-C, --max-remote N` | `max_remote` | `131072` | size of the remote map; when full, new flows are refused |
 | `--udp-timeout SEC` etc. | `udp_timeout`, `tcp_timeout`, `tcp_syn_timeout`, `tcp_close_timeout`, `other_timeout` | see above | lifetime of a local flow after its last packet out |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp`, `esp`, `gre`, `ipip`, `ip6ip6`, `l2tp` | synced protocols: these names, `sctp`, or a protocol number. Giving the option replaces the default list |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | UDP server ports never synced |
@@ -334,7 +331,7 @@ The daemon is configured on the command line only. The init script renders
 | `--fw-table NAME` | - | `fw4` | the firewall's `inet` table |
 | `-d, --debug` | `debug` | off | log every record sent and received |
 
-Changing `max_flows` or `max_copies` makes new maps at the next start: the
+Changing `max_flows` or `max_remote` makes new maps at the next start: the
 flows in the old ones are dropped (local flows are learned again from their
 next packet out, the peers' by the resync). The timeouts and the mark are
 part of the programs and take effect with a restart, the maps stay.
@@ -365,7 +362,7 @@ The status file (`flowsync status`), written every `interval`:
 | `attached` | the programs are on the uplink |
 | `bypass` | the bypass is on |
 | `fw_ok` | both rules are in place |
-| `local` / `copies` | live flows in the local / remote map at the last round |
+| `local` / `remote` | live flows in the local / remote map at the last round |
 | `tx_events` | flows announced from their first packet |
 | `tx_refresh` | records announced by the rounds |
 | `ev_recv` / `ev_overruns` | new-flow events read / lost because the ring was full |
@@ -382,29 +379,58 @@ The status file (`flowsync status`), written every `interval`:
 
 and one line per peer, `peer <address> rx <datagrams> age <seconds> tx_errors <n>`.
 
+## Migration from conntrackd
+
+flowsync and conntrackd (with samplicator) both use UDP port 3780 and cannot
+read each other's datagrams. While the fleet is mixed, every asymmetric flow
+whose forward and reply gateway run different software has no state on the
+reply gateway: with k of n gateways migrated that is 2k(n-k)/(n(n-1)) of
+those flows, 33 % for one of six, 60 % for three of six. So no canary and no
+rollout over days:
+
+- **One window:** build all images in one change and flash the gateways back
+  to back (`sysupgrade` reboots, so there is nothing to clean up), or in two
+  halves within minutes.
+- **Or a scripted flip:** ship an image with both packages, conntrackd active
+  and flowsync with `enabled '0'`; then stop and disable conntrackd and
+  samplicator and start flowsync on all gateways within seconds.
+
+On a gateway that carries traffic the first start hands forwarded IPv6 over
+from conntrack one `interval` after the programs are attached (see "The
+rules"); a flow that stays silent through that interval loses its way back
+in until its client sends again. Going back is `/etc/init.d/flowsync detach`
+(conntrack tracks forwarded IPv6 again from the next packet; flows that were
+running have no entry until their client sends) and starting conntrackd.
+
+bbb-configs has to render the options this version has (`uplink` where it is
+not the sync interface, `mark` if the default bit is taken, the timeouts if
+they should differ) and to stop rendering conntrackd's. Keep the stateless
+ACK/RST accept and the firewall rule for the sync port. The conntrack-based
+flowsync, which was never deployed, is on branch `flowsync-conntrack`.
+
 ## Known limits
 
 - **A reply can be faster than the announcement.** It then meets the stateless
   rules: for TCP the ACK/RST budget, which carries it; without that rule it is
-  rejected and the client's SYN retransmission finds the flow in place (test
-  `tcp_race`). In the tests a reply that takes 1 ms is never faster. Keep the
-  ACK/RST budget for this and for the seconds after a reboot.
+  rejected and the client's SYN retransmission finds the flow in place. How
+  long an announcement takes is measured from outside by gwlab (`latency`).
+  Keep the ACK/RST budget for this and for the seconds after a reboot.
 - **No TCP state on the reply side.** Any segment with the 5-tuple passes
-  while the flow lives. The conntrack version's copies were liberal too.
+  while the flow lives.
 - **Closed connections linger.** The reply gateway learns nothing from the
   server's FIN or RST, and a client that vanishes without a FIN leaves its
   flow for `tcp_timeout`. The local map is an LRU, so a full map evicts the
   idlest flows first, but an evicted flow that was merely idle loses its way
   back in.
 - **An idle connection lives `tcp_timeout`** after the client's last segment,
-  then the server's next push is reset. conntrack's
-  limit on an asymmetric path was `tcp_timeout_unacknowledged` (300 s).
-- **Sync is unauthenticated**, as before, and a gateway that masquerades mesh
-  traffic to its uplink address lets mesh hosts send to the peers' sync port
-  from a peer address (see the conntrack version's review, G-02): only the
-  firewall can stop that.
-- **`max_copies` refuses in arrival order**; there is no per-client limit
-  (the conntrack version had `max_copies_per_client`).
+  then the server's next push is reset.
+- **Sync is unauthenticated.** Peers are recognised by their source address
+  on the `interface` device. A gateway that masquerades mesh traffic to its
+  uplink address (bbb-configs does, for IPv4) rewrites a mesh host's datagram
+  to exactly that address and sends it out of the uplink: any mesh host can
+  then send announcements to every gateway but its own exit. Only the
+  firewall can stop that (no forwarding to the peers' sync port).
+- **`max_remote` refuses in arrival order**; there is no limit per client.
 - **Flow offloading** needs conntrack and cannot be used for forwarded IPv6
   on a gateway that runs this.
 - **The first start cuts flows that stay silent**: a flow that sends no
@@ -415,7 +441,7 @@ and one line per peer, `peer <address> rx <datagrams> age <seconds> tx_errors <n
 
 ## Open points
 
-Not done or not verified in this prototype:
+Not done or not verified yet:
 
 - The OpenWrt package Makefile follows `bridger` (BPF toolchain, `/lib/bpf`)
   but has not been built: no BPF toolchain was available here.

@@ -99,8 +99,8 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 1, UINT32_MAX, &cfg.mark, 16);
 	} else if (!strcmp(name, "max_flows")) {
 		return opt_uint(name, val, 1024, 16777216, &cfg.max_flows, 10);
-	} else if (!strcmp(name, "max_copies")) {
-		return opt_uint(name, val, 1024, 16777216, &cfg.max_copies, 10);
+	} else if (!strcmp(name, "max_remote")) {
+		return opt_uint(name, val, 1024, 16777216, &cfg.max_remote, 10);
 	} else if (!strcmp(name, "udp_timeout")) {
 		return opt_uint(name, val, 1, 86400, &cfg.t_udp, 10);
 	} else if (!strcmp(name, "tcp_timeout")) {
@@ -172,8 +172,8 @@ static const struct {
 	  "the same for a round that answers a resync request, 0: 4 x tx_rate (0)" },
 	{ 'B', "rcvbuf",           "rcvbuf",           "BYTES", "socket receive buffers (8388608)" },
 	{ 'm', "mark",             "mark",             "HEX",   "packet mark of accepted packets (0x01000000)" },
-	{ 'F', "max-flows",        "max_flows",        "N",     "most local flows (131072)" },
-	{ 'C', "max-copies",       "max_copies",       "N",     "most flows held for the peers (131072)" },
+	{ 'F', "max-flows",        "max_flows",        "N",     "most flows of our own: the local map (131072)" },
+	{ 'C', "max-remote",       "max_remote",       "N",     "most flows held for the peers: the remote map (131072)" },
 	{ OPT_UDP_T, "udp-timeout", "udp_timeout",     "SEC",   "local flow lifetime after its last packet out: UDP (180)" },
 	{ OPT_TCP_T, "tcp-timeout", "tcp_timeout",     "SEC",   "TCP (7440)" },
 	{ OPT_TCP_SYN_T, "tcp-syn-timeout", "tcp_syn_timeout", "SEC", "TCP, only SYNs so far (120)" },
@@ -242,7 +242,7 @@ int parse_args(int argc, char **argv)
 	cfg.rcvbuf = 8388608;
 	cfg.mark = 0x01000000;
 	cfg.max_flows = 131072;
-	cfg.max_copies = 131072;
+	cfg.max_remote = 131072;
 	cfg.t_udp = 180;
 	cfg.t_tcp = 7440;
 	cfg.t_tcp_syn = 120;

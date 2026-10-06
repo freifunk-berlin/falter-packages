@@ -101,19 +101,6 @@ uint32_t now_s(void)
 	return mono_ms() / 1000 + 1;
 }
 
-/* one unsigned number from a /proc/sys file; -1 if unreadable */
-int read_sysctl(const char *path, unsigned long *v)
-{
-	FILE *f = fopen(path, "r");
-	int ok;
-
-	if (!f)
-		return -1;
-	ok = fscanf(f, "%lu", v) == 1;
-	fclose(f);
-	return ok ? 0 : -1;
-}
-
 /* true at most once per LOG_INTERVAL_MS for the given slot */
 bool log_ok(uint64_t *last)
 {

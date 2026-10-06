@@ -16,8 +16,8 @@
  *    back.
  *
  * Both are looked at whenever the ruleset changes (a netlink notification)
- * and every interval. The rules are read and written with the nft tool: this
- * happens a few times an hour at most.
+ * and every interval. The rules are read and written with the nft tool: two
+ * short runs per look.
  */
 
 #include <errno.h>

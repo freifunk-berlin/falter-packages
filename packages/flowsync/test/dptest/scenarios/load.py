@@ -5,7 +5,7 @@ import time
 from ..scenario import scenario
 
 
-@scenario(gateways=2, once=True, tags={"heavy", "slow"})
+@scenario(gateways=2, tags={"heavy", "slow"})
 def scale(env):
     """SCALE_FLOWS (default 50000) new flows through g0 in one burst, faster
     than the event ring takes them: what the events miss, the next round
@@ -20,7 +20,7 @@ def scale(env):
     b.flood()
     env.ok("flood of %d flows took %.1f s" % (n, time.monotonic() - t0))
     env.wait_for("g1 holds all of them", 4 * env.I + 10,
-                 lambda: (g1.st("copies") or 0) >= n, step=0.5)
+                 lambda: (g1.st("remote") or 0) >= n, step=0.5)
     env.ok("after %.1f s; g0 events %s (ring overruns %s), g0 round %s ms, g1 round %s ms"
            % (time.monotonic() - t0, g0.st("tx_events"), g0.st("ev_overruns"),
               g0.st("refresh_ms"), g1.st("refresh_ms")))

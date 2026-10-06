@@ -79,7 +79,8 @@ define Package/flowsync/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/flowsync.config $(1)/etc/config/flowsync
 
-	# fw4 includes it at the top of its forward chain on every (re)load
+	# fw4 includes it in its forward chain on every (re)load: behind the
+	# includes its own configuration prepends, before its ct state rule
 	$(INSTALL_DIR) $(1)/usr/share/nftables.d/chain-pre/forward
 	$(INSTALL_DATA) ./files/flowsync.nft $(1)/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft
 endef

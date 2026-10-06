@@ -172,7 +172,7 @@ static int load(void)
 		if (!strcmp(name, "fs_local"))
 			bpf_map__set_max_entries(m, cfg.max_flows);
 		else if (!strcmp(name, "fs_remote"))
-			bpf_map__set_max_entries(m, cfg.max_copies);
+			bpf_map__set_max_entries(m, cfg.max_remote);
 		else if (len >= 7 && !strcmp(name + len - 7, ".rodata") &&
 			 bpf_map__set_initial_value(m, &dcfg, sizeof(dcfg))) {
 			logmsg(LOG_ERR, "%s: configuration does not fit the object", cfg.bpf_object);
@@ -221,7 +221,7 @@ static int on_event(void *ctx, void *data, size_t len)
 
 /*
  * load: the daemon. Loads the programs, creating the maps or taking the
- * pinned ones. Maps pinned with other sizes (max_flows or max_copies changed)
+ * pinned ones. Maps pinned with other sizes (max_flows or max_remote changed)
  * cannot be reused: they are dropped and made anew, with what they held.
  * Without load (the flow commands): open the pinned maps of a running or
  * stopped daemon.

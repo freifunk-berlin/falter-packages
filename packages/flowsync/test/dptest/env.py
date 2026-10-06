@@ -48,8 +48,7 @@ class Env:
     E = 9
     timers = {"udp": 12, "tcp": 40, "tcp_syn": 10, "tcp_close": 8, "other": 15}
 
-    def __init__(self, combo, paths, workdir, checks, topo=None):
-        self.combo = combo
+    def __init__(self, gateways, paths, workdir, checks, topo=None):
         self.flowsync = paths["flowsync"]
         self.bpf_object = paths["bpf_object"]
         # DPTEST_BYPASS=1: every daemon runs with --bypass
@@ -64,7 +63,7 @@ class Env:
             topo.bind(self)
             self.topo = topo
         else:
-            self.topo = Topology(self, combo)
+            self.topo = Topology(self, gateways)
         self.g = self.topo.g
         self.cl = self.topo.cl
         self.sv = self.topo.sv

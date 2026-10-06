@@ -93,7 +93,7 @@ struct config {
 	unsigned long port, interval, element_timeout, batch_lines, tx_rate, rcvbuf;
 	unsigned long mark;		/* packet mark of accepted packets */
 	unsigned long max_flows;	/* local map entries */
-	unsigned long max_copies;	/* remote map entries */
+	unsigned long max_remote;	/* remote map entries */
 	/* lifetime of a local flow after its last packet out, seconds */
 	unsigned long t_udp, t_tcp, t_tcp_syn, t_tcp_close, t_other;
 	unsigned long resync_rate;	/* tx_rate of a round answering a resync request */
@@ -133,7 +133,7 @@ struct gauges {
 	uint64_t refresh_entries;	/* flows announced by the last complete round */
 	uint64_t loop_max_ms;		/* longest handler run between two polls, per interval */
 	uint64_t local;			/* live local flows, last complete round */
-	uint64_t copies;		/* live remote flows, last complete round */
+	uint64_t remote;		/* live remote flows, last complete round */
 	bool refresh_running;
 	bool attached;			/* the tc programs are on the uplink */
 	bool bypass;			/* the bypass is on */
@@ -160,7 +160,6 @@ const char *addr_str(const struct in6_addr *a, char *buf, size_t len);
 int parse_prefix(const char *s, struct prefix *p);
 bool in_list(const struct in6_addr *a, const struct prefix_list *l);
 int parse_port(const char *s, uint16_t *port);
-int read_sysctl(const char *path, unsigned long *v);
 
 /* policy.c */
 const char *proto_name(uint8_t proto);

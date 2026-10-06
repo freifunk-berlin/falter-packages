@@ -28,7 +28,7 @@ static uint64_t tokens_ts;
 static struct dp_walk *walk;
 static enum dp_map walk_map;
 static uint64_t round_start;
-static uint64_t round_entries, round_local, round_copies;
+static uint64_t round_entries, round_local, round_remote;
 
 /* new flows whose announcement did not get out: the ring was full, or the
  * send buffer of some peer; the next round carries them */
@@ -102,7 +102,7 @@ int refresh_start(void)
 	}
 	walk_map = DP_LOCAL;
 	round_start = mono_ms();
-	round_entries = round_local = round_copies = 0;
+	round_entries = round_local = round_remote = 0;
 	gauge.refresh_running = true;
 	/* the walk finds the flows whose events were lost before it */
 	ring_check();
@@ -116,11 +116,11 @@ static void round_done(void)
 	gauge.refresh_ms = mono_ms() - round_start;
 	gauge.refresh_entries = round_entries;
 	gauge.local = round_local;
-	gauge.copies = round_copies;
+	gauge.remote = round_remote;
 	cnt.refresh_rounds++;
 	DBG("refresh: round done, %llu of %llu local flows announced, %llu remote, %llu ms",
 	    (unsigned long long)round_entries, (unsigned long long)round_local,
-	    (unsigned long long)round_copies, (unsigned long long)gauge.refresh_ms);
+	    (unsigned long long)round_remote, (unsigned long long)gauge.refresh_ms);
 }
 
 /* one batch of the walk */
@@ -148,7 +148,7 @@ static void walk_step(void)
 			else
 				cnt.remote_expired++;
 		} else if (walk_map == DP_REMOTE) {
-			round_copies++;
+			round_remote++;
 		} else {
 			round_local++;
 			if (wanted(&ent[i].f)) {

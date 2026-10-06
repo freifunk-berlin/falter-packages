@@ -39,11 +39,11 @@ void log_counters(void)
 #undef X
 	if (len < sizeof(buf))
 		snprintf(buf + len, sizeof(buf) - len, " refresh_ms=%llu loop_max_ms=%llu "
-			 "local=%llu copies=%llu attached=%d fw_ok=%d",
+			 "local=%llu remote=%llu attached=%d fw_ok=%d",
 			 (unsigned long long)gauge.refresh_ms,
 			 (unsigned long long)gauge.loop_max_ms,
 			 (unsigned long long)gauge.local,
-			 (unsigned long long)gauge.copies, gauge.attached, gauge.fw_ok);
+			 (unsigned long long)gauge.remote, gauge.attached, gauge.fw_ok);
 	logmsg(LOG_INFO, "%s", buf);
 }
 
@@ -93,9 +93,9 @@ void write_status(void)
 	fprintf(f, "refresh_ms %llu\n", (unsigned long long)gauge.refresh_ms);
 	fprintf(f, "loop_max_ms %llu\n", (unsigned long long)gauge.loop_max_ms);
 	fprintf(f, "local %llu\n", (unsigned long long)gauge.local);
-	fprintf(f, "copies %llu\n", (unsigned long long)gauge.copies);
+	fprintf(f, "remote %llu\n", (unsigned long long)gauge.remote);
 	fprintf(f, "max_flows %lu\n", cfg.max_flows);
-	fprintf(f, "max_copies %lu\n", cfg.max_copies);
+	fprintf(f, "max_remote %lu\n", cfg.max_remote);
 #define X(name) fprintf(f, "%s %llu\n", #name, (unsigned long long)cnt.name);
 	COUNTERS(X)
 #undef X

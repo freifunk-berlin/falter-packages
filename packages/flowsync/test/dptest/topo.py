@@ -16,9 +16,8 @@ from .ns import Node, kill
 
 
 class Topology:
-    def __init__(self, env, combo):
+    def __init__(self, env, gateways):
         self.env = env
-        self.combo = combo
         self.hub = Node("hub")
         self.nodes = []
         self.flows = []         # flows of the current scenario, undone by reset()
@@ -26,7 +25,7 @@ class Topology:
         try:
             self.cl = self._node("CL")
             self.sv = self._node("SV")
-            self.g = [Gateway(env, i, self._node("g%d" % i), p) for i, p in enumerate(combo.p)]
+            self.g = [Gateway(env, i, self._node("g%d" % i)) for i in range(gateways)]
             self._build()
         except Exception:
             self.close()

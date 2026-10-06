@@ -73,7 +73,7 @@ render_options() {
 	_opt "$add" rcvbuf rcvbuf
 	_opt "$add" mark mark
 	_opt "$add" max_flows max-flows
-	_opt "$add" max_copies max-copies
+	_opt "$add" max_remote max-remote
 	_opt "$add" udp_timeout udp-timeout
 	_opt "$add" tcp_timeout tcp-timeout
 	_opt "$add" tcp_syn_timeout tcp-syn-timeout

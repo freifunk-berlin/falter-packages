@@ -291,7 +291,7 @@ static int cmd_check(void)
 	printf("rcvbuf %lu\n", cfg.rcvbuf);
 	printf("mark 0x%08lx\n", cfg.mark);
 	printf("max_flows %lu\n", cfg.max_flows);
-	printf("max_copies %lu\n", cfg.max_copies);
+	printf("max_remote %lu\n", cfg.max_remote);
 	printf("udp_timeout %lu\n", cfg.t_udp);
 	printf("tcp_timeout %lu\n", cfg.t_tcp);
 	printf("tcp_syn_timeout %lu\n", cfg.t_tcp_syn);

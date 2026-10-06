@@ -80,10 +80,9 @@ class Entry:
 
 
 class Gateway:
-    def __init__(self, env, idx, node, profile):
+    def __init__(self, env, idx, node):
         self.i = idx
         self.node = node
-        self.p = profile
         self.addr = "10.0.0.%d" % (idx + 1)
         self.proc = None
         self.opts = []
