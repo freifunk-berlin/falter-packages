@@ -52,9 +52,15 @@ OpenWrt package build is untested (see "Open points").
   system and the programs stay attached when the daemon stops. Flows on a
   symmetric path keep working, peers' flows until they expire. A restart
   loads the programs anew, reuses the maps and replaces the filters in place.
-- **Fail closed.** Without the programs nothing is marked, and everything
-  from the uplink meets the stateless rules and the reject, as unsolicited
-  traffic does.
+- **No flow, no way in.** What the programs do not mark meets the stateless
+  rules and the reject, as unsolicited traffic does.
+- **Without a working datapath, back to conntrack.** With forwarded IPv6
+  untracked, only the programs can accept a reply. When they cannot be on the
+  uplink, or the accept rule cannot be put into the firewall, for a whole
+  `interval`, the daemon takes its notrack table away: conntrack carries the
+  flows on a symmetric path, as it did before flowsync, and the asymmetric
+  ones wait. The table returns one `interval` after the datapath works again.
+  A daemon that cannot start at all removes the table on its way out.
 - **One thread, no blocking.** New-flow events, datagrams and the map walks
   are driven from one `poll()` loop.
 
@@ -144,7 +150,11 @@ ruleset changes, and looks every `interval`):
    the packet and rejects it. The package ships the rule as an fw4 include
    (`/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft`), so it is part
    of every ruleset fw4 loads. If it is missing all the same, the daemon
-   inserts it (`fw_repaired`, and a warning the second time).
+   inserts it (`fw_repaired`, and a warning the second time). A rule with
+   the comment and another mark than the daemon's (`mark` changed, the
+   include not) is replaced, with a warning: every firewall reload brings
+   the include's rule back, and replies are rejected for the moment until
+   the daemon has replaced it again. Write the same mark into both.
 
    Its place in the chain matters. bbb-configs clamps the MSS of every
    forwarded IPv6 SYN with a rule it prepends to the same chain, and a
@@ -195,6 +205,10 @@ What it costs:
   packets, the forward chain does not.** `dp_in_bypass` counts them.
 - **The size check is against the outgoing device's MTU**, not a route or
   path MTU below it.
+- **The route is looked up with the mark the packet has at the uplink's tc
+  hook** (the daemon's included), as on the normal path. Routing rules that
+  match a mark which nftables sets later, in prerouting, do not see it: such
+  a setup needs the bypass off. bbb-configs has none.
 - **The uplink must be an Ethernet-like device** (the daemon checks and leaves
   the bypass off otherwise): the helper takes a link-layer header off the
   packet. The outgoing device may be anything with a neighbour layer; tunnel
@@ -331,10 +345,12 @@ The daemon is configured on the command line only. The init script renders
 | `--fw-table NAME` | - | `fw4` | the firewall's `inet` table |
 | `-d, --debug` | `debug` | off | log every record sent and received |
 
-Changing `max_flows` or `max_remote` makes new maps at the next start: the
-flows in the old ones are dropped (local flows are learned again from their
-next packet out, the peers' by the resync). The timeouts and the mark are
-part of the programs and take effect with a restart, the maps stay.
+Changing `max_flows` or `max_remote` makes that map anew at the next start:
+the flows in the old one are dropped (local flows are learned again from
+their next packet out, the peers' by the resync), the other map stays. The
+timeouts and the mark are part of the programs and take effect with a
+restart, the maps stay. A start that fails (no object file, programs the
+kernel refuses) leaves the maps and the programs of the last run alone.
 
 ### Privileges
 
@@ -353,7 +369,16 @@ Stopping the service leaves the programs on the uplink and the maps in place.
 `/etc/init.d/flowsync detach` takes everything away (programs, maps, the
 table, the rule): forwarded IPv6 is conntrack's again from the next packet,
 and flows that were running have no conntrack entry until their client sends
-again.
+again. Removing the package does the same first.
+
+A service that stays stopped keeps what it left: nobody puts the programs
+back when the uplink device is created anew, and with the notrack table in
+place every reply is rejected from then on. Stop it for good with `detach`.
+
+The rules are looked at when the ruleset changes (a netlink notification),
+when the programs come or go, and every `interval` only while something is
+not in place: a gateway in order runs `nft` after a firewall reload and
+otherwise not at all.
 
 The status file (`flowsync status`), written every `interval`:
 
@@ -361,7 +386,7 @@ The status file (`flowsync status`), written every `interval`:
 |---|---|
 | `attached` | the programs are on the uplink |
 | `bypass` | the bypass is on |
-| `fw_ok` | both rules are in place |
+| `fw_ok` | both rules are in place (0 while the daemon has fallen back to conntrack) |
 | `local` / `remote` | live flows in the local / remote map at the last round |
 | `tx_events` | flows announced from their first packet |
 | `tx_refresh` | records announced by the rounds |
@@ -371,7 +396,7 @@ The status file (`flowsync status`), written every `interval`:
 | `rx_limited` / `rx_errors` | flows the full remote map refused / other map errors |
 | `local_expired` / `remote_expired` | entries the rounds removed |
 | `dp_attached` | how often the programs were attached (1, plus one per re-created uplink or lost filter) |
-| `fw_repaired` | how often the accept rule had to be inserted |
+| `fw_repaired` | how often the accept rule had to be inserted or replaced |
 | `dp_out_pkts`, `dp_out_new`, `dp_out_skip` | the egress program: packets looked at, first of a flow, without a flow (ICMPv6, later fragments) |
 | `dp_in_pkts`, `dp_in_local`, `dp_in_remote`, `dp_in_miss`, `dp_in_skip` | the ingress program: looked at, accepted on a local / a peer's flow, no flow, not parsed |
 | `dp_in_bypass` | of the accepted packets, forwarded by the program itself |
@@ -443,8 +468,10 @@ flowsync, which was never deployed, is on branch `flowsync-conntrack`.
 
 Not done or not verified yet:
 
-- The OpenWrt package Makefile follows `bridger` (BPF toolchain, `/lib/bpf`)
-  but has not been built: no BPF toolchain was available here.
+- The package builds with the snapshot SDK and its BPF toolchain for x86_64,
+  mipsel_24kc and aarch64_generic (what the repository's CI builds), kernel
+  6.18 headers. It has not been built for mips64_octeonplus or against 6.12,
+  and no built package has been installed anywhere.
 - Nothing has run on kernel 6.12, on a big-endian target or on the
   edgerouter-4. The per-packet cost of the programs is unmeasured.
 - The mark a reassembled packet inherits is kernel behaviour read from the

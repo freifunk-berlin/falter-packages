@@ -151,6 +151,29 @@ def rules(env):
 
 
 @scenario(gateways=2)
+def rules_idle(env):
+    """A gateway in order does not run nft: the rules are looked at when the
+    ruleset changes, not every interval."""
+    g0 = env.g[0]
+
+    def looks():
+        return g0.log().count("rules: looked")
+
+    env.start()
+    env.sleep(1.5)
+    n0 = looks()
+    env.check("the start looked at the rules", n0, lambda n: 1 <= n <= 2)
+    env.sleep(2 * env.I + 1)
+    env.check("no look in the two intervals since", looks() - n0, 0)
+    g0.node.sh("nft add table inet other")
+    env.wait_for("somebody changes the ruleset: a look", 2, lambda: looks() - n0 == 1, step=0.1)
+    g0.node.sh("nft delete table inet other")
+    env.sleep(2)
+    env.check("and one for the next change, no more", looks() - n0, 2)
+    env.check("status: rules in place", g0.st("fw_ok"), 1)
+
+
+@scenario(gateways=2)
 def bootstrap(env):
     """The first start on a gateway that tracked its flows with conntrack: the
     accept rule and the programs come at once, the notrack table one interval
@@ -231,3 +254,121 @@ def unprivileged(env):
                  lambda: "the filters were gone" in g1.log(), step=0.05)
     env.check("replies pass g1 again (of 3)", replies(env, f), 3)
     lp.stop()
+
+
+def forward_chain(g):
+    return g.node.run("nft", "list", "chain", "inet", "fw", "forward", check=False)
+
+
+def own_table(g):
+    return g.node.ok("nft", "list", "table", "inet", "flowsync")
+
+
+@scenario(gateways=2)
+def mark_mismatch(env):
+    """The daemon runs with another mark than the firewall's accept rule
+    names (option mark changed, the package's include not). The daemon
+    replaces the rule: what it marks is accepted, and the other mark no
+    longer opens the firewall."""
+    g0 = env.g[0]
+    env.start("-m", "0x02000000")
+    f = env.flow("udp", fw=g0, rev=g0)
+    lp = env.loop(100, 1, f.send)
+    env.wait_for("the accept rule names the daemon's mark", 2,
+                 lambda: "0x02000000" in forward_chain(g0), step=0.1)
+    env.check("the rule for the other mark is gone", "0x01000000" in forward_chain(g0), False)
+    env.check("replies pass (of 3)", replies(env, f), 3)
+    env.check("the daemon names the file to fix", g0.log(), "10-flowsync.nft")
+    lp.stop()
+
+
+@scenario(gateways=2)
+def fail_open(env):
+    """The programs cannot be attached (a foreign filter sits where the
+    egress program belongs): nothing would learn new flows, and with forwarded
+    IPv6 untracked every reply would be rejected. After one interval the
+    daemon takes its notrack table away and conntrack carries the flows on a
+    symmetric path, as before flowsync. Once the programs are back the table
+    returns, again one interval later."""
+    g0 = env.g[0]
+    env.start()
+    g0.stop()           # or it would have its program back before the other filter is in
+    g0.node.sh("tc filter del dev wan0 egress; tc filter add dev wan0 egress prio 3780 "
+               "protocol all matchall action ok")
+    g0.start()
+    env.wait_for("the daemon cannot attach", 3, lambda: "attach egress" in g0.log(), step=0.1)
+    env.wait_for("the notrack table is gone after an interval", env.I + 3,
+                 lambda: not own_table(g0), step=0.2)
+    env.check("the daemon says so", g0.log(), "falling back to conntrack")
+    f = env.flow("udp", fw=g0, rev=g0)
+    f.send()
+    env.check("a new symmetric flow passes (of 3)", replies(env, f), 3)
+    env.check("conntrack accepted the replies", g0.fwc("est"), 3)
+    g0.tick()
+    env.check("status: not attached, rules not in place", [g0.st("attached"), g0.st("fw_ok")],
+              [0, 0])
+    env.check("the daemon does not spin on its own failed attempts (log lines)",
+              g0.log().count("attach egress"), lambda n: n <= 3)
+
+    g0.node.sh("tc filter del dev wan0 egress prio 3780")
+    env.wait_for("the programs are back within moments, not at the next tick", 2.5,
+                 lambda: g0.log().count("attached to uplink") >= 2, step=0.05)
+    env.check("no notrack table yet: the flows must be learned first", own_table(g0), False)
+    lp = env.loop(100, 0.5, f.send)
+    env.wait_for("the notrack table is back after an interval", env.I + 3, lambda: own_table(g0),
+                 step=0.2)
+    e0 = g0.fwc("est")
+    env.check("replies pass, and not on conntrack any more (of 3)",
+              [replies(env, f), g0.fwc("est") - e0], [3, 0])
+    env.check("nothing was rejected", g0.fwc("rej"), 0)
+    lp.stop()
+
+
+@scenario(gateways=2)
+def load_failure(env):
+    """A daemon that cannot load its programs (here: no object file) leaves
+    the programs of the last run on the uplink with their flow tables, and
+    hands forwarded IPv6 back to conntrack. The next start that works finds
+    every flow."""
+    g0, g1 = env.g[:2]
+    env.start()
+    fa = env.flow("udp", fw=g0, rev=g1)
+    fs = env.flow("udp", fw=g1, rev=g1)
+    fa.send()
+    fs.send()
+    synced(env, fa)
+    g1.stop()
+    g1.start("--bpf-object", "/nonexistent/flowsync.o")
+    env.wait_for("the daemon says why it gives up", 3,
+                 lambda: "/nonexistent/flowsync.o" in g1.log(), step=0.1)
+    env.wait_for("and is gone", 3, lambda: not children(g1.proc.pid), step=0.1)
+    env.check("it took the notrack table with it: nobody looks after the programs now",
+              own_table(g1), False)
+    env.check("the flow tables are still there: the peer's flow, its own",
+              [g1.ft(fa).remote, g1.ft(fs).local], [True, True])
+    env.check("replies pass, both flows (of 6)", replies(env, fa) + replies(env, fs), 6)
+    g1.start()
+    env.wait_for("a start that works", 5, g1.up)
+    env.check("found both flows", [g1.ft(fa).remote, g1.ft(fs).local], [True, True])
+    env.wait_for("the notrack table is back after an interval", env.I + 3, lambda: own_table(g1),
+                 step=0.2)
+    env.check("nothing rejected", rejects(env), 0)
+
+
+@scenario(gateways=2)
+def resize(env):
+    """max_remote changes: the remote table cannot be reused and is made
+    anew (the peers fill it again on request), the local one is kept."""
+    g0, g1 = env.g[:2]
+    env.start()
+    fa = env.flow("udp", fw=g0, rev=g1)
+    fs = env.flow("udp", fw=g1, rev=g1)
+    fa.send()
+    fs.send()
+    synced(env, fa)
+    g1.restart("-C", 4096)
+    env.wait_for("g1 is up again", 5, g1.up)
+    env.check("g1 says which table it replaced", g1.log(), "fs_remote was pinned with another size")
+    env.check("its own flow is still there", g1.ft(fs).local, True)
+    env.wait_for("the peer's flow is back (resync)", 3, lambda: g1.ft(fa).remote, step=0.05)
+    env.check("replies pass, both flows (of 6)", replies(env, fa) + replies(env, fs), 6)

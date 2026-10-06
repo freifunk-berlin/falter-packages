@@ -156,3 +156,26 @@ def bypass_tcp(env):
     g1.tick()
     env.check("the data was bypassed (packets)", g1.st("dp_in_bypass"), lambda n: n >= 40)
     undo()
+
+
+@scenario(gateways=2)
+def bypass_fwmark(env):
+    """Policy routing by packet mark holds for bypassed packets as for those
+    on the normal path, which are routed with the mark the ingress program
+    gave them: the bypass looks its route up with it."""
+    g0 = env.g[0]
+    env.start("--bypass")
+    f = env.flow("udp", fw=g0, rev=g0)
+    f.send()
+    env.check("replies arrive (of 3)", replies(env, f), 3)
+    g0.node.sh("ip -6 route add blackhole default table 77 && "
+               "ip -6 rule add fwmark 0x01000000/0x01000000 lookup 77")
+    try:
+        env.check("a rule routes marked packets into a blackhole: none arrives (of 3)",
+                  replies(env, f), 0)
+        g0.tick()
+        env.check("none was bypassed past the rule", g0.st("dp_in_bypass"), 3)
+    finally:
+        g0.node.sh("ip -6 rule del fwmark 0x01000000/0x01000000 lookup 77; "
+                   "ip -6 route flush table 77", check=False)
+    env.check("without the rule they arrive again (of 3)", replies(env, f), 3)

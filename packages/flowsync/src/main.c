@@ -105,6 +105,7 @@ static int cmd_run(void)
 
 	if (!cfg.uplink[0]) {
 		logmsg(LOG_ERR, "no uplink device: set uplink (or interface)");
+		fw_fallback();
 		return 1;
 	}
 	sigaction(SIGTERM, &sa, NULL);
@@ -121,11 +122,15 @@ static int cmd_run(void)
 	peers_init();
 	udp_fd = udp_open(true);
 	/* an interface that does not exist yet is waited for (udp_tick) */
-	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open() || dp_link_open())
+	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open() || dp_link_open()) {
+		fw_fallback();
 		return 1;
+	}
 	dp_tick();
-	if (drop_privileges())
+	if (drop_privileges()) {
+		fw_fallback();
 		return 1;
+	}
 	resync_init();
 	if (!cfg.ifname[0])
 		logmsg(LOG_WARNING, "no interface set: datagrams with a peer's source address are "
@@ -251,6 +256,8 @@ static int cmd_run(void)
 			dp_tick();
 			if (udp_tick())
 				resync_request();
+		} else if (dp_retry_due()) {
+			dp_tick();
 		}
 	}
 
@@ -439,12 +446,13 @@ static int cmd_bypass(int argc, char **argv)
 
 static int cmd_detach(void)
 {
-	if (!cfg.uplink[0]) {
-		fprintf(stderr, "no uplink device: set uplink (or interface)\n");
-		return 1;
-	}
+	/* the rules and the maps go in any case: with the notrack table left
+	 * behind and no programs, nothing forwarded would be accepted */
 	fw_remove();
-	return dp_detach();
+	if (!cfg.uplink[0])
+		fprintf(stderr, "no uplink device set (uplink or interface): programs on a "
+			"device, if any, stay there\n");
+	return dp_detach() || !cfg.uplink[0];
 }
 
 static int cmd_announce(int argc, char **argv)
@@ -474,16 +482,23 @@ static int cmd_announce(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	const char *cmd;
+	bool daemon = false;
 	int i;
 
 	/* the daemon logs to syslog unless run from a terminal */
 	for (i = 1; i < argc; i++)
-		if (!strcmp(argv[i], "run"))
+		if (!strcmp(argv[i], "run")) {
 			log_open(true);
+			daemon = true;
+		}
 
 	i = parse_args(argc, argv);
-	if (i < 0)
+	if (i < 0) {
+		/* a daemon that cannot start, as in cmd_run() */
+		if (daemon)
+			fw_fallback();
 		return 1;
+	}
 	if (i >= argc) {
 		usage(stderr);
 		return 1;

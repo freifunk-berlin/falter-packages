@@ -35,6 +35,9 @@
 /* our filters on the uplink's clsact qdisc */
 #define TC_PRIO		3780
 #define TC_HANDLE	1
+/* after a failed attach: a notification starts the next attempt this much
+ * later */
+#define ATTACH_RETRY_MS	1000
 
 static struct bpf_object *obj;
 static int map_fd[2] = { -1, -1 };
@@ -93,7 +96,7 @@ static void ent_local(struct dp_ent *e, const struct fs_local *v, uint32_t now)
 	uint32_t ttl = fs_ttl(&dcfg, e->f.proto, v->flags);
 
 	e->flags = v->flags;
-	e->age = (int32_t)(now - v->seen) > 0 ? now - v->seen : 0;
+	e->age = fs_age(now, v->seen);
 	e->left = e->age > ttl ? 0 : ttl - e->age + 1;
 }
 
@@ -152,6 +155,40 @@ static void set_cfg(void)
 	dcfg.t_other = cfg.t_other;
 }
 
+/*
+ * A pinned map the object cannot take over, because it was made with another
+ * size (max_flows, max_remote changed) or by another version of the object:
+ * libbpf would refuse to load. It is unpinned and the load makes a new one;
+ * what it held is lost (own flows come back with their next packet out, the
+ * peers' with the resync). Only this map: every other failure to load leaves
+ * the pins alone.
+ */
+static void drop_unusable_pin(const struct bpf_map *m)
+{
+	const char *path = bpf_map__pin_path(m);
+	struct bpf_map_info info;
+	__u32 ilen = sizeof(info);
+	int fd;
+
+	if (!path)
+		return;
+	fd = bpf_obj_get(path);
+	if (fd < 0)
+		return;
+	memset(&info, 0, sizeof(info));
+	if (!bpf_map_get_info_by_fd(fd, &info, &ilen) &&
+	    (info.type != bpf_map__type(m) || info.key_size != bpf_map__key_size(m) ||
+	     info.value_size != bpf_map__value_size(m) ||
+	     info.max_entries != bpf_map__max_entries(m) ||
+	     info.map_flags != bpf_map__map_flags(m))) {
+		logmsg(LOG_WARNING, "%s was pinned with another size or layout (%u entries, now "
+		       "%u): made anew, what it held is dropped", bpf_map__name(m),
+		       info.max_entries, bpf_map__max_entries(m));
+		unlink(path);
+	}
+	close(fd);
+}
+
 static int load(void)
 {
 	LIBBPF_OPTS(bpf_object_open_opts, opts, .pin_root_path = cfg.pin_dir);
@@ -178,6 +215,7 @@ static int load(void)
 			logmsg(LOG_ERR, "%s: configuration does not fit the object", cfg.bpf_object);
 			goto fail;
 		}
+		drop_unusable_pin(m);
 	}
 	err = bpf_object__load(obj);
 	if (err) {
@@ -221,8 +259,8 @@ static int on_event(void *ctx, void *data, size_t len)
 
 /*
  * load: the daemon. Loads the programs, creating the maps or taking the
- * pinned ones. Maps pinned with other sizes (max_flows or max_remote changed)
- * cannot be reused: they are dropped and made anew, with what they held.
+ * pinned ones. A map pinned with another size (max_flows or max_remote
+ * changed) cannot be reused: it is dropped and made anew, with what it held.
  * Without load (the flow commands): open the pinned maps of a running or
  * stopped daemon.
  */
@@ -252,13 +290,9 @@ int dp_open(bool load_progs)
 		return -1;
 	}
 	if (load()) {
-		logmsg(LOG_WARNING, "retrying with new maps: the flows in %s are dropped",
-		       cfg.pin_dir);
-		unpin_all();
-		if (mkdir(cfg.pin_dir, 0755) && errno != EEXIST)
-			return -1;
-		if (load())
-			return -1;
+		logmsg(LOG_ERR, "the programs on the uplink and the flow tables in %s stay as "
+		       "they are", cfg.pin_dir);
+		return -1;
 	}
 	for (i = 0; i < 2; i++) {
 		memset(&info, 0, sizeof(info));
@@ -286,7 +320,9 @@ static void tc_hook(struct bpf_tc_hook *hook, unsigned int ifindex, int dir)
 	hook->attach_point = dir ? BPF_TC_EGRESS : BPF_TC_INGRESS;
 }
 
-static int attach(unsigned int ifindex)
+/* say: log why it fails (the caller tries again and again). Returns 0, -1 if
+ * it failed, -2 if it failed after it had put a filter in. */
+static int attach(unsigned int ifindex, bool say)
 {
 	struct bpf_tc_hook hook;
 	int dir, err;
@@ -297,7 +333,8 @@ static int attach(unsigned int ifindex)
 	err = bpf_tc_hook_create(&hook);	/* the clsact qdisc */
 	quiet = false;
 	if (err && err != -EEXIST) {
-		logmsg(LOG_ERR, "%s: clsact qdisc: %s", cfg.uplink, strerror(-err));
+		if (say)
+			logmsg(LOG_ERR, "%s: clsact qdisc: %s", cfg.uplink, strerror(-err));
 		return -1;
 	}
 	for (dir = 0; dir < 2; dir++) {
@@ -305,11 +342,14 @@ static int attach(unsigned int ifindex)
 			    .prog_fd = prog_fd[dir], .flags = BPF_TC_F_REPLACE);
 
 		tc_hook(&hook, ifindex, dir);
+		quiet = !say;		/* libbpf prints the kernel's reason */
 		err = bpf_tc_attach(&hook, &opts);
+		quiet = false;
 		if (err) {
-			logmsg(LOG_ERR, "%s: attach %s: %s", cfg.uplink, dir ? "egress" : "ingress",
-			       strerror(-err));
-			return -1;
+			if (say)
+				logmsg(LOG_ERR, "%s: attach %s: %s", cfg.uplink,
+				       dir ? "egress" : "ingress", strerror(-err));
+			return dir ? -2 : -1;
 		}
 	}
 	return 0;
@@ -395,11 +435,28 @@ static bool attached(unsigned int ifindex)
  * device may not exist yet, may have been created anew under its name (netifd
  * does that to a VLAN on every ifup; the new device has no filters), or
  * somebody removed the qdisc. Returns true when they were attached now.
+ *
+ * An attempt that fails half way (one filter in, the other refused) changes
+ * the device's filters and so notifies us like anybody else's change. A
+ * notification right after such a failure therefore starts no new attempt at
+ * once, or the daemon would spin: the attempt is made ATTACH_RETRY_MS after
+ * the failed one (dp_retry_due), and at every tick. Any other failure (the
+ * device is just going away) is tried again with the next notification.
  */
+static uint64_t failed_at;
+static bool retry_wanted;
+
+bool dp_retry_due(void)
+{
+	return retry_wanted && mono_ms() - failed_at >= ATTACH_RETRY_MS;
+}
+
 bool dp_tick(void)
 {
 	static uint64_t last_log;
 	unsigned int ifindex = if_nametoindex(cfg.uplink);
+	uint64_t now = mono_ms();
+	int err;
 
 	if (!ifindex) {
 		if (gauge.attached || log_ok(&last_log))
@@ -411,11 +468,19 @@ bool dp_tick(void)
 	}
 	if (ifindex == attached_ifindex && attached(ifindex))
 		return false;
-	if (attach(ifindex)) {
-		gauge.attached = false;
-		attached_ifindex = 0;
+	if (failed_at && now - failed_at < ATTACH_RETRY_MS) {
+		retry_wanted = true;
 		return false;
 	}
+	retry_wanted = false;
+	err = attach(ifindex, gauge.attached || log_ok(&last_log));
+	if (err) {
+		gauge.attached = false;
+		attached_ifindex = 0;
+		failed_at = err == -2 ? now : 0;
+		return false;
+	}
+	failed_at = 0;
 	logmsg(LOG_NOTICE, "attached to uplink %s (ifindex %u)%s", cfg.uplink, ifindex,
 	       attached_ifindex == ifindex ? ": the filters were gone" :
 	       attached_ifindex ? ": the device was created anew" : "");

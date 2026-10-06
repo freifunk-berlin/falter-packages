@@ -296,8 +296,12 @@ static __always_inline int bypass(struct __sk_buff *skb, const struct fs_key *k,
 	fib.flowinfo = pk->flowinfo;
 	__builtin_memcpy(fib.ipv6_src, k->s, 16);
 	__builtin_memcpy(fib.ipv6_dst, k->c, 16);
+	/* routing rules that match the packet mark see what they see on the
+	 * normal path: the mark as it is here, ours included */
+	fib.mark = skb->mark;
 	/* the neighbour is resolved by the redirect: tunnel devices have none */
-	if (bpf_fib_lookup(skb, &fib, sizeof(fib), BPF_FIB_LOOKUP_SKIP_NEIGH) !=
+	if (bpf_fib_lookup(skb, &fib, sizeof(fib),
+			   BPF_FIB_LOOKUP_SKIP_NEIGH | BPF_FIB_LOOKUP_MARK) !=
 	    BPF_FIB_LKUP_RET_SUCCESS)
 		return -1;
 	if (fib.ifindex == skb->ingress_ifindex)
@@ -359,7 +363,7 @@ int fs_ingress(struct __sk_buff *skb)
 	now = now_s();
 
 	v = bpf_map_lookup_elem(&fs_local, &k);
-	if (v && now - v->seen <= fs_ttl((const struct fs_cfg *)&cfg, k.proto, v->flags)) {
+	if (v && fs_age(now, v->seen) <= fs_ttl((const struct fs_cfg *)&cfg, k.proto, v->flags)) {
 		if (st)
 			st->in_local++;
 		return accepted(skb, &k, &pk, tf, st);

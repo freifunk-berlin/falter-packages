@@ -77,6 +77,19 @@ struct fs_stats {
 #define FS_PROTO_TCP	6
 #define FS_PROTO_UDP	17
 
+/*
+ * Seconds since a local flow's last packet out. Never negative: the clock is
+ * the tick's, read per packet, and the egress program on another CPU may
+ * have written a second that the reader's has not reached yet. Unsigned, that
+ * would be an age of 136 years and a live flow taken for expired.
+ */
+static inline __u32 fs_age(__u32 now, __u32 seen)
+{
+	__s32 age = now - seen;
+
+	return age > 0 ? age : 0;
+}
+
 /* how long a local flow lives after its last packet out */
 static inline __u32 fs_ttl(const struct fs_cfg *c, __u8 proto, __u8 flags)
 {

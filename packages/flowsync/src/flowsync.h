@@ -211,6 +211,7 @@ struct dp_ent {
 };
 int dp_open(bool load);
 bool dp_tick(void);
+bool dp_retry_due(void);
 int dp_link_open(void);
 int dp_link_fd(void);
 bool dp_link_changed(void);
@@ -235,6 +236,7 @@ int fw_fd(void);
 void fw_handle(void);
 void fw_tick(void);
 void fw_remove(void);
+void fw_fallback(void);
 
 /* tx.c */
 void tx_event(const struct flow *f);

@@ -12,12 +12,19 @@
  *    program marked. An accept in a table of our own would not do, the
  *    firewall's chain still sees the packet and rejects it. The package
  *    ships the rule as an fw4 include (it is there from the first ruleset
- *    on, and after every reload); here it is checked and, if missing, put
- *    back.
+ *    on, and after every reload); here it is checked and, if it is missing
+ *    or names another mark than ours, put right.
  *
- * Both are looked at whenever the ruleset changes (a netlink notification)
- * and every interval. The rules are read and written with the nft tool: two
- * short runs per look.
+ * The table makes the gateway depend on the programs: what conntrack no
+ * longer sees, only they can accept. When they cannot be on the uplink, or
+ * the rule cannot be put in, for a whole interval, the table is taken away
+ * again and conntrack carries the flows on a symmetric path, as it did before
+ * flowsync. It comes back as at the first start.
+ *
+ * Both are looked at when the ruleset changes (a netlink notification), when
+ * the programs come or go, and when time has made a step due; every interval
+ * only while something is wrong or there are no notifications. The rules are
+ * read and written with the nft tool: two short runs per look.
  */
 
 #include <errno.h>
@@ -35,12 +42,15 @@
 
 #define OWN_TABLE	"flowsync"
 #define RULE_TAG	"comment \"flowsync\""
+#define RULE_FILE	"/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft"
 #define SETTLE_MS	500
 
 static int gen_fd = -1;
 static bool dirty = true;
 static uint64_t dirty_at;
-static uint64_t attached_at;	/* when we first saw the programs attached */
+static uint64_t works_since;	/* the datapath accepts its flows since; 0: it does not */
+static uint64_t broken_since;	/* ... cannot since; 0: it can */
+static uint64_t due;		/* a look that time alone makes necessary; 0: none */
 
 /* run nft; script goes to its stdin if given, its stdout into out. Returns
  * its exit status, -1 if it could not be run. */
@@ -139,40 +149,90 @@ static int own_table_install(void)
 	return nft(argv, script, NULL, 0);
 }
 
-/* 1: the accept rule is in the firewall's forward chain, 0: it is not,
- * -1: there is no such chain */
-static int fw_rule_present(char *buf, size_t len)
+static int own_table_remove(void)
 {
-	char *argv[] = { "nft", "-a", "list", "chain", "inet", (char *)cfg.fw_table, "forward", NULL };
+	char *argv[] = { "nft", "delete", "table", "inet", OWN_TABLE, NULL };
 
-	if (nft(argv, NULL, buf, len))
-		return -1;
-	return strstr(buf, RULE_TAG) != NULL;
+	return nft(argv, NULL, NULL, 0);
 }
 
 /*
- * Where the package's include puts it: behind everything the chain does to
- * every packet before it accepts any (on the gateways the MSS clamp on SYNs,
- * which a marked SYN/ACK must still pass), right before the rule that
- * accepts established flows. listing is the chain as fw_rule_present() read
- * it. Without such a rule: at the top.
+ * The next rule with our comment in a chain listing (nft -a), from p on:
+ * returns where to go on and sets its handle and whether it names our mark;
+ * NULL when there is none left.
  */
-static int fw_rule_insert(const char *listing)
+static const char *rule_next(const char *listing, const char *p, unsigned long *handle, bool *ours)
+{
+	const char *tag = strstr(p, RULE_TAG), *bol, *eol, *h, *m;
+	char want[48];
+
+	if (!tag)
+		return NULL;
+	for (bol = tag; bol > listing && bol[-1] != '\n'; bol--)
+		;
+	eol = strchr(tag, '\n');
+	if (!eol)
+		eol = tag + strlen(tag);
+	h = strstr(tag, "# handle ");
+	*handle = h && h < eol ? strtoul(h + 9, NULL, 10) : 0;
+	/* as nft prints what the include and fw_rules_fix() say */
+	snprintf(want, sizeof(want), "meta mark & 0x%08lx == 0x%08lx ", cfg.mark, cfg.mark);
+	m = strstr(bol, want);
+	*ours = m && m < tag;
+	return eol;
+}
+
+/* the forward chain with handles; -1: there is no such chain */
+static int fw_chain_list(char *buf, size_t len)
+{
+	char *argv[] = { "nft", "-a", "list", "chain", "inet", (char *)cfg.fw_table, "forward", NULL };
+
+	return nft(argv, NULL, buf, len) ? -1 : 0;
+}
+
+/*
+ * Rules with our comment and another mark go, and ours comes in if it is not
+ * there, in one transaction. Its place is where the package's include puts
+ * it: behind everything the chain does to every packet before it accepts any
+ * (on the gateways the MSS clamp on SYNs, which a marked SYN/ACK must still
+ * pass), right before the rule that accepts established flows; without such a
+ * rule at the top. Returns 0 if nothing was to do, 1 if the chain was put
+ * right (*replaced: a rule for another mark went), -1 if that failed.
+ */
+static int fw_rules_fix(const char *listing, bool *replaced)
 {
 	char *argv[] = { "nft", "-f", "-", NULL };
-	char script[256], pos[48] = "";
-	const char *ct = strstr(listing, "ct state"), *h, *eol;
+	char script[1024], pos[48] = "";
+	const char *ct = strstr(listing, "ct state"), *h, *eol, *p = listing;
+	unsigned long handle;
+	size_t len = 0;
+	bool ours, have = false;
 
-	if (ct) {
-		eol = strchr(ct, '\n');
-		h = strstr(ct, "# handle ");
-		if (h && (!eol || h < eol))
-			snprintf(pos, sizeof(pos), "position %lu ", strtoul(h + 9, NULL, 10));
+	*replaced = false;
+	script[0] = 0;
+	while ((p = rule_next(listing, p, &handle, &ours)) != NULL) {
+		if (ours) {
+			have = true;
+		} else if (handle && len < sizeof(script) - 128) {
+			len += snprintf(script + len, sizeof(script) - len,
+					"delete rule inet %s forward handle %lu\n", cfg.fw_table, handle);
+			*replaced = true;
+		}
 	}
-	snprintf(script, sizeof(script),
-		 "insert rule inet %s forward %smeta nfproto ipv6 meta mark & 0x%08lx == 0x%08lx "
-		 "accept " RULE_TAG "\n", cfg.fw_table, pos, cfg.mark, cfg.mark);
-	return nft(argv, script, NULL, 0);
+	if (have && !len)
+		return 0;
+	if (!have) {
+		if (ct) {
+			eol = strchr(ct, '\n');
+			h = strstr(ct, "# handle ");
+			if (h && (!eol || h < eol))
+				snprintf(pos, sizeof(pos), "position %lu ", strtoul(h + 9, NULL, 10));
+		}
+		snprintf(script + len, sizeof(script) - len,
+			 "insert rule inet %s forward %smeta nfproto ipv6 meta mark & 0x%08lx == "
+			 "0x%08lx accept " RULE_TAG "\n", cfg.fw_table, pos, cfg.mark, cfg.mark);
+	}
+	return nft(argv, script, NULL, 0) ? -1 : 1;
 }
 
 static void fw_check(void)
@@ -180,53 +240,101 @@ static void fw_check(void)
 	static char buf[65536];
 	static uint64_t last_log;
 	static bool inserted_before;
-	uint64_t now = mono_ms();
-	bool ok = true;
+	uint64_t now = mono_ms(), wait = cfg.interval * 1000;
+	/* can the datapath accept what conntrack no longer sees? */
+	bool works = gauge.attached, ok = true, have, replaced;
 	int r;
 
 	dirty = false;
-	if (gauge.attached && !attached_at)
-		attached_at = now;
+	due = 0;
 
-	r = fw_rule_present(buf, sizeof(buf));
-	if (r < 0) {
+	if (fw_chain_list(buf, sizeof(buf))) {
+		/* no chain rejects anything either: nothing to fall back from */
 		ok = false;
 		if (log_ok(&last_log))
 			logmsg(LOG_ERR, "no chain forward in table inet %s: nothing accepts the "
 			       "marked packets (is the firewall running?)", cfg.fw_table);
-	} else if (!r) {
-		if (fw_rule_insert(buf)) {
-			ok = false;
+	} else {
+		r = fw_rules_fix(buf, &replaced);
+		if (r < 0) {
+			ok = works = false;
 			if (log_ok(&last_log))
 				logmsg(LOG_ERR, "could not add the accept rule to inet %s forward",
 				       cfg.fw_table);
-		} else {
+		} else if (r > 0) {
 			cnt.fw_repaired++;
-			logmsg(inserted_before ? LOG_WARNING : LOG_NOTICE,
-			       "accept rule for mark 0x%08lx added to inet %s forward%s", cfg.mark,
-			       cfg.fw_table, inserted_before ?
-			       " again: something removed it (a firewall reload without the "
-			       "package's include?)" : "");
+			if (replaced)
+				logmsg(LOG_WARNING, "the accept rule in inet %s forward named another "
+				       "mark: replaced by one for 0x%08lx. Every firewall reload "
+				       "brings it back and rejects the replies until this is done "
+				       "again: write the mark into " RULE_FILE, cfg.fw_table, cfg.mark);
+			else
+				logmsg(inserted_before ? LOG_WARNING : LOG_NOTICE,
+				       "accept rule for mark 0x%08lx added to inet %s forward%s",
+				       cfg.mark, cfg.fw_table, inserted_before ?
+				       " again: something removed it (a firewall reload without the "
+				       "package's include?)" : "");
 			inserted_before = true;
 		}
 	}
 
-	if (!own_table_present()) {
+	if (works) {
+		broken_since = 0;
+		if (!works_since)
+			works_since = now;
+	} else {
+		works_since = 0;
+		if (!broken_since)
+			broken_since = now;
+	}
+
+	have = own_table_present();
+	if (works && !have) {
 		/* not before the programs are on the uplink, and learning for one
 		 * interval: without them nothing would be accepted any more */
-		if (!attached_at || now - attached_at < cfg.interval * 1000) {
-			ok = false;
+		if (now - works_since < wait) {
+			due = works_since + wait;
 		} else if (own_table_install()) {
-			ok = false;
 			if (log_ok(&last_log))
 				logmsg(LOG_ERR, "could not install table inet " OWN_TABLE
 				       " (kmod-nft-fib?)");
 		} else {
+			have = true;
 			logmsg(LOG_NOTICE, "table inet " OWN_TABLE " installed: forwarded IPv6 "
 			       "bypasses conntrack");
 		}
+	} else if (!works && have) {
+		/* not at once: netifd creating the uplink anew is over in a moment,
+		 * and the flows would have to be learned again */
+		if (now - broken_since < wait) {
+			due = broken_since + wait;
+		} else if (!own_table_remove()) {
+			have = false;
+			logmsg(LOG_ERR, "%s for %lu s: table inet " OWN_TABLE " removed, falling back "
+			       "to conntrack (flows on a symmetric path only) until that is over",
+			       gauge.attached ? "no accept rule in the firewall" :
+			       "the programs are not on the uplink", cfg.interval);
+		}
 	}
+	if (!works || !have)
+		ok = false;
+	/* what failed is tried again, without waiting for a change */
+	if (!ok && !due)
+		due = now + wait;
 	gauge.fw_ok = ok;
+	logmsg(LOG_DEBUG, "rules: looked, %s", ok ? "in place" : "not in place");
+}
+
+/*
+ * The daemon cannot start. Programs of an earlier run may still be on the
+ * uplink, but nobody would put them back when they go: forwarded IPv6 is
+ * conntrack's again.
+ */
+void fw_fallback(void)
+{
+	if (own_table_present() && !own_table_remove())
+		logmsg(LOG_ERR, "table inet " OWN_TABLE " removed: falling back to conntrack "
+		       "(flows on a symmetric path only)");
 }
 
 /* ruleset change notifications */
@@ -264,39 +372,45 @@ void fw_handle(void)
 	}
 }
 
-/* main loop, every iteration: check once the change has settled; every
- * interval (force) regardless */
+/*
+ * Main loop, every iteration: look once a change of the ruleset has settled,
+ * when the programs came or went, and when a step is due. Our own changes
+ * notify us too and cost one more look, which finds nothing to do: dropping
+ * those notifications unseen would drop a foreign change that came with them.
+ * Without notifications: every interval.
+ */
 void fw_tick(void)
 {
 	static uint64_t last;
+	static bool was_attached;
 	uint64_t now = mono_ms();
 
-	if ((dirty && now - dirty_at >= SETTLE_MS) || now - last >= cfg.interval * 1000) {
+	if ((dirty && now - dirty_at >= SETTLE_MS) || gauge.attached != was_attached ||
+	    (due && now >= due) || (gen_fd < 0 && now - last >= cfg.interval * 1000)) {
 		last = now;
+		was_attached = gauge.attached;
 		fw_check();
-		/* our own changes notify us too */
-		if (gen_fd >= 0)
-			fw_handle();
-		dirty = false;
 	}
 }
 
 /* the detach command: our table and the accept rule go */
 void fw_remove(void)
 {
-	char *del[] = { "nft", "delete", "table", "inet", OWN_TABLE, NULL };
 	char *argv[] = { "nft", "-f", "-", NULL };
 	static char buf[65536];
-	char script[128], *p, *h;
+	char script[1024];
+	const char *p = buf;
+	unsigned long handle;
+	size_t len = 0;
+	bool ours;
 
-	nft(del, NULL, NULL, 0);
-	if (fw_rule_present(buf, sizeof(buf)) != 1)
+	own_table_remove();
+	if (fw_chain_list(buf, sizeof(buf)))
 		return;
-	p = strstr(buf, RULE_TAG);
-	h = strstr(p, "# handle ");
-	if (!h)
-		return;
-	snprintf(script, sizeof(script), "delete rule inet %s forward handle %lu\n", cfg.fw_table,
-		 strtoul(h + 9, NULL, 10));
-	nft(argv, script, NULL, 0);
+	while ((p = rule_next(buf, p, &handle, &ours)) != NULL)
+		if (handle && len < sizeof(script) - 128)
+			len += snprintf(script + len, sizeof(script) - len,
+					"delete rule inet %s forward handle %lu\n", cfg.fw_table, handle);
+	if (len)
+		nft(argv, script, NULL, 0);
 }

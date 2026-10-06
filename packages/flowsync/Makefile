@@ -45,6 +45,17 @@ define Package/flowsync/conffiles
 /etc/config/flowsync
 endef
 
+# stopping the service leaves the programs on the uplink, the maps and the
+# rules (replies keep passing across a restart). With the package gone nobody
+# would look after them: take them away first, forwarded IPv6 is conntrack's
+# again. (apk runs this behind the default prerm, which stops and disables
+# the service; detach stops it itself.)
+define Package/flowsync/prerm
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/flowsync detach
+exit 0
+endef
+
 # only the sources: src/ may also hold a host build from development (objects,
 # the binary, local.mk) that the default cp -fpR would carry along, newer than
 # the sources, so that make would not rebuild them for the target
