@@ -42,6 +42,11 @@ class Impl:
     def lose_state(self, gw):
         raise NotImplementedError
 
+    def broken(self, timers):
+        """reasons why this implementation's own timers no longer relate to
+        the others as in production at this scale (see Timers.broken)"""
+        return []
+
 
 def load(name, opts):
     if name not in NAMES:

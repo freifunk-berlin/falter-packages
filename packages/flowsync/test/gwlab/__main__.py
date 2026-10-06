@@ -160,6 +160,25 @@ def lab(args, opts):
     return 0
 
 
+def check_scale(scale, impl):
+    """warn where the scale stops being exact, refuse where it stops being a test"""
+    def broken(n):
+        t = Timers(n)
+        return t.broken() + impl.broken(t), t
+    why, t = broken(scale)
+    if why:
+        usable = max(n for n in range(1, int(scale) + 1) if not broken(n)[0])
+        raise SystemExit("scale %g is useless for this implementation (highest usable: %d):\n  %s"
+                         % (scale, usable, "\n  ".join(why)))
+    if scale > 10:
+        print("warning: scale %g is above 10, timers no longer keep production's ratios exactly:" % scale)
+        for names, what in ((t.clamped, "held at 1 s"), (t.rounded, "rounded to whole seconds")):
+            if names:
+                print("  %s: %s" % (what, ", ".join("%s (%g s)" % kv for kv in names.items())))
+        print("  and whatever is real time (sync latency, TCP retries) weighs %g times heavier "
+              "than in production" % scale, flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="gwlab", usage=__doc__)
     ap.add_argument("scenario")
@@ -184,6 +203,8 @@ def main():
     fleets = args.fleet or list(sc.FLEETS)
     alone = getattr(sc, "ALONE", False)
     args.scale = args.scale or getattr(sc, "SCALE", 10)
+    if not alone:
+        check_scale(args.scale, impl)
     spans = [span(in_lab(f["p"], Timers(args.scale))) for f in sc.FLOWS if args.flow in f["id"]]
     secs = (sum(spans) + 2 * len(spans) + 15) * len(fleets) if alone else max(spans) + 35
     print("%s on %s: fleets %s, about %d s; results in %s"

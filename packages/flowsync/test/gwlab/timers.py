@@ -22,10 +22,14 @@ CONNTRACK = dict(
 )
 
 
+SYN_RETRY = 1       # seconds, real time: when a client sends its SYN again
+
+
 class Timers:
     def __init__(self, scale):
         self.scale = scale
         self.clamped = {}           # name -> production value of what was set to 1 s
+        self.rounded = {}           # name -> production value of what did not divide evenly
 
     def s(self, name, production):
         """a production timer (seconds) in lab time: whole seconds, at least 1"""
@@ -33,7 +37,23 @@ class Timers:
         if v < 1:
             self.clamped[name] = production
             return 1
+        if v != round(v):
+            self.rounded[name] = production
         return round(v)
+
+    def broken(self):
+        """why a run at this scale would not test what production does: the
+        relations between timers that the scenarios rely on, each of which a
+        too large scale destroys"""
+        c, out = self.conntrack(), []
+        if c["tcp_timeout_syn_sent"] <= SYN_RETRY:
+            out.append("a half-open TCP connection (120 s) is forgotten before the client's first "
+                       "SYN retry (1 s, real time): connecting over two gateways cannot be judged")
+        if c["udp_timeout"] >= c["udp_timeout_stream"]:
+            out.append("a UDP flow without an answer (60 s) lives as long as one with (180 s)")
+        if c["tcp_timeout_unacknowledged"] >= c["tcp_timeout_established"]:
+            out.append("TCP unacknowledged (300 s) is no shorter than established (7440 s)")
+        return out
 
     def conntrack(self):
         return {k: self.s(k, v) for k, v in CONNTRACK.items()}
