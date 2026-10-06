@@ -19,8 +19,7 @@ Measurements, run one at a time (counted on the interface, not by a reader):
   tcp_bulk      seconds: the server sends at full speed
   udp_newflows  rates, step_seconds, reply_delay: one datagram per new source
                 port at each rate; the server answers each after reply_delay
-Losses are split at "grace" seconds into the flow: before it is the start of
-the flow, after it the flow has to be clean.
+The agent reports what it saw and when; expect.py judges it.
 """
 import json
 import select
@@ -47,11 +46,10 @@ def sock(kind, addr, port):
     return s
 
 
-def missing(got, pps, seconds, grace):
-    """(lost at the start, lost later) of the numbered packets 0..n-1"""
-    n, edge = int(pps * seconds), grace * pps
-    lost = [k for k in range(n) if k not in got]
-    return sum(1 for k in lost if k < edge), sum(1 for k in lost if k >= edge)
+def missing(got, pps, seconds):
+    """which of the numbered packets 0..n-1 did not arrive (packet k was sent
+    k / pps seconds into the stream)"""
+    return [k for k in range(int(pps * seconds)) if k not in got]
 
 
 def stream(s, peer, pps, seconds, deadline):
@@ -122,8 +120,7 @@ def c_udp_stream(f, p, t0, grace):
     sleep_until(t0)
     got, sent, gap, refused = stream(s, (f["s"], f["sport"]), p["up_pps"], p["seconds"],
                                      t0 + p["seconds"] + 1.0)
-    start, late = missing(got, p["down_pps"], p["seconds"], grace)
-    return dict(tx=sent, rx=len(got), lost_start=start, lost_late=late,
+    return dict(tx=sent, rx=len(got), lost=missing(got, p["down_pps"], p["seconds"]),
                 outage_ms=round(gap * 1000, 1), refused=refused)
 
 
@@ -354,8 +351,7 @@ def s_udp_rr(f, p, t0, grace):
 def s_udp_stream(f, p, t0, grace):
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
     got, sent, gap, refused = stream(s, None, p["down_pps"], p["seconds"], t0 + p["seconds"] + 2.0)
-    start, late = missing(got, p["up_pps"], p["seconds"], grace)
-    return dict(tx=sent, rx=len(got), lost_start=start, lost_late=late, refused=refused)
+    return dict(tx=sent, rx=len(got), lost=missing(got, p["up_pps"], p["seconds"]), refused=refused)
 
 
 def s_tcp(f, p, t0, grace):

@@ -70,9 +70,8 @@ def render(run):
         rows.append(list(key) + [
             len(rs), sum(1 for r in rs if not r["bad"]), sum(1 for r in rs if r["bad"]),
             sum(1 for r in rs if r["retry"]),
-            sum(s.get("lost_start", 0) + s.get("lost_late", 0) for s in sv),
-            sum(c.get("lost_start", 0) + c.get("lost_late", 0) + c.get("answered", []).count(False)
-                for c in cl),
+            sum(len(s.get("lost", [])) for s in sv),
+            sum(len(c.get("lost", [])) + c.get("answered", []).count(False) for c in cl),
             max([c.get("outage_ms", 0) for c in cl] + [0]),
             "%d / %d" % (statistics.median(cms), max(cms)) if cms else "-",
         ])

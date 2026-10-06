@@ -51,7 +51,7 @@ def lab(args, opts):
             at += span(f["p"]) + 2
         time.sleep(2)                           # the implementations settle
         cpu0 = {n: g.cpu_ms() for n, g in lb.gw.items()}
-        job = dict(t0=time.monotonic() + 3, grace=expect.GRACE)
+        job = dict(t0=time.monotonic() + 4, grace=expect.GRACE)
         agents, parts = [], []
         for role, ends in (("server", lb.servers), ("client", lb.clients)):
             for e in ends.values():
@@ -63,6 +63,24 @@ def lab(args, opts):
                 agents.append(e.node.spawn(sys.executable, os.path.join(HERE, "agent.py"), role, jf, rf,
                                            log=os.path.join(out, "%s.log" % e.node.name)))
                 parts.append(rf)
+        events = getattr(sc, "EVENTS", [])
+        todo = []                               # (seconds after t0, what happens)
+        for e in events:
+            g = lb.gw.get(e.get("gw"))
+            if e["do"] == "reroute":
+                todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"])))
+            elif e["do"] == "lose_state":
+                todo.append((e["at"], lambda g=g: impl.lose_state(g)))
+            elif e["do"] == "uplink_recreate":
+                todo.append((e["at"], lambda g=g: lb.uplink_recreate(g)))
+            elif e["do"] == "sync_blackout":
+                todo.append((e["at"], lambda g=g: lb.sync_blackout(g, True)))
+                todo.append((e["at"] + e["seconds"], lambda g=g: lb.sync_blackout(g, False)))
+            else:
+                raise SystemExit("unknown event %r" % e["do"])
+        for at, act in sorted(todo, key=lambda x: x[0]):
+            time.sleep(max(0, job["t0"] + at - time.monotonic()))
+            act()
         windows = {}
         if alone:                               # CPU per gateway while each flow ran
             for f in flows:
@@ -90,7 +108,7 @@ def lab(args, opts):
     res = []
     for f in flows:
         c, s = seen["client"].get(f["id"]), seen["server"].get(f["id"])
-        bad, retry = expect.judge(f, c, s)
+        bad, retry = expect.judge(f, c, s, events)
         res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,

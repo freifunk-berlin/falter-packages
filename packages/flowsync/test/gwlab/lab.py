@@ -155,7 +155,9 @@ class Lab:
             # the lab's own observer: what the gateway sends on the sync path
             g.node.nft("table inet gwlab {\n\tcounter sync_tx {}\n\tchain out {\n"
                        "\t\ttype filter hook output priority -300;\n"
-                       "\t\tmeta nfproto ipv4 oifname \"wan0\" counter name sync_tx\n\t}\n}\n")
+                       "\t\tmeta nfproto ipv4 oifname \"wan0\" counter name sync_tx\n\t}\n"
+                       "\tchain cut_in {\n\t\ttype filter hook input priority -310;\n\t}\n"
+                       "\tchain cut_out {\n\t\ttype filter hook output priority -310;\n\t}\n}\n")
         for e in ends:
             e.node.ip(["link set lo up", "link set eth0 up", "addr add %s/64 dev eth0 nodad" % e.lan6])
         for node, dev, ms in delay:
@@ -197,6 +199,51 @@ class Lab:
             if add[e]:
                 e.node.ip(add[e])
         return flows
+
+    # ------------------------------------------------------------- events
+    # What a scenario can do to the lab while traffic runs. None of it knows
+    # the implementation (losing state is the implementation's own verb).
+    def reroute(self, flows, leg):
+        """every flow's forward (leg "fwd") or return ("rev") path moves to
+        the next gateway"""
+        names = list(self.gw)
+        cmds = {}
+        for f in flows:
+            new = self.gw[names[(names.index(f[leg]) + 1) % len(names)]]
+            f[leg] = new.name
+            if leg == "fwd":
+                cmds.setdefault(self.clients[f["client"]], []).append(
+                    "route replace %s/128 via %s" % (f["s"], new.mesh6))
+            else:
+                cmds.setdefault(self.servers[f["server"]], []).append(
+                    "route replace %s/128 via %s" % (f["c"], new.uplink6))
+        for e, lines in cmds.items():
+            e.node.ip(lines)
+
+    def sync_blackout(self, gw, on):
+        """the gateway neither sends nor receives sync (IPv4 on its uplink)"""
+        if on:
+            gw.node.nft('add rule inet gwlab cut_in meta nfproto ipv4 iifname "wan0" drop\n'
+                        'add rule inet gwlab cut_out meta nfproto ipv4 oifname "wan0" drop\n')
+        else:
+            gw.node.nft("flush chain inet gwlab cut_in\nflush chain inet gwlab cut_out\n")
+
+    def uplink_recreate(self, gw):
+        """the uplink device goes away and comes back under the same name and
+        addresses with a new ifindex, as netifd does to a VLAN uplink"""
+        port = "i-" + gw.name
+        mac = gw.node.run("ip", "-o", "link", "show", "dev", "wan0").split("link/ether ")[1].split()[0]
+        self.hub.ip(["link del %s" % port,       # a VLAN device comes back with its MAC address
+                     "link add %s type veth peer name wan0 address %s netns %d" % (port, mac, gw.node.pid),
+                     "link set %s master inet up" % port])
+        gw.node.ip(["link set wan0 up", "addr add %s/64 dev wan0 nodad" % gw.uplink6,
+                    "addr add %s/24 dev wan0" % gw.addr4]
+                   + ["route add %s/64 via %s" % (s.prefix, s.lan6) for s in self.servers.values()])
+        for node in (self.hub, gw.node):
+            dev = port if node is self.hub else "wan0"
+            if gw.uplink_ms:
+                node.run("tc", "qdisc", "add", "dev", dev, "root", "netem", "delay",
+                         "%gms" % gw.uplink_ms, "limit", "100000")
 
     def close(self):
         for g in getattr(self, "gw", {}).values():
