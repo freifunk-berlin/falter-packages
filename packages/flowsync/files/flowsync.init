@@ -10,11 +10,12 @@ USE_PROCD=1
 # before netifd has set it.
 START=21
 STOP=10
-EXTRA_COMMANDS="check announce flows flow detach"
+EXTRA_COMMANDS="check announce flows flow bypass detach"
 EXTRA_HELP="	check	Print the configuration as the daemon parses it
 	announce <client> <cport> <server> <sport> [proto]	Send one record to all peers
 	flows [local|remote]	List the flow tables
 	flow <client> <cport> <server> <sport> [proto]	Look one flow up in both tables
+	bypass [on|off]	Show or switch the bypass until the next restart
 	detach	Stop, take the programs off the uplink, drop the tables and rules"
 
 PROG=/usr/sbin/flowsync
@@ -54,11 +55,13 @@ _dev() {
 
 render_options() {
 	local add="$1"
-	local debug
+	local debug bypass
 
 	config_load flowsync
 	config_get_bool debug main debug 0
 	[ "$debug" = 1 ] && "$add" --debug
+	config_get_bool bypass main bypass 0
+	[ "$bypass" = 1 ] && "$add" --bypass
 	_opt "$add" bind_address bind
 	_dev "$add" interface interface
 	_dev "$add" uplink uplink
@@ -160,6 +163,11 @@ flow() {
 	ARGS=""
 	append_arg "$@"
 	eval "$PROG" "$opts" flow "$ARGS"
+}
+
+bypass() {
+	render_options append_arg
+	eval "$PROG" "$ARGS" bypass "$@"
 }
 
 # stopping the service leaves the programs on the uplink and the tables in

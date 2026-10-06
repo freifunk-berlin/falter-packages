@@ -137,6 +137,56 @@ rule no longer matches forwarded IPv6. What the gateways' ruleset does besides
 that is stateless already (zone forwardings, `inbound_allow`, the ICMPv6
 rule, the MSS clamp, the ACK/RST budget) and works as before.
 
+### Bypass
+
+Optional (`bypass`, off by default). With it the ingress program does not
+only mark an accepted packet, it forwards it: route lookup, hop limit minus
+one, and out through the neighbour layer of the outgoing device
+(`bpf_fib_lookup`, `bpf_redirect_neigh`). Such a packet passes neither
+nftables, nor conntrack's hooks, nor the kernel's IPv6 forwarding path. It
+covers the direction from the uplink to the mesh only, which is where the
+programs sit and where most bytes go.
+
+Bypassed is only what needs none of the above; everything else keeps its mark
+and takes the normal path:
+
+| not bypassed | because |
+|---|---|
+| packets without a flow | the firewall decides: stateless rules, reject |
+| anything but TCP and UDP directly behind the IPv6 header | fragments must be reassembled before the firewall; extension headers and other protocols are rare |
+| TCP segments with SYN, FIN or RST | the firewall clamps the MSS on SYNs |
+| hop limit 0 or 1 | the stack sends the ICMPv6 error |
+| too big for the outgoing device (GSO segments included) | the stack sends "packet too big" |
+| no route, or the route leads back out of the uplink or to the gateway itself | not ours to forward here |
+
+What it costs:
+
+- **A change of the firewall's rules does not reach flows that are in the
+  tables.** A rule added to block a destination applies to new flows and to
+  the packets on the normal path; packets of a running flow keep bypassing it
+  until the flow ends. `flowsync bypass off` puts everything back through the
+  firewall at once.
+- **nftables counters, tracing and tcpdump on the uplink's ingress see the
+  packets, the forward chain does not.** `dp_in_bypass` counts them.
+- **The size check is against the outgoing device's MTU**, not a route or
+  path MTU below it.
+- **The uplink must be an Ethernet-like device** (the daemon checks and leaves
+  the bypass off otherwise): the helper takes a link-layer header off the
+  packet. The outgoing device may be anything with a neighbour layer; tunnel
+  devices have not been tried.
+- The egress side of the outgoing device (its qdisc and tc filters) is passed
+  as usual.
+
+The switch is a map entry the programs read per packet, so it can be changed
+while they run: `flowsync bypass on|off` (or `/etc/init.d/flowsync bypass
+...`), which lasts until the daemon attaches the programs again and applies
+its configuration.
+
+Measured in the same VM as the other numbers (pktgen on one CPU, 10k flows,
+from the uplink to the client): about 0.72 µs per packet with the bypass,
+0.79 µs with conntrack, 0.96 µs with the tables and no bypass, 0.64 µs with
+an empty ruleset. The other direction is unchanged.
+
 ### Filter policy
 
 Which flows are synced; applied identically on TX and RX:
@@ -221,6 +271,7 @@ The daemon is configured on the command line only. The init script renders
       announce <client> <cport> <server> <sport> [proto] send one record to all peers
       flows [local|remote]                       list the flow tables
       flow <client> <cport> <server> <sport> [proto] look one flow up in both tables
+      bypass [on|off]                            show or switch the bypass of the running programs
       detach                                     take the programs, maps and rules away
 
 | option | UCI option | default | meaning |
@@ -228,6 +279,7 @@ The daemon is configured on the command line only. The init script renders
 | `-b, --bind ADDR` | `bind_address` | any | local address of the sync socket; peers check the source address, so set it to the address the peers list |
 | `-I, --interface DEV` | `interface` | any | sync datagrams are accepted only when they arrive on this device. The UCI option may name the logical interface, the init script passes its device |
 | `-U, --uplink DEV` | `uplink` | `interface` | the device forwarded traffic leaves to the Internet on; the tc programs attach there. Waited for if it does not exist yet, followed when it is created anew |
+| `--bypass` | `bypass` | off | forward accepted TCP and UDP packets from the uplink's tc hook, past netfilter (see "Bypass") |
 | `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
 | `-i, --interval SEC` | `interval` | `30` | seconds between rounds and counter logs |
 | `-t, --element-timeout SEC` | `element_timeout` | `90` | lifetime of a peer's flow after its last announcement; at least `3 x interval` |
@@ -268,7 +320,7 @@ needs no `CAP_BPF`).
 
 ## Operation
 
-`/etc/init.d/flowsync status|check|flows|flow|announce|detach`.
+`/etc/init.d/flowsync status|check|flows|flow|announce|bypass|detach`.
 
 Stopping the service leaves the programs on the uplink and the maps in place.
 `/etc/init.d/flowsync detach` takes everything away (programs, maps, the
@@ -281,6 +333,7 @@ The status file (`flowsync status`), written every `interval`:
 | | meaning |
 |---|---|
 | `attached` | the programs are on the uplink |
+| `bypass` | the bypass is on |
 | `fw_ok` | both rules are in place |
 | `local` / `copies` | live flows in the local / remote map at the last round |
 | `tx_events` | flows announced from their first packet |
@@ -294,6 +347,7 @@ The status file (`flowsync status`), written every `interval`:
 | `fw_repaired` | how often the accept rule had to be inserted |
 | `dp_out_pkts`, `dp_out_new`, `dp_out_skip` | the egress program: packets looked at, first of a flow, without a flow (ICMPv6, later fragments) |
 | `dp_in_pkts`, `dp_in_local`, `dp_in_remote`, `dp_in_miss`, `dp_in_skip` | the ingress program: looked at, accepted on a local / a peer's flow, no flow, not parsed |
+| `dp_in_bypass` | of the accepted packets, forwarded by the program itself |
 | `loop_max_ms` | longest time the loop spent between two polls in the last interval |
 
 and one line per peer, `peer <address> rx <datagrams> age <seconds> tx_errors <n>`.
@@ -342,6 +396,9 @@ Not done or not verified in this prototype:
 - The notrack rule covers all forwarded IPv6, also between mesh interfaces;
   bbb-configs' own `NOTRACK` rules become redundant, and its ruleset should be
   read once more for anything that still expects conntrack state there.
+- The bypass has forwarded to veth devices only. Forwarding into GRE or
+  WireGuard devices, which is where the gateways' mesh traffic goes, is
+  untested, and so is its gain on the gateways' hardware.
 - A device that is both uplink and carries tunnel traffic sees the tunnel's
   outer packets only; inner packets are looked at where they leave an uplink.
 

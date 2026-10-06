@@ -16,7 +16,8 @@ def sym(env):
     env.check("the packet reached the server", f.delivered("fwd"), 1)
     env.check("g0 has the flow, local", g0.ft(f), lambda e: e.local and not e.remote)
     env.check("replies pass g0 (of 3)", replies(env, f), 3)
-    env.check("accepted on the mark", g0.fwc("mark"), 3)
+    env.check("accepted on the mark (bypassed: the firewall saw none)", g0.fwc("mark"),
+              0 if env.bypass else 3)
     env.check("conntrack accepted nothing", g0.fwc("est"), 0)
     env.check("nothing rejected", rejects(env), 0)
 
@@ -52,7 +53,8 @@ def asym(env):
     synced(env, f)
     env.check("g1 has it as a peer's flow only", g1.ft(f), lambda e: e.remote and not e.local)
     env.check("replies pass g1 (of 3)", replies(env, f), 3)
-    env.check("accepted on the mark", g1.fwc("mark"), 3)
+    env.check("accepted on the mark (bypassed: the firewall saw none)", g1.fwc("mark"),
+              0 if env.bypass else 3)
     env.check("nothing rejected", rejects(env), 0)
     env.wait_st("g0 announced it from the event", g0, "tx_events", 1)
 

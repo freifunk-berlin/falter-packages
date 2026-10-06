@@ -22,7 +22,8 @@ const char *status_path = STATUS_FILE;
 
 /* the tc programs' counters, by name */
 #define DP_STATS(X) \
-	X(out_pkts) X(out_new) X(out_skip) X(in_pkts) X(in_local) X(in_remote) X(in_miss) \
+	X(out_pkts) X(out_new) X(out_skip) X(in_pkts) X(in_local) X(in_remote) X(in_bypass) \
+	X(in_miss) \
 	X(in_skip) X(ev_lost)
 
 void log_counters(void)
@@ -86,6 +87,7 @@ void write_status(void)
 	}
 	fprintf(f, "attached %d\n", gauge.attached);
 	fprintf(f, "fw_ok %d\n", gauge.fw_ok);
+	fprintf(f, "bypass %d\n", gauge.bypass);
 	fprintf(f, "refresh_running %d\n", gauge.refresh_running);
 	fprintf(f, "refresh_entries %llu\n", (unsigned long long)gauge.refresh_entries);
 	fprintf(f, "refresh_ms %llu\n", (unsigned long long)gauge.refresh_ms);

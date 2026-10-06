@@ -1,5 +1,6 @@
 """What a scenario works with: the topology, the gateways, flows, checks and
 timers of one run."""
+import os
 import threading
 import time
 
@@ -51,6 +52,8 @@ class Env:
         self.combo = combo
         self.flowsync = paths["flowsync"]
         self.bpf_object = paths["bpf_object"]
+        # FSTEST_BYPASS=1: every daemon runs with --bypass
+        self.bypass = os.environ.get("FSTEST_BYPASS", "") not in ("", "0")
         self.probe_path = paths["probe"]
         self.ptyrun = paths["ptyrun"]
         self.python = paths["python"]

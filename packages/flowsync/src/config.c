@@ -59,6 +59,9 @@ static int apply_option(const char *name, const char *val)
 	if (!strcmp(name, "debug")) {
 		cfg.debug = !strcmp(val, "1") || !strcmp(val, "on") ||
 			    !strcmp(val, "true") || !strcmp(val, "yes");
+	} else if (!strcmp(name, "bypass")) {
+		cfg.bypass = !strcmp(val, "1") || !strcmp(val, "on") ||
+			     !strcmp(val, "true") || !strcmp(val, "yes");
 	} else if (!strcmp(name, "bind_address")) {
 		cfg.bind_set = false;
 		if (!*val)
@@ -147,7 +150,7 @@ static int apply_option(const char *name, const char *val)
 /* short option (from 256: none), long option, UCI name, argument name for
  * the help text */
 enum { OPT_UDP_T = 256, OPT_TCP_T, OPT_TCP_SYN_T, OPT_TCP_CLOSE_T, OPT_OTHER_T,
-       OPT_BPF_OBJECT, OPT_PIN_DIR, OPT_FW_TABLE };
+       OPT_BPF_OBJECT, OPT_PIN_DIR, OPT_FW_TABLE, OPT_BYPASS };
 static const struct {
 	int c;
 	const char *name;
@@ -184,6 +187,8 @@ static const struct {
 	{ 'D', "exclude-dst",      "exclude_dst",      "CIDR",  "server prefix not synced, repeatable" },
 	{ 's', "status-file",      NULL,               "PATH",  "status file (" STATUS_FILE ")" },
 	{ 'u', "user",             NULL,               "NAME",  "run as this user, CAP_NET_ADMIN only" },
+	{ OPT_BYPASS, "bypass",    "bypass",           NULL,
+	  "forward accepted TCP and UDP packets from tc, past netfilter" },
 	{ OPT_BPF_OBJECT, "bpf-object", NULL,          "PATH",  "the tc programs (" BPF_OBJECT ")" },
 	{ OPT_PIN_DIR, "pin-dir",  NULL,               "PATH",  "where the maps are pinned (" PIN_DIR ")" },
 	{ OPT_FW_TABLE, "fw-table", NULL,              "NAME",  "the firewall's inet table (" FW_TABLE ")" },
@@ -204,6 +209,7 @@ void usage(FILE *out)
 		"  announce <client> <cport> <server> <sport> [proto] send one record to all peers\n"
 		"  flows [local|remote]                       list the flow tables\n"
 		"  flow <client> <cport> <server> <sport> [proto] look one flow up in both tables\n"
+		"  bypass [on|off]                            show or switch the bypass of the running programs\n"
 		"  detach                                     take the programs, maps and rules away\n"
 		"options (defaults in parentheses):\n");
 	for (i = 0; i < N_OPTIONS; i++) {

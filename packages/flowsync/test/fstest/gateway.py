@@ -150,7 +150,7 @@ table inet sync {
                 "--bpf-object", self.env.bpf_object,
                 "--udp-timeout", t["udp"], "--tcp-timeout", t["tcp"],
                 "--tcp-syn-timeout", t["tcp_syn"], "--tcp-close-timeout", t["tcp_close"],
-                "--other-timeout", t["other"]]
+                "--other-timeout", t["other"]] + (["--bypass"] if self.env.bypass else [])
 
     def start(self, *opts, debug=True):
         """start flowsync with the standard options plus opts (later options win);

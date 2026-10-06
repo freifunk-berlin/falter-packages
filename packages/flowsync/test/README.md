@@ -92,7 +92,11 @@ shows.
 | `frag.py` | `frag_sym`, `frag_asym`, `frag_unsolicited`, `exthdr` |
 | `tcp.py` | `tcp_state`, `tcp_pickup`, `tcp_connect`, `tcp_race`, `race_window`, `tcp_idle_push`, `tcp_idle_limit` (slow), `tcp_busy` |
 | `ops.py` | `daemon_down`, `restart_keeps`, `reboot`, `uplink_recreate`, `sync_recreate`, `rules`, `bootstrap`, `lost_first`, `loss`, `forged`, `unprivileged` |
+| `bypass.py` | `bypass`, `bypass_default_off`, `bypass_normal_path`, `bypass_tcp` |
 | `load.py` | `scale` (heavy; `SCALE_FLOWS`, default 50000) |
+
+`FSTEST_BYPASS=1` in the environment runs every daemon of every scenario with
+`--bypass`; the whole matrix passes that way too.
 
 ## Writing a scenario
 

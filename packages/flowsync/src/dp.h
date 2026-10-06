@@ -11,7 +11,8 @@
  *            the time it expires at.
  *
  * The ingress program accepts (marks) a packet whose flow is alive in either
- * table. Nothing else is shared: no entry is ever written by both sides.
+ * table, and with fs_ctl.bypass forwards it itself where it can. Nothing else
+ * is shared: no entry is ever written by both sides.
  */
 #ifndef FLOWSYNC_DP_H
 #define FLOWSYNC_DP_H
@@ -53,6 +54,11 @@ struct fs_cfg {
 	__u32 t_other;		/* every other protocol */
 };
 
+/* what the daemon may change while the programs run (fs_ctl, one entry) */
+struct fs_ctl {
+	__u32 bypass;		/* forward accepted TCP and UDP packets straight from tc */
+};
+
 /* per CPU */
 struct fs_stats {
 	__u64 out_pkts;		/* forwarded IPv6 packets out of the uplink, looked at */
@@ -61,6 +67,7 @@ struct fs_stats {
 	__u64 in_pkts;		/* IPv6 packets in from the uplink, looked at */
 	__u64 in_local;		/* accepted on a local flow */
 	__u64 in_remote;	/* accepted on a peer's flow */
+	__u64 in_bypass;	/* of the accepted ones, forwarded without the stack */
 	__u64 in_miss;		/* no flow: left unmarked */
 	__u64 in_skip;		/* not parsed, left unmarked (later fragments take the first one's mark) */
 	__u64 ev_lost;		/* new flows whose event did not fit the ring */

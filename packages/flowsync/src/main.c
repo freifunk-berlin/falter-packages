@@ -272,6 +272,7 @@ static int cmd_check(void)
 	printf("bind_address %s\n", cfg.bind_set ? addr_str(&cfg.bind, abuf, sizeof(abuf)) : "*");
 	printf("interface %s\n", cfg.ifname[0] ? cfg.ifname : "*");
 	printf("uplink %s\n", cfg.uplink[0] ? cfg.uplink : "-");
+	printf("bypass %d\n", cfg.bypass);
 	printf("port %lu\n", cfg.port);
 	printf("interval %lu\n", cfg.interval);
 	printf("element_timeout %lu\n", cfg.element_timeout);
@@ -411,6 +412,34 @@ static int cmd_flow(int argc, char **argv)
 	return alive ? 0 : 1;
 }
 
+/* the switch in the pinned control map: takes effect with the next packet,
+ * and lasts until the daemon attaches the programs again (it then applies
+ * its own configuration) */
+static int cmd_bypass(int argc, char **argv)
+{
+	int on;
+
+	if (maps_open())
+		return 2;
+	if (argc) {
+		if (strcmp(argv[0], "on") && strcmp(argv[0], "off")) {
+			fprintf(stderr, "bypass: on or off\n");
+			return 2;
+		}
+		if (dp_set_bypass(!strcmp(argv[0], "on"))) {
+			perror("bypass");
+			return 1;
+		}
+	}
+	on = dp_get_bypass();
+	if (on < 0) {
+		perror("bypass");
+		return 1;
+	}
+	printf("bypass %s\n", on ? "on" : "off");
+	return 0;
+}
+
 static int cmd_detach(void)
 {
 	if (!cfg.uplink[0]) {
@@ -476,6 +505,8 @@ int main(int argc, char **argv)
 		return cmd_flows(argc - i, argv + i);
 	if (!strcmp(cmd, "flow") && (argc - i == 4 || argc - i == 5))
 		return cmd_flow(argc - i, argv + i);
+	if (!strcmp(cmd, "bypass") && argc - i <= 1)
+		return cmd_bypass(argc - i, argv + i);
 	if (!strcmp(cmd, "detach"))
 		return cmd_detach();
 	usage(stderr);

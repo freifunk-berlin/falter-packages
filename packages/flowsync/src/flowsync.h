@@ -83,6 +83,7 @@ struct prefix_list {
 
 struct config {
 	bool debug;
+	bool bypass;			/* forward accepted packets from tc, past netfilter */
 	bool bind_set;
 	struct in6_addr bind;
 	char ifname[IFNAMSIZ];		/* the sync socket's device, "" for any */
@@ -135,6 +136,7 @@ struct gauges {
 	uint64_t copies;		/* live remote flows, last complete round */
 	bool refresh_running;
 	bool attached;			/* the tc programs are on the uplink */
+	bool bypass;			/* the bypass is on */
 	bool fw_ok;			/* the nftables rules are in place */
 };
 
@@ -220,6 +222,8 @@ void dp_remote_add(const struct flow *f);
 void dp_remote_flush(void);
 int dp_get(enum dp_map which, const struct flow *f, struct dp_ent *out);
 int dp_stats(struct fs_stats *sum);
+int dp_set_bypass(bool on);
+int dp_get_bypass(void);
 
 /* fw.c */
 int fw_open(void);

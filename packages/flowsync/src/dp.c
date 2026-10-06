@@ -15,6 +15,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <net/if.h>
+#include <net/if_arp.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +37,7 @@
 static struct bpf_object *obj;
 static int map_fd[2] = { -1, -1 };
 static int stats_fd = -1;
+static int ctl_fd = -1;
 static int prog_fd[2] = { -1, -1 };	/* ingress, egress */
 static __u32 prog_id[2];
 static struct ring_buffer *rb;
@@ -125,7 +129,7 @@ static void pin_path(char *buf, size_t len, const char *name)
 
 static void unpin_all(void)
 {
-	static const char *const names[] = { "fs_local", "fs_remote", "fs_stats" };
+	static const char *const names[] = { "fs_local", "fs_remote", "fs_stats", "fs_ctl" };
 	char path[PATH_MAX];
 	unsigned int i;
 
@@ -181,11 +185,12 @@ static int load(void)
 	map_fd[DP_LOCAL] = bpf_object__find_map_fd_by_name(obj, "fs_local");
 	map_fd[DP_REMOTE] = bpf_object__find_map_fd_by_name(obj, "fs_remote");
 	stats_fd = bpf_object__find_map_fd_by_name(obj, "fs_stats");
+	ctl_fd = bpf_object__find_map_fd_by_name(obj, "fs_ctl");
 	p = bpf_object__find_program_by_name(obj, "fs_ingress");
 	prog_fd[0] = p ? bpf_program__fd(p) : -1;
 	p = bpf_object__find_program_by_name(obj, "fs_egress");
 	prog_fd[1] = p ? bpf_program__fd(p) : -1;
-	if (map_fd[DP_LOCAL] < 0 || map_fd[DP_REMOTE] < 0 || stats_fd < 0 ||
+	if (map_fd[DP_LOCAL] < 0 || map_fd[DP_REMOTE] < 0 || stats_fd < 0 || ctl_fd < 0 ||
 	    prog_fd[0] < 0 || prog_fd[1] < 0) {
 		logmsg(LOG_ERR, "%s: maps or programs missing", cfg.bpf_object);
 		goto fail;
@@ -235,6 +240,8 @@ int dp_open(bool load_progs)
 		map_fd[DP_REMOTE] = bpf_obj_get(path);
 		pin_path(path, sizeof(path), "fs_stats");
 		stats_fd = bpf_obj_get(path);
+		pin_path(path, sizeof(path), "fs_ctl");
+		ctl_fd = bpf_obj_get(path);
 		return map_fd[DP_LOCAL] < 0 || map_fd[DP_REMOTE] < 0 ? -1 : 0;
 	}
 	if (mkdir(cfg.pin_dir, 0755) && errno != EEXIST) {
@@ -306,6 +313,62 @@ static int attach(unsigned int ifindex)
 	return 0;
 }
 
+/* the bypass switch of the running programs; -1 if it cannot be set */
+int dp_set_bypass(bool on)
+{
+	struct fs_ctl ctl = { .bypass = on };
+	__u32 zero = 0;
+
+	if (ctl_fd < 0 || bpf_map_update_elem(ctl_fd, &zero, &ctl, BPF_ANY))
+		return -1;
+	gauge.bypass = on;
+	return 0;
+}
+
+int dp_get_bypass(void)
+{
+	struct fs_ctl ctl;
+	__u32 zero = 0;
+
+	if (ctl_fd < 0 || bpf_map_lookup_elem(ctl_fd, &zero, &ctl))
+		return -1;
+	return ctl.bypass != 0;
+}
+
+/* the bypass takes an Ethernet header off the packet and writes behind it */
+static bool is_ethernet(const char *dev)
+{
+	struct ifreq ifr;
+	bool eth = false;
+	int fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+
+	if (fd < 0)
+		return false;
+	memset(&ifr, 0, sizeof(ifr));
+	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", dev);
+	if (!ioctl(fd, SIOCGIFHWADDR, &ifr))
+		eth = ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER;
+	close(fd);
+	return eth;
+}
+
+/* as configured, but never on a device the bypass cannot work on */
+static void apply_bypass(void)
+{
+	bool on = cfg.bypass;
+
+	if (on && !is_ethernet(cfg.uplink)) {
+		logmsg(LOG_WARNING, "bypass: uplink %s is not an Ethernet device, bypass stays off",
+		       cfg.uplink);
+		on = false;
+	}
+	if (dp_set_bypass(on))
+		logmsg(LOG_WARNING, "bypass: %s", strerror(errno));
+	else if (on)
+		logmsg(LOG_NOTICE, "bypass on: accepted TCP and UDP packets are forwarded from tc, "
+		       "past netfilter");
+}
+
 /* are both filters on the device, with our programs? */
 static bool attached(unsigned int ifindex)
 {
@@ -356,6 +419,7 @@ bool dp_tick(void)
 	       attached_ifindex ? ": the device was created anew" : "");
 	attached_ifindex = ifindex;
 	gauge.attached = true;
+	apply_bypass();
 	cnt.dp_attached++;
 	return true;
 }
