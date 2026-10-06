@@ -25,7 +25,7 @@ define Package/bird3-babelpatch
   CATEGORY:=Network
   SUBMENU:=Routing and Redirection
   PROVIDES:=bird3
-  DEPENDS:=+libpthread +libatomic
+  DEPENDS:=+libpthread $(ATOMIC64_DEPENDS)
   CONFLICTS:=bird2 bird3
 endef
 
@@ -52,7 +52,7 @@ This is the 3.0 branch of Bird which is a multithreaded rewrite.
 endef
 
 CONFIGURE_ARGS += --disable-libssh --with-protocols=babel,bgp,mrt,pipe,static
-TARGET_LDFLAGS += -latomic
+TARGET_LDFLAGS += -Wl,--as-needed
 
 define Package/bird3-babelpatch/conffiles
 /etc/bird.conf
