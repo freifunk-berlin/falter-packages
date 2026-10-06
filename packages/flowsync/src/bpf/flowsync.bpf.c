@@ -94,7 +94,8 @@ static __always_inline struct fs_stats *stats(void)
 
 static __always_inline __u32 now_s(void)
 {
-	return bpf_ktime_get_ns() / 1000000000ULL;
+	/* seconds are all we need: the tick's time, without reading a clock */
+	return bpf_ktime_get_coarse_ns() / 1000000000ULL;
 }
 
 /*

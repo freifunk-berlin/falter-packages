@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
+#define _GNU_SOURCE
 /*
  * The datapath: the tc programs on the uplink, their maps and the new-flow
  * events (bpf/flowsync.bpf.c, dp.h).
@@ -18,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -51,10 +53,13 @@ struct dp_walk {
 	uint32_t now;
 };
 
-/* the programs' clock: bpf_ktime_get_ns() in seconds */
+/* the programs' clock: bpf_ktime_get_coarse_ns() in seconds */
 uint32_t dp_now(void)
 {
-	return mono_ms() / 1000;
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+	return ts.tv_sec;
 }
 
 static void key_of(struct fs_key *k, const struct flow *f)
