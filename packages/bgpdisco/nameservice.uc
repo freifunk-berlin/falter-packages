@@ -131,7 +131,9 @@ function write_hostnames(data) {
     return;
   }
 
-  let tmp_file = cfg.hosts_file + '.tmp';
+  // dnsmasq watches the directory and skips dotfiles, so it doesn't read
+  // the half-written file
+  let tmp_file = fs.dirname(cfg.hosts_file) + '/.' + fs.basename(cfg.hosts_file) + '.tmp';
   if (!fs.writefile(tmp_file, contents)) {
     ERR('Could not write hostnames to %s', tmp_file);
     return;
