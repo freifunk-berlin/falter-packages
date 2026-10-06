@@ -20,7 +20,8 @@
 #include <linux/types.h>
 
 /* client: the address behind the gateways; server: the one outside. Ports in
- * network byte order, 0 for protocols without ports. */
+ * network byte order: TCP, UDP and SCTP have both, every other protocol none
+ * (0), its flows are per pair of addresses. */
 struct fs_key {
 	__u8 c[16];
 	__u8 s[16];

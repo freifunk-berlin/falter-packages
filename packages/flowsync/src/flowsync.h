@@ -164,7 +164,9 @@ int read_sysctl(const char *path, unsigned long *v);
 
 /* policy.c */
 const char *proto_name(uint8_t proto);
+const char *proto_str(uint8_t proto, char *buf, size_t len);
 int proto_num(const char *s);
+bool proto_ports(uint8_t proto);
 bool skip_port(unsigned int port);
 bool wanted(const struct flow *f);
 

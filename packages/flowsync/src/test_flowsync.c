@@ -149,9 +149,13 @@ static void test_policy(void)
 
 	CHECK(proto_num("udp") == IPPROTO_UDP);
 	CHECK(proto_num("tcp") == IPPROTO_TCP);
-	CHECK(proto_num("sctp") < 0);
+	CHECK(proto_num("sctp") == IPPROTO_SCTP && proto_num("esp") == IPPROTO_ESP);
+	CHECK(proto_num("gre") == 47 && proto_num("47") == 47 && proto_num("l2tp") == 115);
+	CHECK(proto_num("ipip") == 4 && proto_num("ip6ip6") == 41);
+	CHECK(proto_num("0") < 0 && proto_num("256") < 0 && proto_num("udpx") < 0 && proto_num("") < 0);
 	CHECK(!strcmp(proto_name(IPPROTO_UDP), "udp"));
 	CHECK(proto_name(1) == NULL);
+	CHECK(proto_ports(IPPROTO_TCP) && proto_ports(IPPROTO_SCTP) && !proto_ports(IPPROTO_ESP));
 	CHECK(skip_port(53) && !skip_port(54));
 
 	CHECK(wanted(&f));
@@ -163,6 +167,19 @@ static void test_policy(void)
 	CHECK(wanted(&g));
 	g = f; g.proto = IPPROTO_ICMPV6;		/* not configured */
 	CHECK(!wanted(&g));
+	/* the shape of a flow goes with its protocol */
+	cfg.proto[IPPROTO_ESP] = cfg.proto[IPPROTO_ICMPV6] = cfg.proto[IPPROTO_SCTP] = true;
+	g = f; g.proto = IPPROTO_ESP;			/* no ports */
+	CHECK(!wanted(&g));
+	g.cport = g.sport = 0;
+	CHECK(wanted(&g));
+	g.proto = IPPROTO_ICMPV6;			/* never a flow, whatever is configured */
+	CHECK(!wanted(&g));
+	g = f; g.proto = IPPROTO_SCTP;			/* two ports */
+	CHECK(wanted(&g));
+	g.sport = 0;
+	CHECK(!wanted(&g));
+	cfg.proto[IPPROTO_ESP] = cfg.proto[IPPROTO_ICMPV6] = cfg.proto[IPPROTO_SCTP] = false;
 	g = f; g.cport = 0;
 	CHECK(!wanted(&g));
 	g = f; g.sport = 0;
@@ -234,8 +251,10 @@ static void test_wire(void)
 	buf[0] = '1';	/* the old text format */
 	CHECK(wire_check(buf, WIRE_HDR_LEN + 2 * WIRE_REC_LEN, &count, &fl) == PARSE_VERSION);
 	buf[0] = WIRE_VERSION;
-	buf[WIRE_HDR_LEN] = 1;	/* ICMPv6 is not a known protocol */
+	buf[WIRE_HDR_LEN] = 0;	/* no protocol; every other number is one, the policy decides */
 	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_ERR);
+	buf[WIRE_HDR_LEN] = 50;
+	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_OK && g.proto == 50);
 	buf[WIRE_HDR_LEN] = 17;
 	CHECK(wire_get(buf + WIRE_HDR_LEN, &g) == PARSE_OK);
 	buf[WIRE_HDR_LEN + 1] = 1;	/* record flags: zero in version 1 */

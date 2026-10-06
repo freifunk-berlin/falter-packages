@@ -289,8 +289,8 @@ static int cmd_check(void)
 	printf("other_timeout %lu\n", cfg.t_other);
 	printf("resync_rate %lu\n", cfg.resync_rate);
 	for (i = 0; i < 256; i++)
-		if (cfg.proto[i] && proto_name(i))
-			printf("proto %s\n", proto_name(i));
+		if (cfg.proto[i])
+			printf("proto %s\n", proto_str(i, abuf, sizeof(abuf)));
 	for (i = 1; i < 65536; i++)
 		if (skip_port(i))
 			printf("skip_server_port %u\n", i);
@@ -304,8 +304,7 @@ static int cmd_check(void)
 
 static int flow_args(struct flow *f, int argc, char **argv)
 {
-	char *end;
-	long p;
+	int p;
 
 	memset(f, 0, sizeof(*f));
 	f->proto = IPPROTO_UDP;
@@ -315,26 +314,14 @@ static int flow_args(struct flow *f, int argc, char **argv)
 		return -1;
 	}
 	if (argc == 5) {
-		/* a name, or a number for what is not synced (flow command) */
 		p = proto_num(argv[4]);
 		if (p < 0) {
-			p = strtol(argv[4], &end, 10);
-			if (end == argv[4] || *end || p < 0 || p > 255) {
-				fprintf(stderr, "unknown protocol '%s'\n", argv[4]);
-				return -1;
-			}
+			fprintf(stderr, "unknown protocol '%s'\n", argv[4]);
+			return -1;
 		}
 		f->proto = p;
 	}
 	return 0;
-}
-
-static const char *proto_str(uint8_t proto, char *buf, size_t len)
-{
-	if (proto_name(proto))
-		return proto_name(proto);
-	snprintf(buf, len, "%u", proto);
-	return buf;
 }
 
 static int maps_open(void)

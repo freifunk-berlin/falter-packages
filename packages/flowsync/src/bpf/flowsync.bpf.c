@@ -122,8 +122,10 @@ static __always_inline __u32 now_s(void)
 /*
  * The flow of a packet, from the network header on whatever the device's
  * link layer is. out: the packet leaves (source is the client). Returns 0
- * with *k filled, or -1 for what has no flow of its own: ICMPv6 (the firewall
- * handles it statelessly), later fragments, an unusable header chain.
+ * with *k filled: addresses and ports for TCP, UDP and SCTP, the addresses
+ * alone for every other protocol (ESP, GRE, IP in IP, L2TP, ...). -1 for
+ * what has no flow of its own: ICMPv6 (the firewall handles it statelessly),
+ * later fragments, an unusable header chain.
  */
 static __always_inline int parse(struct __sk_buff *skb, int out, struct fs_key *k, __u8 *tcp_flags,
 				 struct pkt *pk)
@@ -180,9 +182,7 @@ static __always_inline int parse(struct __sk_buff *skb, int out, struct fs_key *
 			return -1;
 		/* fall through */
 	case IPPROTO_UDP:
-	case IPPROTO_UDPLITE:
 	case IPPROTO_SCTP:
-	case IPPROTO_DCCP:
 		if (bpf_skb_load_bytes_relative(skb, off, ports, sizeof(ports), BPF_HDR_START_NET))
 			return -1;
 		break;

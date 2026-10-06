@@ -61,9 +61,26 @@ yet, and the OpenWrt package build is untested (see "Open points").
 ### What is a flow
 
 The key is client address, server address, protocol, client port, server
-port. TCP, UDP, UDP-Lite, SCTP and DCCP have ports; every other protocol is
-one flow per address pair. ICMPv6 has no flows: the firewall handles it
-statelessly (fw4's `Allow-ICMPv6-Forward`), errors about a flow included.
+port. TCP, UDP and SCTP have ports; every other protocol (ESP, GRE, IP in IP,
+L2TP, ...) is one flow per pair of addresses. ICMPv6 has no flows: the
+firewall handles it statelessly (fw4's `Allow-ICMPv6-Forward`), errors about
+a flow included.
+
+Protocols by what clients actually use across a gateway:
+
+| | handled as | synced by default |
+|---|---|---|
+| TCP, UDP (with QUIC, WireGuard, WebRTC, ... on top) | ports | yes |
+| ESP: IPsec without UDP encapsulation, as phones (WiFi calling) and VPN clients send it where there is no NAT | address pair | yes |
+| GRE, IPv4 in IPv6, IPv6 in IPv6, L2TPv3: plain tunnels | address pair | yes |
+| SCTP: hardly seen natively (WebRTC carries it inside UDP) | ports | no (`proto sctp`) |
+| anything else | address pair | no (`proto <number>`) |
+| ICMPv6 | no flow, stateless in the firewall | - |
+
+There is nothing like conntrack's helpers (FTP, SIP, H.323): they read
+unencrypted control connections to let in a second connection the outside
+starts. The gateways have never loaded any, and what is in use today either
+starts every flow from the client or is encrypted.
 
 A local flow lives for a timeout after its last packet out:
 
@@ -199,18 +216,22 @@ an empty ruleset. The other direction is unchanged.
 
 Which flows are synced; applied identically on TX and RX:
 
-- IPv6, and the protocol is in `proto` (default `udp`, `tcp`)
+- IPv6, and the protocol is in `proto` (default `udp`, `tcp`, `esp`, `gre`,
+  `ipip`, `ip6ip6`, `l2tp`); never ICMPv6
 - client is inside at least one `prefix` and inside no `exclude`
 - server is inside no `exclude_dst` (the mesh prefix, no default)
 - for UDP, the server port is not in `skip_server_port` (default `53`)
-- both ports are 1..65535, both addresses routable (not unspecified,
-  loopback, multicast, link-local or v4-mapped)
+- TCP, UDP and SCTP: both ports are 1..65535; every other protocol: no ports
+- both addresses routable (not unspecified, loopback, multicast, link-local
+  or v4-mapped)
 
 A flow that does not pass is still a local flow on the gateway that forwards
 it: its replies pass there and nowhere else (test `policy`).
 
 A spoofed sender can therefore at most create entries for (client inside our
 prefixes) x (server outside the mesh), each living `element_timeout` seconds.
+An entry of a protocol without ports lets everything of that protocol from
+that server to that client in, not one port.
 
 ### TX
 
@@ -299,7 +320,7 @@ The daemon is configured on the command line only. The init script renders
 | `-F, --max-flows N` | `max_flows` | `131072` | size of the local map. It is an LRU: when full, the flow that has been idle longest makes room. About 100 bytes per entry, allocated at start |
 | `-C, --max-copies N` | `max_copies` | `131072` | size of the remote map; when full, new flows are refused |
 | `--udp-timeout SEC` etc. | `udp_timeout`, `tcp_timeout`, `tcp_syn_timeout`, `tcp_close_timeout`, `other_timeout` | see above | lifetime of a local flow after its last packet out |
-| `-P, --proto NAME` | `proto` (list) | `udp`, `tcp` | synced protocols |
+| `-P, --proto NAME` | `proto` (list) | `udp`, `tcp`, `esp`, `gre`, `ipip`, `ip6ip6`, `l2tp` | synced protocols: these names, `sctp`, or a protocol number. Giving the option replaces the default list |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | UDP server ports never synced |
 | `-e, --peer ADDR` | `peer` (list) | - | the other gateways (max. 32) |
 | `-x, --prefix CIDR` | `prefix` (list) | - | synced client prefixes |

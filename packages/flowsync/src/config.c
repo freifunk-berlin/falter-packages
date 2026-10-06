@@ -111,6 +111,7 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 1, 86400, &cfg.t_tcp_close, 10);
 	} else if (!strcmp(name, "other_timeout")) {
 		return opt_uint(name, val, 1, 86400, &cfg.t_other, 10);
+
 	} else if (!strcmp(name, "resync_rate")) {
 		return opt_uint(name, val, 0, 4000000, &cfg.resync_rate, 10);
 	} else if (!strcmp(name, "proto")) {
@@ -179,7 +180,9 @@ static const struct {
 	{ OPT_TCP_CLOSE_T, "tcp-close-timeout", "tcp_close_timeout", "SEC",
 	  "TCP, after the client's FIN or RST (120)" },
 	{ OPT_OTHER_T, "other-timeout", "other_timeout", "SEC", "other protocols (600)" },
-	{ 'P', "proto",            "proto",            "NAME",  "synced protocol, repeatable (udp tcp)" },
+	{ 'P', "proto",            "proto",            "NAME",
+	  "synced protocol, repeatable: tcp udp sctp esp gre ipip ip6ip6 l2tp or a number "
+	  "(udp tcp esp gre ipip ip6ip6 l2tp)" },
 	{ 'S', "skip-server-port", "skip_server_port", "N",     "server port never synced, repeatable (53)" },
 	{ 'e', "peer",             "peer",             "ADDR",  "other gateway, repeatable" },
 	{ 'x', "prefix",           "prefix",           "CIDR",  "synced client prefix, repeatable" },
@@ -300,9 +303,14 @@ int parse_args(int argc, char **argv)
 	}
 
 	if (!cfg.n_proto) {
-		cfg.proto[IPPROTO_UDP] = true;
-		cfg.proto[IPPROTO_TCP] = true;
-		cfg.n_proto = 2;
+		/* what clients use across the gateways: everything on TCP and
+		 * UDP, IPsec without UDP encapsulation, and plain tunnels */
+		static const char *const def[] = { "udp", "tcp", "esp", "gre", "ipip", "ip6ip6",
+						   "l2tp" };
+
+		for (i = 0; i < sizeof(def) / sizeof(def[0]); i++)
+			cfg.proto[proto_num(def[i])] = true;
+		cfg.n_proto = i;
 	}
 	if (!cfg.n_skip_port) {
 		cfg.skip_port[53 / 8] |= 1 << (53 % 8);

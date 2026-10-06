@@ -88,7 +88,7 @@ shows.
 
 | module | scenarios |
 |---|---|
-| `basic.py` | `sym`, `unsolicited`, `asym`, `latency`, `expiry`, `server_cannot_hold`, `long_flow`, `reroute`, `policy`, `other_proto`, `idle_peers` |
+| `basic.py` | `sym`, `unsolicited`, `asym`, `latency`, `expiry`, `server_cannot_hold`, `long_flow`, `reroute`, `policy`, `tunnel_protos`, `proto_list`, `other_proto`, `idle_peers` |
 | `frag.py` | `frag_sym`, `frag_asym`, `frag_unsolicited`, `exthdr` |
 | `tcp.py` | `tcp_state`, `tcp_pickup`, `tcp_connect`, `tcp_race`, `race_window`, `tcp_idle_push`, `tcp_idle_limit` (slow), `tcp_busy` |
 | `ops.py` | `daemon_down`, `restart_keeps`, `reboot`, `uplink_recreate`, `sync_recreate`, `rules`, `bootstrap`, `lost_first`, `loss`, `forged`, `unprivileged` |

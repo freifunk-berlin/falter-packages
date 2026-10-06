@@ -192,25 +192,63 @@ def policy(env):
 
 
 @scenario(gateways=2)
+def tunnel_protos(env):
+    """ESP, GRE, IPv4 in IPv6, IPv6 in IPv6 and L2TP are flows by their two
+    addresses and synced by default: out through g0, back through g1."""
+    g0, g1 = env.g[:2]
+    env.start()
+    for name, num in (("esp", 50), ("gre", 47), ("ipip", 4), ("ip6ip6", 41), ("l2tp", 115)):
+        f = env.flow("udp", fw=g0, rev=g1)
+        env.probe(env.sv, "v6proto", f.s, f.c, num, 2)
+        env.sleep(0.3)
+        env.check("%s unsolicited: nothing passes g1" % name, f.delivered("rev"), 0)
+        env.probe(env.cl, "v6proto", f.c, f.s, num, 1)
+        env.wait_for("%s: g1 holds the flow by its name" % name, 1,
+                     lambda: g1.ft_tuple(name, f.c, 0, f.s, 0).remote, step=0.05)
+        env.probe(env.sv, "v6proto", f.s, f.c, num, 3)
+        env.sleep(0.3)
+        env.check("%s: replies pass g1 (of 3)" % name, f.delivered("rev"), 3)
+        env.check("%s: UDP between the same hosts is another flow, rejected" % name,
+                  replies(env, f, 2), 0)
+
+
+@scenario(gateways=2)
+def proto_list(env):
+    """The list is the administrator's: with `proto` given, only those are
+    synced (ESP no longer), and a protocol can be named by its number."""
+    g0, g1 = env.g[:2]
+    env.start("-P", "udp", "-P", "tcp", "-P", "99")
+    e = env.flow("udp", fw=g0, rev=g1)
+    env.probe(env.cl, "v6proto", e.c, e.s, 50, 1)
+    n = env.flow("udp", fw=g0, rev=g1)
+    env.probe(env.cl, "v6proto", n.c, n.s, 99, 1)
+    env.wait_for("protocol 99 is synced", 1, lambda: g1.ft_tuple(99, n.c, 0, n.s, 0).remote,
+                 step=0.05)
+    env.check("ESP is local to g0 now", [g0.ft_tuple("esp", e.c, 0, e.s, 0).local,
+                                         g1.ft_tuple("esp", e.c, 0, e.s, 0).alive],
+              [True, False])
+
+
+@scenario(gateways=2)
 def other_proto(env):
-    """A protocol without ports (47, GRE) is a local flow by its addresses:
-    replies pass the gateway that forwarded it, are not synced, and nothing
-    comes in unsolicited."""
+    """A protocol that is not in the list (99) is a local flow by its
+    addresses: replies pass the gateway that forwarded it, are not synced,
+    and nothing comes in unsolicited."""
     g0, g1 = env.g[:2]
     env.start()
     f = env.flow("udp", fw=g0, rev=g0)
-    env.probe(env.sv, "v6proto", f.s, f.c, 47, 2)
+    env.probe(env.sv, "v6proto", f.s, f.c, 99, 2)
     env.sleep(0.3)
     env.check("unsolicited: nothing passes", f.delivered("rev"), 0)
-    env.probe(env.cl, "v6proto", f.c, f.s, 47, 1)
+    env.probe(env.cl, "v6proto", f.c, f.s, 99, 1)
     env.sleep(0.3)
     env.check("the client's packet reached the server", f.delivered("fwd"), 1)
     env.check("g0 has it as a local flow without ports",
-              [ln for ln in g0.flows("local") if " 47 " in ln and ":0 ->" in ln], lambda l: len(l) == 1)
-    env.probe(env.sv, "v6proto", f.s, f.c, 47, 3)
+              [ln for ln in g0.flows("local") if " 99 " in ln and ":0 ->" in ln], lambda l: len(l) == 1)
+    env.probe(env.sv, "v6proto", f.s, f.c, 99, 3)
     env.sleep(0.3)
     env.check("replies pass g0 (of 3)", f.delivered("rev"), 3)
-    env.probe(env.sv, "--mark", g1.i + 1, "v6proto", f.s, f.c, 47, 2)
+    env.probe(env.sv, "--mark", g1.i + 1, "v6proto", f.s, f.c, 99, 2)
     env.sleep(0.3)
     env.check("none passes g1", f.delivered("rev"), 3)
     env.check("UDP between the same hosts is another flow: rejected", replies(env, f, 2), 0)
