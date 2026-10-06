@@ -76,7 +76,10 @@ def render(run):
     if run.get("ladder"):
         ms = run["sync_ms"]
         out.append("sync latency measured before the flows: %s" % (
-            "answers never passed: nothing is accepted on asymmetric paths" if ms is None else
+            "not every answer passed, even %g ms late: nothing is accepted on asymmetric paths (passed: %s)"
+            % (run["ladder"]["delays_ms"][-1], ", ".join(
+                "%g ms: %d/%d" % (d, n, run["ladder"]["flows"])
+                for d, n in zip(run["ladder"]["delays_ms"], run["ladder"]["passed"]))) if ms is None else
             "at most %g ms; a flow whose answer takes a shorter detour than that may lose its start" % ms))
     groups = {}
     for r in run["flows"]:

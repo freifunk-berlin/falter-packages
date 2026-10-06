@@ -124,7 +124,7 @@ what expires before what stays as on a gateway, and a run takes minutes.
 
 ## Scenarios
 
-    python3 -m gwlab steady|reroute|stateloss|blackout|uplink|longlived|latency|perf --impl NAME [--scale N]
+    python3 -m gwlab SCENARIO --impl NAME [--scale N]     # a module in scenarios/
 
 | Scenario | What happens | Result |
 |---|---|---|
@@ -133,9 +133,19 @@ what expires before what stays as on a gateway, and a run takes minutes.
 | `stateloss` | gw2 loses every flow it knows (the implementation's `lose_state`) | pass / FAIL |
 | `blackout` | gw2 is cut off from the sync while every flow starts | pass / FAIL |
 | `uplink` | gw2's uplink device is deleted and created again (new ifindex, same MAC) | pass / FAIL |
+| `restart` | the sync software on gw2 is stopped and started again | pass / FAIL |
+| `idle` | connections fall silent for ten minutes, then the server speaks; ten more, then the client | pass / FAIL |
+| `syncloss` | gw2's sync path loses 30 % of its packets, all the time | pass / FAIL against the sync latency measured under that loss |
+| `syncmtu` | gw2's sync path drops packets above 1280 bytes | pass / FAIL |
 | `longlived` | one connection per gateway pair talks for 2.2 established timeouts, scale 30 | pass / FAIL |
 | `latency` | new flows to a server at distance 0 that holds its first answer back by 0 to 1000 ms | from which delay on every answer passes: the sync latency, seen from outside |
 | `perf` | one flow at a time, nothing else running, no link latency | numbers, below |
+
+A bad sync path (`sync=dict(gw2=dict(loss=30))` or `mtu=1280` in the
+topology) is there from the start, also while the sync latency is measured:
+the flows are judged against what the implementation achieves on it. The
+answers held back in that measurement stay below the lifetime of an unanswered
+UDP flow; a later answer would not pass a single gateway either.
 
 After an event a flow has to deliver again and no connection may reset; the
 report's recovery column says how long the loss went on after the event

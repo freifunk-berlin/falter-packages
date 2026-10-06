@@ -14,6 +14,7 @@ Traffic kinds (p["kind"]):
   tcp_short   connections, every, request, response: a new connection (new
               client port) each time
   tcp_talk    seconds, every: one connection, 1 KiB each way per exchange
+  tcp_idle    idle: talk, idle seconds of silence, the server pushes, silence, the client talks
   udp_ladder  delays_ms: a new flow per delay, the server answers that much later
 Measurements, run one at a time (counted on the interface, not by a reader):
   udp_flood     dir, seconds, size: datagrams as fast as one core sends them
@@ -186,6 +187,41 @@ def c_tcp_talk(f, p, t0):
         r["error"] = type(e).__name__ if not str(e) else str(e)
         r["failed_at_s"] = round(mono() - t0, 1)
     r["retrans"] = retrans(s)
+    s.close()
+    return r
+
+
+def c_tcp_idle(f, p, t0):
+    """talk, fall silent, the server speaks; fall silent again, the client
+    speaks. Stages reached: connected, talked, pushed, resumed."""
+    sleep_until(t0)
+    s = sock(socket.SOCK_STREAM, f["c"], f["cport"])
+    s.settimeout(8)
+    r, t = dict(done=False, connect_ms=None, stage="nothing", exchanges=0), mono()
+
+    def read(n):
+        while n > 0:
+            d = s.recv(65536)
+            if not d:
+                raise OSError("closed early")
+            n -= len(d)
+    try:
+        s.connect((f["s"], f["sport"]))
+        r["connect_ms"], r["stage"] = round((mono() - t) * 1000, 1), "connected"
+        s.sendall(b"t" * 1024)
+        read(1024)
+        r["stage"] = "talked"
+        s.settimeout(p["idle"] + 8)
+        read(1024)                              # the server's push after its silence
+        r["stage"] = "pushed"
+        time.sleep(p["idle"])
+        s.settimeout(8)
+        s.sendall(b"t" * 1024)
+        read(1024)
+        r["stage"], r["done"] = "resumed", True
+    except OSError as e:
+        r["error"] = str(e) or type(e).__name__
+        r["failed_at_s"] = round(mono() - t0, 1)
     s.close()
     return r
 
@@ -397,13 +433,24 @@ def s_tcp(f, p, t0):
     ls = sock(socket.SOCK_STREAM, f["s"], f["sport"])
     ls.listen(16)
     ls.settimeout(0.5)
-    span = p["seconds"] if "seconds" in p else p["connections"] * p["every"]
+    span = (2 * p["idle"] + 4 if "idle" in p else
+            p["seconds"] if "seconds" in p else p["connections"] * p["every"])
     end, stat, workers = t0 + span + 8, dict(accepted=0, errors=0), []
 
     def serve(c):
         c.settimeout(10)
         try:
-            if p["kind"] == "tcp_bulk":
+            if p["kind"] == "tcp_idle":
+                c.settimeout(2 * p["idle"] + 30)
+                c.sendall(c.recv(65536))        # the echo
+                time.sleep(p["idle"])
+                c.sendall(b"p" * 1024)          # the push
+                while True:
+                    d = c.recv(65536)
+                    if not d:
+                        return
+                    c.sendall(d)
+            elif p["kind"] == "tcp_bulk":
                 chunk, until = b"b" * 65536, mono() + p["seconds"]
                 while mono() < until:
                     c.sendall(chunk)
@@ -442,10 +489,10 @@ def s_tcp(f, p, t0):
 KINDS = {
     "client": dict(udp_rr=c_udp_rr, udp_stream=c_udp_stream, tcp_short=c_tcp_short, tcp_talk=c_tcp_talk,
                    udp_flood=c_udp_flood, tcp_bulk=c_tcp_bulk, udp_newflows=c_udp_newflows,
-                   udp_ladder=c_udp_ladder),
+                   udp_ladder=c_udp_ladder, tcp_idle=c_tcp_idle),
     "server": dict(udp_rr=s_udp_rr, udp_stream=s_udp_stream, tcp_short=s_tcp, tcp_talk=s_tcp,
                    udp_flood=s_udp_flood, tcp_bulk=s_tcp, udp_newflows=s_udp_newflows,
-                   udp_ladder=s_udp_ladder),
+                   udp_ladder=s_udp_ladder, tcp_idle=s_tcp),
 }
 
 

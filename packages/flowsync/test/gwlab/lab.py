@@ -176,6 +176,15 @@ class Lab:
                        "\t\tmeta nfproto ipv4 oifname \"wan0\" counter name sync_tx\n\t}\n"
                        "\tchain cut_in {\n\t\ttype filter hook input priority -310;\n\t}\n"
                        "\tchain cut_out {\n\t\ttype filter hook output priority -310;\n\t}\n}\n")
+            # a bad sync path, from the start: loss in percent, the largest packet that gets through
+            bad = topology.get("sync", {}).get(g.name, {})
+            for d, hook in (("iifname", "cut_in"), ("oifname", "cut_out")):
+                if bad.get("loss"):
+                    g.node.nft('add rule inet gwlab %s meta nfproto ipv4 %s "wan0" numgen random mod 100 '
+                               '< %d drop\n' % (hook, d, bad["loss"]))
+                if bad.get("mtu"):
+                    g.node.nft('add rule inet gwlab %s meta nfproto ipv4 %s "wan0" meta length > %d drop\n'
+                               % (hook, d, bad["mtu"]))
         for e in ends:
             e.node.ip(["link set lo up", "link set eth0 up", "addr add %s/64 dev eth0 nodad" % e.lan6])
         for node, dev, ms in delay:
@@ -275,10 +284,15 @@ class Lab:
     def sync_blackout(self, gw, on):
         """the gateway neither sends nor receives sync (IPv4 on its uplink)"""
         if on:
-            gw.node.nft('add rule inet gwlab cut_in meta nfproto ipv4 iifname "wan0" drop\n'
-                        'add rule inet gwlab cut_out meta nfproto ipv4 oifname "wan0" drop\n')
-        else:
-            gw.node.nft("flush chain inet gwlab cut_in\nflush chain inet gwlab cut_out\n")
+            gw.node.nft('insert rule inet gwlab cut_in meta nfproto ipv4 iifname "wan0" counter drop\n'
+                        'insert rule inet gwlab cut_out meta nfproto ipv4 oifname "wan0" counter drop\n')
+        else:                                   # only the blackout's rules: a lossy path stays lossy
+            for chain in ("cut_in", "cut_out"):
+                out = gw.node.run("nft", "-a", "list", "chain", "inet", "gwlab", chain)
+                for line in out.split("\n"):
+                    if "counter" in line and "# handle" in line:
+                        gw.node.run("nft", "delete", "rule", "inet", "gwlab", chain, "handle",
+                                    line.rsplit("# handle", 1)[1].strip())
 
     def uplink_recreate(self, gw):
         """the uplink device goes away and comes back under the same name and

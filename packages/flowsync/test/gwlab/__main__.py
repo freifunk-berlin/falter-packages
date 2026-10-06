@@ -60,7 +60,7 @@ def traffic(lb, flows, out, tag, during=None):
     return seen
 
 
-def measure_sync(lb, out):
+def measure_sync(lb, out, delays_ms=None):
     """the implementation's sync latency in this lab, seen from outside: new
     flows over every asymmetric gateway pair whose server holds its first
     answer back. Returns ms from a flow's first packet at the forward gateway
@@ -69,6 +69,11 @@ def measure_sync(lb, out):
     never passed."""
     c, s = next(iter(lb.clients)), next(iter(lb.servers))
     flows = [f for f in grid(["ladder"], [c], [s], list(lb.gw), list(lb.gw)) if f["fwd"] != f["rev"]]
+    # an answer later than an unanswered UDP flow lives would not pass one gateway either
+    limit = 800 * lb.timers.conntrack()["udp_timeout"]
+    delays_ms = [d for d in (delays_ms or flows[0]["p"]["delays_ms"]) if d < limit]
+    for f in flows:
+        f["p"] = dict(f["p"], delays_ms=delays_ms)
     lb.place(flows)
     for n, f in enumerate(flows):
         f["start"] = 0.01 * n
@@ -99,7 +104,7 @@ def lab(args, opts):
             impl.start(g)
         time.sleep(2)                           # the implementations settle
         # verdicts depend on how fast the implementation syncs: measure it first
-        sync_ms, ladder = (None, None) if alone else measure_sync(lb, out)
+        sync_ms, ladder = (None, None) if alone else measure_sync(lb, out, sc.TOPOLOGY.get("ladder_ms"))
         flows = [dict(f, p=in_lab(f["p"], timers)) for f in sc.FLOWS if args.flow in f["id"]]
         lb.place(flows)
         at = 0.0
@@ -117,6 +122,8 @@ def lab(args, opts):
                     todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"])))
                 elif e["do"] == "lose_state":
                     todo.append((e["at"], lambda g=g: impl.lose_state(g)))
+                elif e["do"] == "restart":
+                    todo.append((e["at"], lambda g=g: (impl.stop(g), impl.start(g))))
                 elif e["do"] == "uplink_recreate":
                     todo.append((e["at"], lambda g=g: lb.uplink_recreate(g)))
                 elif e["do"] == "sync_blackout":

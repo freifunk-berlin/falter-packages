@@ -14,7 +14,7 @@ def grid(traffic, client, server, fwd, rev):
     return flows
 
 
-SCALED = ("tcp_short", "tcp_talk", "udp_rr", "udp_stream")      # traffic written in production time
+SCALED = ("tcp_short", "tcp_talk", "tcp_idle", "udp_rr", "udp_stream")      # traffic written in production time
 
 
 def in_lab(p, timers):
@@ -22,7 +22,7 @@ def in_lab(p, timers):
     if p["kind"] not in SCALED:
         return p
     p = dict(p)
-    for k in ("seconds", "every"):
+    for k in ("seconds", "every", "idle"):
         if k in p:
             p[k] = timers.span(p[k])
     for k in ("up_pps", "down_pps"):
@@ -35,6 +35,8 @@ def span(p):
     """seconds a flow of this traffic lasts"""
     if p["kind"] == "udp_newflows":
         return len(p["rates"]) * (p["step_seconds"] + p["reply_delay"] + 1.2) + 1
+    if p["kind"] == "tcp_idle":
+        return 2 * p["idle"] + 4
     if p["kind"] == "udp_ladder":
         return sum(p["delays_ms"]) / 1000 + len(p["delays_ms"]) * 0.5
     if p["kind"] == "udp_flood":

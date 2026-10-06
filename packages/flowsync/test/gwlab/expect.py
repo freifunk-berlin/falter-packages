@@ -143,6 +143,15 @@ def tcp_talk(f, c, s, x):
     return ([e] if e else []), slow(f, c), None
 
 
+def tcp_idle(f, c, s, x):
+    """silence is no reason to lose a connection: one gateway keeps it for
+    the established timeout, and so must two"""
+    e = connect_ok(f, c, 0, x, "connect")
+    if not e and not c["done"]:
+        e = "got as far as '%s', then after %s s: %s" % (c["stage"], c.get("failed_at_s"), c.get("error"))
+    return ([e] if e else []), slow(f, c), None
+
+
 def udp_ladder(f, c, s, x):
     """a number, not a verdict, with one limit: an answer a second late must
     pass, or even a TCP client's retry would not"""
@@ -187,4 +196,4 @@ def sustained(steps):
 
 
 RULES = dict(udp_rr=udp_rr, udp_stream=udp_stream, tcp_short=tcp_short, tcp_talk=tcp_talk,
-             udp_flood=udp_flood, tcp_bulk=tcp_bulk, udp_newflows=udp_newflows, udp_ladder=udp_ladder)
+             udp_flood=udp_flood, tcp_bulk=tcp_bulk, udp_newflows=udp_newflows, udp_ladder=udp_ladder, tcp_idle=tcp_idle)
