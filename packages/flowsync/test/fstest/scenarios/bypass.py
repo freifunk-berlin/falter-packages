@@ -2,6 +2,7 @@
 hook, past netfilter; and everything that must still take the normal path."""
 import subprocess
 
+from ..gateway import MSS
 from ..ns import kill
 from ..scenario import scenario
 from .common import out, read, rejects, replies, slow_server, synced
@@ -90,6 +91,40 @@ def bypass_normal_path(env):
     env.check("a packet with an extension header arrives", e.delivered("rev"), 1)
     env.check("through the firewall", g1.fwc("mark") - m0, 1)
     env.check("nothing rejected", rejects(env) - r0, 0)
+
+
+def clamped(env, name, *opts):
+    g0, g1 = env.g[:2]
+    undo = slow_server(env)
+    env.start(*opts)
+    f = env.flow("tcp", fw=g0, rev=g1, real=True)
+    srv = env.spawn(env.sv, "tcpsrv", f.s, f.sport, 1000, out=out(env, "srv"))
+    env.sleep(0.3)
+    env.spawn(env.cl, "tcpmss", f.c, f.cport, f.s, f.sport, 1000, 10, out=out(env, "cli")).wait()
+    try:
+        srv.wait(5)
+    except subprocess.TimeoutExpired:
+        kill(srv)
+    res = read(out(env, "cli"))
+    # what the socket reports is less the 12 bytes of the timestamp option
+    env.check("%s: connected, and the client's MSS is the clamp's (unclamped it reads 1428)"
+              % name, res, "^OK %d$" % (MSS - 12))
+    env.check("nothing rejected", rejects(env), 0)
+    undo()
+
+
+@scenario(gateways=2, tags={"tcp"})
+def mss_clamp(env):
+    """The firewall's MSS clamp reaches the SYN/ACK that comes in from the
+    uplink for a known flow: it is accepted on its mark only behind the
+    clamp rule."""
+    clamped(env, "tables")
+
+
+@scenario(gateways=2, tags={"tcp"})
+def mss_clamp_bypass(env):
+    """The same with the bypass on: segments with SYN are never bypassed."""
+    clamped(env, "bypass", "--bypass")
 
 
 @scenario(gateways=2, tags={"tcp"})

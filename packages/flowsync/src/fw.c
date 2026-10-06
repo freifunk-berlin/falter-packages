@@ -150,14 +150,28 @@ static int fw_rule_present(char *buf, size_t len)
 	return strstr(buf, RULE_TAG) != NULL;
 }
 
-static int fw_rule_insert(void)
+/*
+ * Where the package's include puts it: behind everything the chain does to
+ * every packet before it accepts any (on the gateways the MSS clamp on SYNs,
+ * which a marked SYN/ACK must still pass), right before the rule that
+ * accepts established flows. listing is the chain as fw_rule_present() read
+ * it. Without such a rule: at the top.
+ */
+static int fw_rule_insert(const char *listing)
 {
 	char *argv[] = { "nft", "-f", "-", NULL };
-	char script[256];
+	char script[256], pos[48] = "";
+	const char *ct = strstr(listing, "ct state"), *h, *eol;
 
+	if (ct) {
+		eol = strchr(ct, '\n');
+		h = strstr(ct, "# handle ");
+		if (h && (!eol || h < eol))
+			snprintf(pos, sizeof(pos), "position %lu ", strtoul(h + 9, NULL, 10));
+	}
 	snprintf(script, sizeof(script),
-		 "insert rule inet %s forward meta nfproto ipv6 meta mark & 0x%08lx == 0x%08lx "
-		 "accept " RULE_TAG "\n", cfg.fw_table, cfg.mark, cfg.mark);
+		 "insert rule inet %s forward %smeta nfproto ipv6 meta mark & 0x%08lx == 0x%08lx "
+		 "accept " RULE_TAG "\n", cfg.fw_table, pos, cfg.mark, cfg.mark);
 	return nft(argv, script, NULL, 0);
 }
 
@@ -181,7 +195,7 @@ static void fw_check(void)
 			logmsg(LOG_ERR, "no chain forward in table inet %s: nothing accepts the "
 			       "marked packets (is the firewall running?)", cfg.fw_table);
 	} else if (!r) {
-		if (fw_rule_insert()) {
+		if (fw_rule_insert(buf)) {
 			ok = false;
 			if (log_ok(&last_log))
 				logmsg(LOG_ERR, "could not add the accept rule to inet %s forward",

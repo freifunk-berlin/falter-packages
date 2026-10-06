@@ -12,6 +12,7 @@ PREFIX = "2001:db8:100::/44"        # synced client prefix
 XDST = "2001:db8::/32"              # the mesh: never synced as a server
 SERVER_NET = "2a00:1450:4001::/48"  # where the test's servers live
 MARK = 0x01000000
+MSS = 1416                          # the gateways' clamp: what fits their GRE tunnels
 
 # what the daemon installs one interval after its first start (fw.c); the
 # tests put it there from the beginning, so that conntrack never accepts a
@@ -105,7 +106,9 @@ class Gateway:
         self.node.nft(OWN_TABLE)
 
     def ruleset(self, accept_rule=True):
-        """fw4 as on the gateways: forward policy reject, established accept
+        """fw4 as on the gateways: the MSS clamp on every forwarded SYN first
+        (bbb-configs' chain-prepend include), forward policy reject,
+        established accept
         (conntrack sees nothing forwarded once the daemon's table is in), the
         mesh may go anywhere, optionally the stateless budget for TCP
         segments with ACK or RST. The accept rule for marked packets is the
@@ -118,6 +121,7 @@ table inet fw {
 	counter fwd_rej {}
 	chain forward {
 		type filter hook forward priority 0; policy drop;
+		meta nfproto ipv6 tcp flags syn tcp option maxseg size set %(mss)d
 %(accept)s
 		ct state established,related counter name fwd_est accept
 		iifname "mesh0" accept
@@ -133,6 +137,7 @@ table inet sync {
 	}
 }
 """ % {
+            "mss": MSS,
             "accept": ('\t\tmeta nfproto ipv6 meta mark & 0x%08x == 0x%08x counter name fwd_mark '
                        'accept comment "flowsync"' % (MARK, MARK)) if accept_rule else "",
             "ack": ("\t\tmeta nfproto ipv6 tcp flags & ack == ack limit rate 5000/second "

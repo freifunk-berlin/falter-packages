@@ -156,6 +156,9 @@ def rules(env):
                  lambda: rule_present(g0), step=0.1)
     env.check("replies pass again (of 3)", replies(env, f), 3)
     env.check("the daemon says so", g0.log(), "accept rule for mark 0x01000000 added")
+    chain = g0.node.run("nft", "list", "chain", "inet", "fw", "forward")
+    env.true("it sits behind the MSS clamp and before the established rule",
+             chain.index("maxseg") < chain.index("flowsync") < chain.index("ct state"))
 
     g0.node.sh("nft delete table inet flowsync")
     env.wait_for("the notrack table is back", 2,

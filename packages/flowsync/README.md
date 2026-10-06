@@ -129,6 +129,14 @@ ruleset changes, and looks every `interval`):
    of every ruleset fw4 loads. If it is missing all the same, the daemon
    inserts it (`fw_repaired`, and a warning the second time).
 
+   Its place in the chain matters. bbb-configs clamps the MSS of every
+   forwarded IPv6 SYN with a rule it prepends to the same chain, and a
+   SYN/ACK from the uplink must pass that rule before it is accepted on its
+   mark. fw4 renders the includes from its own configuration (the clamp)
+   before the ones it finds in `/usr/share/nftables.d` (this rule), and the
+   daemon inserts a missing rule right before fw4's `ct state` rule, behind
+   every prepended include, not at the top (tests `mss_clamp`, `rules`).
+
 The ingress program clears the mark bit on every IPv6 packet from the uplink
 before it decides, so nothing can bring the mark in from outside.
 

@@ -168,6 +168,29 @@ def tcpcli(src, sport, dst, dport, nbytes, timeout):
         print("FAIL %s" % e)
 
 
+def tcpmss(src, sport, dst, dport, nbytes, timeout):
+    # like tcpcli, but print the MSS the connection ended up with: "OK <mss>"
+    nbytes = int(nbytes)
+    s = sock(socket.AF_INET6, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((src, int(sport)))
+    s.settimeout(float(timeout))
+    try:
+        s.connect((dst, int(dport)))
+        mss = s.getsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG)
+        s.sendall(b"x" * nbytes)
+        got = 0
+        while got < nbytes:
+            d = s.recv(65536)
+            if not d:
+                break
+            got += len(d)
+        s.close()
+        print("OK %d" % mss if got == nbytes else "FAIL short read %d" % got)
+    except OSError as e:
+        print("FAIL %s" % e)
+
+
 def tcpecho(addr, port, seconds):
     # accept one connection and echo whatever arrives until it closes or time is up
     ls = sock(socket.AF_INET6, socket.SOCK_STREAM)
@@ -430,6 +453,6 @@ if __name__ == "__main__":
         argv = argv[2:]
     cmd, args = argv[0], argv[1:]
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
-     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpecho": tcpecho, "tcptalk": tcptalk,
+     "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpmss": tcpmss, "tcpecho": tcpecho, "tcptalk": tcptalk,
      "tcppush": tcppush, "tcpread": tcpread, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
      "v6udp": v6udp, "v6ext": v6ext, "v6proto": v6proto, "tcpflood": tcpflood}[cmd](*args)
