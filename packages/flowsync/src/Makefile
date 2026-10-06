@@ -62,7 +62,7 @@ test: $(TEST)
 #
 # Exit status 1 if a flow failed; results and logs in the directory it names
 # (in the VM: OUT, default /tmp/gwlab-out).
-# check: the unit test and the scenario steady.
+# check: the unit test, dptest and the scenario steady.
 S ?= steady
 FLEET ?=
 FLOW ?=
@@ -77,7 +77,24 @@ itest: $(PROG) $(BPF_OBJ)
 	@cd ../test && if [ "$$(id -u)" = 0 ]; then python3 -m gwlab $(GWLAB_ARGS); \
 		else gwlab/vm.sh $(OUT) $(GWLAB_ARGS); fi
 
-check: test itest
+# what is specific to this datapath, from inside a gateway (../test/dptest,
+# see its README.md): flow tables, programs, rules, fragments, the bypass.
+# Root or the VM as for itest.
+#
+#   make dptest                                  all scenarios
+#   make dptest DS="frag_asym bypass"            some
+#   make dptest DPTEST_BYPASS=1                  every daemon with --bypass
+DS ?=
+DPOUT ?= /tmp/dptest-out
+DPTEST_ARGS = --flowsync $(CURDIR)/$(PROG) --bpf-object $(CURDIR)/$(BPF_OBJ) --quiet \
+	$(if $(DS),--scenarios $(DS))
+
+dptest: $(PROG) $(BPF_OBJ)
+	@cd ../test && if [ "$$(id -u)" = 0 ]; then \
+		DPTEST_BYPASS=$(DPTEST_BYPASS) python3 -m dptest $(DPTEST_ARGS); \
+		else DPTEST_BYPASS=$(DPTEST_BYPASS) dptest/vm.sh $(DPOUT) $(DPTEST_ARGS); fi
+
+check: test dptest itest
 
 $(OBJS) $(TEST_OBJS): flowsync.h
 dp.o tx.o status.o: dp.h
@@ -90,4 +107,4 @@ install: $(PROG) $(BPF_OBJ)
 clean:
 	rm -f $(PROG) $(TEST) $(OBJS) $(TEST_OBJS) $(BPF_OBJ)
 
-.PHONY: all test itest check install clean
+.PHONY: all test itest dptest check install clean

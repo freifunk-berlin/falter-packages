@@ -113,8 +113,8 @@ transport header themselves.
   chain, builds the reassembled packet on the first fragment's packet header:
   the packet the firewall sees carries its mark. That is how
   `inet_frag_reasm_prepare()` works (`skb_morph(skb, head)`), not a documented
-  interface, and no scenario of the current test suite exercises it (see
-  "Source layout and tests").
+  interface; the dptest scenarios `frag_sym`, `frag_asym` and
+  `frag_unsolicited` hold it down.
 - Reassembly is hooked in as long as any rule in the ruleset uses conntrack
   (fw4's input chain does). The daemon's own table contains such a rule in a
   chain that is never run, so that this does not depend on the firewall.
@@ -461,10 +461,15 @@ otherwise in a throwaway VM on the host's kernel (virtme-ng, `VNG=`).
     make -C src test                                  # unit test
     make -C src itest                                 # scenario steady, all fleets
     make -C src itest S=symasym FLEET=strict          # another scenario, one fleet
-    make -C src check                                 # both
+    make -C src check                                 # unit test, dptest, steady
 
-gwlab judges delivery end to end. What is specific to this design is not in
-it yet: fragments and extension headers, the bypass, the place of the accept
-rule behind the MSS clamp, the rules and programs being put back, protocols
-without ports, the first start. The scenarios that covered those ran on the
-suite gwlab replaced; they are on branch `flowsync-bpf` (`test/fstest`).
+`test/dptest` is the layer below, documented in
+[test/dptest/README.md](test/dptest/README.md): what is specific to this
+datapath and cannot be judged from the endpoints. Two or three gateways
+without link latency; the scenarios look into the flow tables, the firewall's
+counters and the daemon's status: fragments and extension headers, the
+bypass, the place of the accept rule behind the MSS clamp, rules and programs
+being put back, protocols without ports, the first start.
+
+    make -C src dptest                                # all scenarios
+    make -C src dptest DS="frag_asym bypass"          # some
