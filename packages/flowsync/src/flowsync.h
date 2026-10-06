@@ -212,6 +212,9 @@ struct dp_ent {
 };
 int dp_open(bool load);
 bool dp_tick(void);
+int dp_link_open(void);
+int dp_link_fd(void);
+bool dp_link_changed(void);
 int dp_detach(void);
 int dp_events_fd(void);
 void dp_handle_events(void (*cb)(const struct flow *f));

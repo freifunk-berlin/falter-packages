@@ -97,7 +97,7 @@ static int cmd_run(void)
 	struct sigaction sa = { .sa_handler = on_signal };
 	sigset_t stopset, waitset;
 	struct timespec ts;
-	struct pollfd fds[3];
+	struct pollfd fds[4];
 	uint64_t now, next_tick, busy_since = 0, busy, loop_max = 0, last_early = 0;
 	char abuf[INET6_ADDRSTRLEN];
 	bool first = true, owed = false, fast = false;
@@ -121,7 +121,7 @@ static int cmd_run(void)
 	peers_init();
 	udp_fd = udp_open(true);
 	/* an interface that does not exist yet is waited for (udp_tick) */
-	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open())
+	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open() || dp_link_open())
 		return 1;
 	dp_tick();
 	if (drop_privileges())
@@ -218,6 +218,9 @@ static int cmd_run(void)
 		fds[nfds].fd = fw_fd();
 		fds[nfds].events = POLLIN;
 		fds[nfds++].revents = 0;
+		fds[nfds].fd = dp_link_fd();
+		fds[nfds].events = POLLIN;
+		fds[nfds++].revents = 0;
 
 		/* handler time from the last poll return to this poll call */
 		if (busy_since) {
@@ -242,6 +245,13 @@ static int cmd_run(void)
 			handle_rx();
 		if (fds[2].revents)
 			fw_handle();
+		/* a device came, went or changed: the uplink may need its programs
+		 * back and the sync socket a new device, now and not at the tick */
+		if (fds[3].revents && dp_link_changed()) {
+			dp_tick();
+			if (udp_tick())
+				resync_request();
+		}
 	}
 
 	/* the programs stay on the uplink and the maps pinned: local flows and,

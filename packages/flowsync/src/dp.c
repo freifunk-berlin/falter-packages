@@ -16,6 +16,8 @@
 #include <limits.h>
 #include <net/if.h>
 #include <net/if_arp.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <stdarg.h>
@@ -422,6 +424,55 @@ bool dp_tick(void)
 	apply_bypass();
 	cnt.dp_attached++;
 	return true;
+}
+
+/*
+ * Link notifications. A device that is created anew has no filters, and with
+ * forwarded IPv6 untracked every reply through it is rejected until they are
+ * back: the interval tick alone would leave the gateway closed for up to
+ * interval seconds. So the main loop looks (dp_tick, udp_tick) whenever a
+ * link comes, goes or changes, and whenever a qdisc or filter does (ours may
+ * have been removed).
+ */
+static int link_fd = -1;
+
+int dp_link_open(void)
+{
+	struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_LINK | RTMGRP_TC };
+
+	link_fd = socket(AF_NETLINK, SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC, NETLINK_ROUTE);
+	if (link_fd < 0 || bind(link_fd, (struct sockaddr *)&sa, sizeof(sa))) {
+		logmsg(LOG_WARNING, "link notifications: %s (a re-created uplink is noticed at "
+		       "the next interval only)", strerror(errno));
+		if (link_fd >= 0)
+			close(link_fd);
+		link_fd = -1;
+	}
+	return 0;
+}
+
+int dp_link_fd(void)
+{
+	return link_fd;
+}
+
+/* drain the notifications; true if there was any (or some were lost) */
+bool dp_link_changed(void)
+{
+	char buf[8192];
+	bool any = false;
+	ssize_t n;
+
+	for (;;) {
+		n = recv(link_fd, buf, sizeof(buf), MSG_DONTWAIT);
+		if (n > 0 || (n < 0 && errno == ENOBUFS))
+			any = true;
+		else if (n < 0 && errno == EINTR)
+			continue;
+		else
+			break;
+	}
+	return any;
 }
 
 /* the detach command: filters off the uplink, maps unpinned */

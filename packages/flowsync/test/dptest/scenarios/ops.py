@@ -92,10 +92,9 @@ def recreate_wan(env, g):
 
 @scenario(gateways=2)
 def uplink_recreate(env):
-    """g0's uplink device is created anew. Until the daemon has attached the
-    programs again (its next tick) the gateway accepts nothing, which is the
-    safe side; then old and new flows work, and the flows from before are
-    still in the map."""
+    """g0's uplink device is created anew. The daemon attaches the programs
+    to the new device as soon as it appears; old and new flows work, and the
+    flows from before are still in the map."""
     g0, g1 = env.g[:2]
     env.start()
     f = env.flow("udp", fw=g0, rev=g0)
@@ -104,9 +103,8 @@ def uplink_recreate(env):
     g0.tick()
     recreate_wan(env, g0)
     f.reroute()
-    env.check("right after: nothing is accepted (of 2)", replies(env, f, 2), 0)
-    env.wait_for("the daemon attached again", env.I + 2,
-                 lambda: "created anew" in g0.log(), step=0.2)
+    env.wait_for("the daemon attached again at once (a link notification, not its tick)", 1,
+                 lambda: g0.log().count("attached to uplink") >= 2, step=0.05)
     env.check("the old flow passes again without a new packet out (of 3)", replies(env, f), 3)
     n = env.flow("udp", fw=g0, rev=g1)
     n.send()
@@ -144,9 +142,8 @@ def rules(env):
                  lambda: g0.node.ok("nft", "list", "table", "inet", "flowsync"), step=0.1)
 
     g0.node.sh("tc filter del dev wan0 ingress; tc filter del dev wan0 egress")
-    env.check("without the programs nothing is accepted (of 2)", replies(env, f, 2), 0)
-    env.wait_for("the programs are back at the next tick", env.I + 2,
-                 lambda: "the filters were gone" in g0.log(), step=0.2)
+    env.wait_for("the programs are back at once", 1,
+                 lambda: "the filters were gone" in g0.log(), step=0.05)
     env.check("replies pass again (of 3)", replies(env, f), 3)
     env.wait_st("status shows it", g0, "dp_attached", 2)
     env.check("status: attached and rules in place", [g0.st("attached"), g0.st("fw_ok")], [1, 1])
@@ -230,7 +227,7 @@ def unprivileged(env):
     g1.node.nft(g1.ruleset(accept_rule=False))
     env.wait_for("g1 put the accept rule back", 2, lambda: rule_present(g1), step=0.1)
     g1.node.sh("tc filter del dev wan0 ingress")
-    env.wait_for("and attached the programs again", env.I + 2,
-                 lambda: "the filters were gone" in g1.log(), step=0.2)
+    env.wait_for("and attached the programs again", 1,
+                 lambda: "the filters were gone" in g1.log(), step=0.05)
     env.check("replies pass g1 again (of 3)", replies(env, f), 3)
     lp.stop()
