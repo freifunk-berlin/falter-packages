@@ -135,8 +135,7 @@ def dead_uplink(env):
     recreate_wan(env, g0)
     f.reroute()
     env.check("the table is still there, no programs on the new device",
-              [own_table(g0), "3780" in g0.node.run("tc", "filter", "show", "dev", "wan0",
-                                                     "egress", check=False)], [True, False])
+              [own_table(g0), hook_names(g0, "ingress") + hook_names(g0, "egress")], [True, []])
     n = env.flow("udp", fw=g0, rev=g0)
     n.send()
     env.check("a new symmetric flow passes on conntrack at once (of 3)", replies(env, n), 3)
@@ -329,6 +328,11 @@ def mark_mismatch(env):
     env.check("the rule for the other mark is gone", "0x01000000" in forward_chain(g0), False)
     env.check("replies pass (of 3)", replies(env, f), 3)
     env.check("the daemon names the file to fix", g0.log(), "10-flowsync.nft")
+    # the gateway came with a notrack table for the old mark (gateway.py OWN_TABLE)
+    table = g0.node.run("nft", "list", "table", "ip6", "flowsync", check=False)
+    env.check("the notrack table's rule names the daemon's mark, not the old one",
+              ["0x02000000 notrack" in table, "0x01000000" in table], [True, False])
+    env.check("the daemon said so", g0.log(), "had rules for another mark")
     lp.stop()
 
 

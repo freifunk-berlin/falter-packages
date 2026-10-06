@@ -550,6 +550,17 @@ flowsync, which was never deployed, is on branch `flowsync-conntrack`.
 - **`max_remote` refuses in arrival order**; there is no limit per client.
 - **Flow offloading** needs conntrack and cannot be used for forwarded IPv6
   on a gateway that runs this.
+- **The outbound notrack rule decides by destination alone.** `fib daddr oif
+  @alive` looks the destination up in the main table: it is the uplink's
+  packets that go untracked, as long as the main table routes them there.
+  Source-based policy routing (an `ip -6 rule from <prefix> table <n>` that
+  sends clients out of the uplink while the main table's default goes
+  elsewhere, or the reverse) makes the rule untrack the wrong packets: a
+  flow that leaves through a tunnel with its replies unmarked then has no
+  conntrack entry and is rejected. nftables offers only `fib daddr . mark
+  oif`, so such a setup needs a mark set per routing rule or an `oifname`
+  match in a mangle chain instead. Whether the gateways route by source is
+  to be checked against bbb-configs before deployment (see "Open points").
 - Adding or removing a gateway requires re-rendering all gateways.
 
 ## Open points
@@ -563,6 +574,9 @@ Not done or not verified yet:
   against 6.12, and no built package has been installed anywhere.
 - The daemon and the programs have not run on kernel 6.12 or on the
   edgerouter-4. The per-packet cost of the programs is unmeasured.
+- Whether the gateways route forwarded traffic by source (policy routing
+  rules) has not been checked; if they do, the outbound notrack rule needs
+  another predicate (see "Known limits").
 - The tcx attachment needs kernel 6.6 and libbpf 1.3 (OpenWrt 24.10 has
   6.6 and 1.5). It has run next to an ingress qdisc with an IFB redirect
   and fq_codel in the VM (dptest `ingress_qdisc`), not next to sqm-scripts

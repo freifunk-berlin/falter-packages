@@ -140,8 +140,16 @@ static void walk_step(void)
 		return;
 	}
 	for (i = 0; i < n; i++) {
+		struct dp_ent again;
+
+		/* a local flow may have had a packet since the batch read it: the
+		 * egress program only refreshes it and sends no event, so a delete
+		 * would take a live flow away until its next packet out. Look once
+		 * more right before, and announce it if it lives. */
+		if (!ent[i].left && walk_map == DP_LOCAL &&
+		    !dp_get(DP_LOCAL, &ent[i].f, &again) && again.left)
+			ent[i] = again;
 		if (!ent[i].left) {
-			/* a packet since the walk read it makes the flow anew */
 			dp_delete(walk_map, &ent[i].f);
 			if (walk_map == DP_LOCAL)
 				cnt.local_expired++;

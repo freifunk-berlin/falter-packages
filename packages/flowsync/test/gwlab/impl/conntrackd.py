@@ -94,9 +94,13 @@ class IMPL(Impl):
         ]
 
     def stop(self, gw):
+        """the processes only: the run directory (lock file, socket) is in the
+        configuration and start() needs it again (the restart event)"""
         for p in self.procs.pop(gw.name, []):
             kill(p)
-        shutil.rmtree(self.run.get(gw.name, ""), ignore_errors=True)
+
+    def uninstall(self, gw):
+        shutil.rmtree(self.run.pop(gw.name, ""), ignore_errors=True)
 
     def lose_state(self, gw):
         ctfw.flush(gw)

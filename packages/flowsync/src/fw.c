@@ -130,11 +130,19 @@ fail:
 	return -1;
 }
 
-static bool own_table_present(void)
+/* is the table there, with the rules this daemon's configuration calls for?
+ * 0: yes; 1: there, but a rule differs (another mark, an older layout); -1:
+ * no table */
+static int own_table_state(void)
 {
 	char *argv[] = { "nft", "list", "table", "ip6", OWN_TABLE, NULL };
+	static char buf[8192];
+	char want[64];
 
-	return nft(argv, NULL, NULL, 0) == 0;
+	if (nft(argv, NULL, buf, sizeof(buf)))
+		return -1;
+	snprintf(want, sizeof(want), "meta mark & 0x%08lx == 0x%08lx notrack", cfg.mark, cfg.mark);
+	return strstr(buf, want) && strstr(buf, "fib daddr oif @" ALIVE_SET " notrack") ? 0 : 1;
 }
 
 /*
@@ -352,7 +360,8 @@ static void fw_check(void)
 		}
 	}
 
-	if (own_table_present()) {
+	r = own_table_state();
+	if (r == 0) {
 		table_before = true;
 	} else {
 		if (own_table_apply()) {
@@ -362,11 +371,17 @@ static void fw_check(void)
 				       " (kmod-nft-fib?)");
 		} else {
 			cnt.fw_repaired++;
-			logmsg(table_before ? LOG_WARNING : LOG_NOTICE,
-			       "table ip6 " OWN_TABLE " %s: forwarded IPv6 bypasses conntrack "
-			       "while the programs are on the uplink", table_before ?
-			       "was gone, installed again (something deleted it: conntrack "
-			       "tracked forwarded IPv6 meanwhile)" : "installed");
+			if (r > 0)
+				logmsg(LOG_WARNING, "table ip6 " OWN_TABLE " had rules for another "
+				       "mark or an older layout (a previous run's): replaced by "
+				       "the rules for mark 0x%08lx", cfg.mark);
+			else
+				logmsg(table_before ? LOG_WARNING : LOG_NOTICE,
+				       "table ip6 " OWN_TABLE " %s: forwarded IPv6 bypasses "
+				       "conntrack while the programs are on the uplink",
+				       table_before ? "was gone, installed again (something "
+				       "deleted it: conntrack tracked forwarded IPv6 meanwhile)" :
+				       "installed");
 			table_before = true;
 		}
 	}

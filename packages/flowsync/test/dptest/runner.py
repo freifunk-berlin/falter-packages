@@ -119,6 +119,7 @@ def parent(args):
     scs = select(args.scenarios, args.tags)
     names = [s.name for s in scs]
     root = args.out or tempfile.mkdtemp(prefix="flowsync-dptest.")
+    own_root = not args.out                 # made here: removed after an all-pass run
     os.makedirs(root, exist_ok=True)
     if args.log:
         open(args.log, "w").close()
@@ -210,9 +211,10 @@ def parent(args):
         log.line("FAILED %s: %s" % (n, table.get(n, {}).get("dir", "")))
     log.line("%s: %d of %d failed in %.0f s%s"
              % ("FAIL" if bad else "PASS", len(bad), len(names), time.monotonic() - t_start,
-                "; logs and status files in %s" % root if bad or args.keep else ""))
+                "; logs and status files in %s" % root if bad or args.keep or not own_root
+                else ""))
     with open(os.path.join(root, "results.json"), "w") as f:
         json.dump(table, f, indent=1)
-    if not bad and not args.keep:
+    if not bad and not args.keep and own_root:
         shutil.rmtree(root, ignore_errors=True)     # keep the logs of failed runs only
     return 1 if bad else 0

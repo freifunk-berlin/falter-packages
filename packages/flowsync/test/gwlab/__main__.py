@@ -113,21 +113,24 @@ def lab(args, opts):
             at += span(f["p"]) + 2
         cpu0 = {n: g.cpu_ms() for n, g in lb.gw.items()}
         windows = {}
-        shots = []                              # (seconds after t0, {(source, destination): packets bypassed})
+        # (seconds after t0, kind, {(source, destination): packets bypassed}); kind
+        # "settled": things have settled, a quiet stretch begins; "before": right
+        # before an event (or the end), a quiet stretch ends
+        shots = []
 
-        def bypassed(t0):
+        def bypassed(t0, kind):
             total = {}
             for g in lb.gw.values():
                 for k, n in impl.bypassed(g).items():
                     total[k] = total.get(k, 0) + n
-            shots.append((time.monotonic() - t0, total))
+            shots.append((time.monotonic() - t0, kind, total))
         # the stateless accept may carry a flow where the race cannot be won: at
         # its start and around an event. In between it must not be needed:
         # look at its counters when things have settled and before the next event
         settle = (sync_ms or 0) / 1000 + 1      # the sync, and the endpoints' first retry
-        looks = [max(f["start"] for f in flows) + settle] if flows else []
+        looks = [(max(f["start"] for f in flows) + settle, "settled")] if flows else []
         for e in sorted(events, key=lambda e: e["at"]):
-            looks += [e["at"] - 0.3, e["at"] + e["seconds"] + settle]
+            looks += [(e["at"] - 0.3, "before"), (e["at"] + e["seconds"] + settle, "settled")]
 
         def during(t0):
             todo = []                           # (seconds after t0, what happens)
@@ -147,7 +150,7 @@ def lab(args, opts):
                 else:
                     raise SystemExit("unknown event %r" % e["do"])
             if not alone:
-                todo += [(at, lambda: bypassed(t0)) for at in looks]
+                todo += [(at, lambda kind=kind: bypassed(t0, kind)) for at, kind in looks]
             for at, act in sorted(todo, key=lambda x: x[0]):
                 time.sleep(max(0, t0 + at - time.monotonic()))
                 act()
@@ -164,16 +167,21 @@ def lab(args, opts):
         t_first = [0]
         seen = traffic(lb, flows, out, "flows", lambda t0: (t_first.__setitem__(0, t0), during(t0)))
         if not alone:
-            bypassed(t_first[0])
+            bypassed(t_first[0], "before")      # the end closes the last stretch
         gws = {}
         for n, g in lb.gw.items():
             c1 = g.cpu_ms()
             gws[n] = dict(policy=g.policy, sync_tx=g.sync_traffic(),
                           cpu_ms=[c1[0] - cpu0[n][0], c1[1] - cpu0[n][1]] if c1 and cpu0[n] else None)
-        for g in lb.gw.values():
-            impl.stop(g)
-            impl.uninstall(g)
     finally:
+        # also after a failure or Ctrl-C: what the implementation left outside
+        # the namespaces (pinned maps, run directories) would pile up otherwise
+        for g in lb.gw.values():
+            try:
+                impl.stop(g)
+                impl.uninstall(g)
+            except Exception as e:              # noqa: BLE001  (report, keep cleaning)
+                print("%s: uninstall: %s" % (g.name, e), file=sys.stderr)
         lb.close()
     res = []
     for f in flows:
@@ -181,12 +189,14 @@ def lab(args, opts):
         bad, retry, recovery = expect.judge(f, c, s, events, sync_ms)
         # the quiet stretches: from a look after things settled to the next look before an event
         key, quiet = (f["s"], f["c"]), []
-        for (ta, a), (tb, b) in zip(shots[0::2], shots[1::2]):
-            if tb > ta and b.get(key, 0) > a.get(key, 0):
+        # (a "settled" shot to the next "before" one, in the order they were taken:
+        # an event's "before" that falls before the settle look pairs with nothing)
+        for (ta, ka, a), (tb, kb, b) in zip(shots, shots[1:]):
+            if ka == "settled" and kb == "before" and tb > ta and b.get(key, 0) > a.get(key, 0):
                 quiet.append((round(ta), round(tb), b.get(key, 0) - a.get(key, 0)))
         bad += expect.bypass(f, quiet, sync_ms)
         res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, recovery=recovery,
-                        bypassed=shots[-1][1].get(key, 0) if shots else 0,
+                        bypassed=shots[-1][2].get(key, 0) if shots else 0,
                         cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,
