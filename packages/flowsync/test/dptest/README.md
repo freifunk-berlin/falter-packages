@@ -12,6 +12,7 @@ is specific to this one and cannot be judged from the endpoints.
 | the bypass, and what it must leave to the firewall and to policy routing | `bypass`, `bypass_default_off`, `bypass_normal_path`, `bypass_tcp`, `bypass_fwmark`, `bypass_otherhost`, `bypass_gre`, `bypass_wg` |
 | the accept rule: behind the MSS clamp, with the daemon's mark, looked at on changes only | `mss_clamp`, `mss_clamp_bypass`, `rules`, `rules_idle`, `mark_mismatch` |
 | the datapath without its daemon, a reboot, a re-created uplink, rules and programs put back, the first start | `daemon_down`, `restart_keeps`, `reboot`, `uplink_recreate`, `rules`, `bootstrap` |
+| the programs next to SQM's qdiscs (an ingress qdisc with an IFB redirect, a shaper as root), in either order | `ingress_qdisc` |
 | what fails: programs that cannot be attached, a daemon that cannot load them, a table of another size | `fail_open`, `load_failure`, `resize` |
 | limits, forged announcements, running without root's capabilities | `forged`, `unprivileged` |
 | a burst of new flows (slow, not in the default run) | `scale` |

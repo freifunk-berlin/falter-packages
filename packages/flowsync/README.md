@@ -14,7 +14,9 @@ started. With flowsync that state is not a conntrack entry:
 - **Two tc programs on the uplink device** keep and consult two BPF maps.
   *Egress*: every forwarded IPv6 packet leaving through the uplink keeps its
   flow alive in the **local** map. *Ingress*: a packet from the uplink whose
-  flow is alive in the local or the **remote** map gets a packet mark.
+  flow is alive in the local or the **remote** map gets a packet mark. They
+  sit on the device's tcx hooks (kernel 6.6 and later), not on a qdisc: SQM
+  or any other qdisc and filter setup on the uplink stays as it is.
 - **The firewall accepts the mark** (one rule in fw4's forward chain) and
   treats everything else from the uplink as before: the stateless rules, then
   reject.
@@ -52,7 +54,10 @@ OpenWrt package build is untested (see "Open points").
 - **The datapath outlives the daemon.** The maps are pinned in the BPF file
   system and the programs stay attached when the daemon stops. Flows on a
   symmetric path keep working, peers' flows until they expire. A restart
-  loads the programs anew, reuses the maps and replaces the filters in place.
+  loads the programs anew, reuses the maps and replaces the programs in place.
+- **No qdisc of its own.** The programs attach to the uplink's tcx hooks
+  (`BPF_TCX_INGRESS`, `BPF_TCX_EGRESS`), the place a clsact qdisc's filters
+  run at, without the qdisc. See "Next to SQM and other tc users".
 - **No flow, no way in.** What the programs do not mark meets the stateless
   rules and the reject, as unsolicited traffic does.
 - **Without the programs, back to conntrack, by itself.** With forwarded
@@ -243,6 +248,13 @@ What it costs:
   into.
 - The egress side of the outgoing device (its qdisc and tc filters) is passed
   as usual.
+- **A bypassed packet skips the uplink's ingress shaping.** The program runs
+  before the device's tc filters, so SQM's redirect to its IFB never sees
+  what the program forwarded itself; only the packets that take the normal
+  path (new flows, SYNs, fragments, ...) are shaped on the way in. The
+  shaping of what leaves through the uplink is untouched. A gateway that
+  shapes its downstream must run with the bypass off, or accept that only
+  the uplink's own queue limits the flows in the tables.
 
 The switch is a map entry the programs read per packet, so it can be changed
 while they run: `flowsync bypass on|off` (or `/etc/init.d/flowsync bypass
@@ -253,6 +265,32 @@ Measured in the same VM as the other numbers (pktgen on one CPU, 10k flows,
 from the uplink to the client): about 0.72 µs per packet with the bypass,
 0.79 µs with conntrack, 0.96 µs with the tables and no bypass, 0.64 µs with
 an empty ruleset. The other direction is unchanged.
+
+### Next to SQM and other tc users
+
+The programs are attached to the uplink's tcx hooks, not to a qdisc. A tcx
+hook is where a clsact qdisc's filters run, before the device's tc filters
+and independent of them: an `ingress` qdisc with SQM's redirect to an IFB,
+cake or fq_codel as the root qdisc, or a clsact of another tool can be on the
+uplink at the same time, added before or after the daemon attached, and
+removed or re-added under the programs without the daemon noticing. Nothing
+of the scheduler has to be configured, and the package depends on no
+scheduler module (the kernel's `CONFIG_NET_XGRESS`, which BPF selects).
+
+What the two see of each other:
+
+- The ingress program marks a packet before SQM's filter redirects it to the
+  IFB; the mark travels with the packet. A packet the IFB hands back skips
+  the ingress hook (`tc_skip_classify`), so the program runs once per packet.
+- The egress program runs before the root qdisc: everything leaving is kept
+  in the local map, whatever the shaper does with it afterwards.
+- With the bypass on, bypassed packets never reach the ingress qdisc's
+  filters, so the downstream shaping does not apply to them (see "Bypass").
+- A previous daemon's programs are replaced in place at startup; programs of
+  others on the same hooks are left alone, ours are appended behind them.
+  Attaching and detaching tcx programs sends no netlink notification: if
+  something detaches the programs, the daemon notices at its next tick (up to
+  `interval`), a re-created device at once.
 
 ### Filter policy
 
@@ -389,7 +427,10 @@ sockets, then drops every capability but `CAP_NET_ADMIN` and, with `--user`,
 switches to that user. `CAP_NET_ADMIN` is what attaching the programs again,
 reopening the sync socket and `nft` need; the maps and the event ring are
 used through descriptors that are open by then (on kernel 6.12 and later that
-needs no `CAP_BPF`).
+needs no `CAP_BPF`). Replacing a previous daemon's programs in place takes a
+descriptor of them (`BPF_PROG_GET_FD_BY_ID`, `CAP_SYS_ADMIN`), which only the
+start, as root, needs: a device the daemon attaches to later has none of ours
+on it.
 
 ## Operation
 
@@ -401,7 +442,7 @@ table, the rule): forwarded IPv6 is conntrack's again from the next packet,
 and flows that were running have no conntrack entry until their client sends
 again. Removing the package does the same first. Upgrading it does not: the
 package restarts the service, the new daemon loads the new programs and
-replaces the filters in place, the maps and the alive element stay.
+replaces the old ones in place, the maps and the alive element stay.
 
 A service that stays stopped keeps what it left, but not the switch: the
 alive element expires after `alive_timeout`, and from then on what leaves
@@ -522,6 +563,10 @@ Not done or not verified yet:
   against 6.12, and no built package has been installed anywhere.
 - The daemon and the programs have not run on kernel 6.12 or on the
   edgerouter-4. The per-packet cost of the programs is unmeasured.
+- The tcx attachment needs kernel 6.6 and libbpf 1.3 (OpenWrt 24.10 has
+  6.6 and 1.5). It has run next to an ingress qdisc with an IFB redirect
+  and fq_codel in the VM (dptest `ingress_qdisc`), not next to sqm-scripts
+  on a device.
 - The mark a reassembled packet inherits is kernel behaviour read from the
   6.18 source and tested on 7.3.
 - The notrack rules cover what leaves through the uplink and what comes in

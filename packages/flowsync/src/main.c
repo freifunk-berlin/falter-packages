@@ -147,7 +147,7 @@ static int cmd_run(void)
 			loop_max = 0;
 			if (!first)
 				log_counters();
-			/* the uplink came, was created anew, or lost our filters */
+			/* the uplink came, was created anew, or lost our programs */
 			if (!first)
 				dp_tick();
 			first = false;

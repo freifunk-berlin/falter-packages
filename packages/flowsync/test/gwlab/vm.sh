@@ -21,7 +21,7 @@ if [ -z "$GWLAB_INSIDE" ]; then
 fi
 
 mountpoint -q /sys/fs/bpf || mount -t bpf bpf /sys/fs/bpf
-for m in sch_ingress cls_bpf nf_tables nft_fib_inet nft_ct nft_reject_inet nft_limit \
+for m in nf_tables nft_fib_inet nft_ct nft_reject_inet nft_limit \
 	nft_flow_offload nf_conntrack_netlink sch_netem veth bridge; do
 	modprobe $m 2> /dev/null
 done

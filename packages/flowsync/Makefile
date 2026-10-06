@@ -18,16 +18,17 @@ PKG_BUILD_DEPENDS:=bpf-headers
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/bpf.mk
 
-# libbpf loads the tc programs and talks to their maps; kmod-sched-core and
-# kmod-sched-bpf are the clsact qdisc and the BPF classifier they attach
-# with. The rules are read and written with nft, which firewall4 brings
-# (with kmod-nft-fib, for the notrack rule).
+# libbpf loads the tc programs and talks to their maps. They attach to the
+# uplink's tcx hooks (kernel 6.6, CONFIG_NET_XGRESS, which BPF_SYSCALL
+# selects): no qdisc and no scheduler module is involved, SQM and the like
+# keep theirs. The rules are read and written with nft, which firewall4
+# brings (with kmod-nft-fib, for the notrack rule).
 define Package/flowsync
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=Flow tables for active-active gateways without conntrack
 	URL:=https://github.com/freifunk-berlin/falter-packages
-	DEPENDS:=+libbpf +kmod-sched-core +kmod-sched-bpf +firewall4 $(BPF_DEPENDS)
+	DEPENDS:=+libbpf +firewall4 $(BPF_DEPENDS)
 	# the daemon drops to this user (CAP_NET_ADMIN only) once the programs
 	# are loaded and its sockets open, see --user in the README
 	USERID:=flowsync=3780:flowsync=3780
@@ -60,7 +61,7 @@ endef
 
 # after an upgrade the default postinst's "start" changes nothing on a
 # running service: restart it, so that the new daemon loads the new object
-# and replaces the filters in place (the maps and the alive element stay)
+# and replaces the programs in place (the maps and the alive element stay)
 define Package/flowsync/postinst
 #!/bin/sh
 [ "$${PKG_UPGRADE}" = 1 ] && [ -z "$${IPKG_INSTROOT}" ] && /etc/init.d/flowsync restart

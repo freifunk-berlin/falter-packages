@@ -1,5 +1,19 @@
 """Helpers shared by the scenarios."""
 import os
+import sys
+
+TCX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tcx.py")
+
+
+def tcx(g, *args):
+    """the gateway's uplink hooks from outside the daemon (tcx.py): list,
+    detach NAME..., fill; on wan0 ingress|egress"""
+    return g.node.run(sys.executable, TCX, args[0], "wan0", *args[1:])
+
+
+def hook_names(g, hook):
+    """the names of the programs on the uplink's hook, in order"""
+    return [ln.split()[1] for ln in tcx(g, "list", hook).splitlines() if ln.strip()]
 
 
 def replies(env, f, n=3, gap=0.2, via=None):

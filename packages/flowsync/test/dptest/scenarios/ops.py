@@ -6,7 +6,7 @@ import re
 
 from ..gateway import PORT, SERVER_NET, children
 from ..scenario import scenario
-from .common import rejects, replies, synced
+from .common import hook_names, rejects, replies, synced, tcx
 
 
 @scenario(gateways=2)
@@ -190,9 +190,10 @@ def rules(env):
     env.wait_for("the notrack table is back", 2, lambda: own_table(g0), step=0.1)
     env.wait_for("with the alive element", 5, g0.alive, step=0.2)
 
-    g0.node.sh("tc filter del dev wan0 ingress; tc filter del dev wan0 egress")
-    env.wait_for("the programs are back at once", 1,
-                 lambda: "the filters were gone" in g0.log(), step=0.05)
+    tcx(g0, "detach", "ingress", "fs_ingress")
+    tcx(g0, "detach", "egress", "fs_egress")
+    env.wait_for("the programs are back at the next tick (detaching sends no notification)",
+                 env.I + 1, lambda: "the programs were gone" in g0.log(), step=0.05)
     env.check("replies pass again (of 3)", replies(env, f), 3)
     env.wait_st("status shows it", g0, "dp_attached", 2)
     env.check("status: attached and rules in place", [g0.st("attached"), g0.st("fw_ok")], [1, 1])
@@ -298,9 +299,9 @@ def unprivileged(env):
     g1.node.sh("nft delete table inet fw")
     g1.node.nft(g1.ruleset(accept_rule=False))
     env.wait_for("g1 put the accept rule back", 2, lambda: rule_present(g1), step=0.1)
-    g1.node.sh("tc filter del dev wan0 ingress")
-    env.wait_for("and attached the programs again", 1,
-                 lambda: "the filters were gone" in g1.log(), step=0.05)
+    tcx(g1, "detach", "ingress", "fs_ingress")
+    env.wait_for("and attached the programs again at its tick", env.I + 1,
+                 lambda: "the programs were gone" in g1.log(), step=0.05)
     env.check("replies pass g1 again (of 3)", replies(env, f), 3)
     lp.stop()
 
@@ -333,17 +334,17 @@ def mark_mismatch(env):
 
 @scenario(gateways=2)
 def fail_open(env):
-    """The programs cannot be attached (a foreign filter sits where the
-    egress program belongs). The daemon keeps the alive element out of the
-    set, so what leaves is tracked and conntrack carries the flows on a
-    symmetric path, as before flowsync; the stale element of the last run is
-    taken away at the first look. Once the programs are back, the element
-    follows within a refresh."""
+    """The programs cannot be attached (the uplink's egress hook is full of
+    foreign programs). The daemon keeps the alive element out of the set, so
+    what leaves is tracked and conntrack carries the flows on a symmetric
+    path, as before flowsync; the stale element of the last run is taken away
+    at the first look. Once the programs are back, the element follows within
+    a refresh."""
     g0 = env.g[0]
     env.start()
-    g0.stop()           # or it would have its program back before the other filter is in
-    g0.node.sh("tc filter del dev wan0 egress; tc filter add dev wan0 egress prio 3780 "
-               "protocol all matchall action ok")
+    g0.stop()           # or it would have its program back before the hook is full
+    tcx(g0, "detach", "egress", "fs_egress")
+    tcx(g0, "fill", "egress")
     g0.start()
     env.wait_for("the daemon cannot attach", 3, lambda: "attach egress" in g0.log(), step=0.1)
     c0 = cpu_ticks(g0)
@@ -362,8 +363,8 @@ def fail_open(env):
     env.check("the daemon does not spin on its own failed attempts (CPU ticks while "
               "it could not attach)", cpu_ticks(g0) - c0, lambda n: n < 30)
 
-    g0.node.sh("tc filter del dev wan0 egress prio 3780")
-    env.wait_for("the programs are back within moments, not at the next tick", 2.5,
+    tcx(g0, "detach", "egress", "dptest_dummy")
+    env.wait_for("the programs are back at the next tick", env.I + 1,
                  lambda: g0.log().count("attached to uplink") >= 2, step=0.05)
     env.wait_for("the alive element follows within a refresh", 5, g0.alive, step=0.2)
     lp = env.loop(100, 0.5, f.send)
@@ -425,3 +426,56 @@ def resize(env):
     env.check("its own flow is still there", g1.ft(fs).local, True)
     env.wait_for("the peer's flow is back (resync)", 3, lambda: g1.ft(fa).remote, step=0.05)
     env.check("replies pass, both flows (of 6)", replies(env, fa) + replies(env, fs), 6)
+
+
+@scenario(gateways=2)
+def ingress_qdisc(env):
+    """SQM on the uplink: an ingress qdisc with a redirect to an IFB, a
+    shaper as the root qdisc. The programs sit on the device's tcx hooks,
+    not on a qdisc, so both are there at the same time, whichever came
+    first; the ingress qdisc can be removed and re-added under them, and the
+    daemon never has to attach again."""
+    g0 = env.g[0]
+    sqm = ("ip link add ifb0 type ifb && ip link set ifb0 up && "
+           "tc qdisc add dev ifb0 root fq_codel && "
+           "tc qdisc replace dev wan0 root fq_codel && "
+           "tc qdisc add dev wan0 handle ffff: ingress && "
+           "tc filter add dev wan0 parent ffff: protocol all matchall "
+           "action mirred egress redirect dev ifb0")
+    g0.node.sh(sqm)
+    env.start()
+    f = env.flow("udp", fw=g0, rev=g0)
+    f.send()
+    env.sleep(0.2)
+    env.check("replies pass with SQM in place first (of 3)", replies(env, f), 3)
+    env.check("both programs are on the hooks, SQM's qdiscs stay",
+              [hook_names(g0, "ingress"), hook_names(g0, "egress"),
+               "ingress" in g0.node.run("tc", "qdisc", "show", "dev", "wan0")],
+              [["fs_ingress"], ["fs_egress"], True])
+    env.wait_for("the alive element", 5, g0.alive, step=0.2)
+    env.check("the redirect to the IFB sees the replies (SQM shapes what is not bypassed)",
+              g0.node.run("tc", "-s", "qdisc", "show", "dev", "ifb0"),
+              lambda s: int(re.search(r"Sent \d+ bytes (\d+) pkt", s).group(1)) >= 3
+              if not env.bypass else True)
+
+    g0.node.sh("tc qdisc del dev wan0 ingress")
+    env.check("without the ingress qdisc the programs are still there",
+              hook_names(g0, "ingress"), ["fs_ingress"])
+    env.check("replies pass (of 3)", replies(env, f), 3)
+    g0.node.sh("tc qdisc add dev wan0 handle ffff: ingress && tc filter add dev wan0 parent "
+               "ffff: protocol all matchall action mirred egress redirect dev ifb0")
+    env.check("and with it back (of 3)", replies(env, f), 3)
+    g0.tick()
+    env.check("status: attached throughout, never attached again",
+              [g0.st("attached"), g0.log().count("attached to uplink")], [1, 1])
+    env.check("nothing rejected", rejects(env), 0)
+
+    # the other order: the daemon first, SQM on a running datapath
+    g1 = env.g[1]
+    g1.node.sh(sqm)
+    f1 = env.flow("udp", fw=g1, rev=g1)
+    f1.send()
+    env.sleep(0.2)
+    env.check("replies pass with SQM added under the programs (of 3)", replies(env, f1), 3)
+    env.check("the programs stayed", hook_names(g1, "ingress") + hook_names(g1, "egress"),
+              ["fs_ingress", "fs_egress"])

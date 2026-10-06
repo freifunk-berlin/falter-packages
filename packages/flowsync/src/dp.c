@@ -7,7 +7,14 @@
  * The maps are pinned and the programs stay attached when the daemon exits:
  * flows on a symmetric path, and peers' flows until they expire, keep passing
  * while it is down or restarts. A restart loads the programs anew (with the
- * current configuration), reuses the maps and replaces the filters in place.
+ * current configuration), reuses the maps and replaces the programs in place.
+ *
+ * The programs sit on the device's tcx hooks (BPF_TCX_INGRESS/EGRESS, kernel
+ * 6.6), not on a qdisc: they run where a clsact qdisc's filters would, before
+ * the device's tc filters, and leave the qdiscs alone. An ingress qdisc with
+ * SQM's redirect to an IFB, a shaper as the root qdisc, or a clsact of
+ * somebody else can be on the uplink at the same time, and may come and go
+ * while the programs are attached.
  */
 
 #include <arpa/inet.h>
@@ -32,9 +39,12 @@
 #include "flowsync.h"
 #include "dp.h"
 
-/* our filters on the uplink's clsact qdisc */
-#define TC_PRIO		3780
-#define TC_HANDLE	1
+/* the uplink's tcx hooks our programs go on, by direction (0 in, 1 out) */
+static const enum bpf_attach_type tcx_type[2] = { BPF_TCX_INGRESS, BPF_TCX_EGRESS };
+/* the programs' names in the object, which is how a previous daemon's are
+ * recognised on the hook (bpf_prog_info.name) */
+static const char *const prog_name[2] = { "fs_ingress", "fs_egress" };
+#define TCX_MAX		64	/* BPF_MPROG_MAX: room for every id a hook can hold (63) */
 /* after a failed attach: a notification starts the next attempt this much
  * later */
 #define ATTACH_RETRY_MS	1000
@@ -108,17 +118,12 @@ static void ent_remote(struct dp_ent *e, const struct fs_remote *v, uint32_t now
 	e->left = (int32_t)(v->expires - now) > 0 ? v->expires - now : 0;
 }
 
-/* set around calls whose failure is expected and handled (a qdisc that
- * exists, a filter that is gone): libbpf prints the kernel's message for
- * those too */
-static bool quiet;
-
 static int print_cb(enum libbpf_print_level level, const char *fmt, va_list ap)
 {
 	char buf[512];
 	size_t len;
 
-	if (level == LIBBPF_DEBUG || quiet)
+	if (level == LIBBPF_DEBUG)
 		return 0;
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	len = strlen(buf);
@@ -313,39 +318,85 @@ int dp_open(bool load_progs)
 	return 0;
 }
 
-static void tc_hook(struct bpf_tc_hook *hook, unsigned int ifindex, int dir)
+/* the ids of the programs on one hook of the device, in their order. Returns
+ * how many, -errno. A device nothing was ever attached to has no hook yet:
+ * that is none, not an error. */
+static int hook_progs(unsigned int ifindex, int dir, __u32 *ids)
 {
-	memset(hook, 0, sizeof(*hook));
-	hook->sz = sizeof(*hook);
-	hook->ifindex = ifindex;
-	hook->attach_point = dir ? BPF_TC_EGRESS : BPF_TC_INGRESS;
+	LIBBPF_OPTS(bpf_prog_query_opts, q, .prog_ids = ids, .prog_cnt = TCX_MAX);
+	int err = bpf_prog_query_opts(ifindex, tcx_type[dir], &q);
+
+	if (err == -ENOENT)
+		return 0;
+	if (err)
+		return err;
+	return q.prog_cnt > TCX_MAX ? TCX_MAX : (int)q.prog_cnt;
+}
+
+static bool has_id(const __u32 *ids, int n, __u32 id)
+{
+	int i;
+
+	for (i = 0; i < n; i++)
+		if (ids[i] == id)
+			return true;
+	return false;
+}
+
+/* a descriptor of the program with this id if it is ours by name (a previous
+ * daemon's: the same object, loaded by another process), -1 otherwise. Needs
+ * CAP_SYS_ADMIN (BPF_PROG_GET_FD_BY_ID), which the daemon has at startup, the
+ * moment such a program can be there. */
+static int ours_by_name(__u32 id, int dir)
+{
+	struct bpf_prog_info info;
+	__u32 ilen = sizeof(info);
+	int fd = bpf_prog_get_fd_by_id(id);
+
+	if (fd < 0)
+		return -1;
+	memset(&info, 0, sizeof(info));
+	if (bpf_prog_get_info_by_fd(fd, &info, &ilen) ||
+	    strncmp(info.name, prog_name[dir], sizeof(info.name))) {
+		close(fd);
+		return -1;
+	}
+	return fd;
 }
 
 /* say: log why it fails (the caller tries again and again). Returns 0, -1 if
- * it failed, -2 if it failed after it had put a filter in. */
+ * it failed, -2 if it failed after it had put the ingress program on.
+ *
+ * Per hook: our program is there, nothing to do; a previous daemon's is
+ * there, it is replaced in place (no packet passes without a program);
+ * otherwise ours is appended to whatever programs the hook holds. */
 static int attach(unsigned int ifindex, bool say)
 {
-	struct bpf_tc_hook hook;
-	int dir, err;
+	__u32 ids[TCX_MAX];
+	int dir, i, n, old, err;
 
-	tc_hook(&hook, ifindex, 0);
-	hook.attach_point = BPF_TC_INGRESS | BPF_TC_EGRESS;
-	quiet = true;
-	err = bpf_tc_hook_create(&hook);	/* the clsact qdisc */
-	quiet = false;
-	if (err && err != -EEXIST) {
-		if (say)
-			logmsg(LOG_ERR, "%s: clsact qdisc: %s", cfg.uplink, strerror(-err));
-		return -1;
-	}
 	for (dir = 0; dir < 2; dir++) {
-		LIBBPF_OPTS(bpf_tc_opts, opts, .handle = TC_HANDLE, .priority = TC_PRIO,
-			    .prog_fd = prog_fd[dir], .flags = BPF_TC_F_REPLACE);
+		LIBBPF_OPTS(bpf_prog_attach_opts, opts);
 
-		tc_hook(&hook, ifindex, dir);
-		quiet = !say;		/* libbpf prints the kernel's reason */
-		err = bpf_tc_attach(&hook, &opts);
-		quiet = false;
+		n = hook_progs(ifindex, dir, ids);
+		if (n < 0) {
+			if (say)
+				logmsg(LOG_ERR, "%s: programs on %s: %s", cfg.uplink,
+				       dir ? "egress" : "ingress", strerror(-n));
+			return dir ? -2 : -1;
+		}
+		if (has_id(ids, n, prog_id[dir]))
+			continue;
+		old = -1;
+		for (i = 0; i < n && old < 0; i++)
+			old = ours_by_name(ids[i], dir);
+		if (old >= 0) {
+			opts.flags = BPF_F_REPLACE;
+			opts.replace_prog_fd = old;
+		}
+		err = bpf_prog_attach_opts(prog_fd[dir], ifindex, tcx_type[dir], &opts);
+		if (old >= 0)
+			close(old);
 		if (err) {
 			if (say)
 				logmsg(LOG_ERR, "%s: attach %s: %s", cfg.uplink,
@@ -412,20 +463,15 @@ static void apply_bypass(void)
 		       "past netfilter");
 }
 
-/* are both filters on the device, with our programs? */
+/* are our programs on both hooks of the device? */
 static bool attached(unsigned int ifindex)
 {
-	struct bpf_tc_hook hook;
-	int dir, err;
+	__u32 ids[TCX_MAX];
+	int dir, n;
 
 	for (dir = 0; dir < 2; dir++) {
-		LIBBPF_OPTS(bpf_tc_opts, opts, .handle = TC_HANDLE, .priority = TC_PRIO);
-
-		tc_hook(&hook, ifindex, dir);
-		quiet = true;
-		err = bpf_tc_query(&hook, &opts);
-		quiet = false;
-		if (err || opts.prog_id != prog_id[dir])
+		n = hook_progs(ifindex, dir, ids);
+		if (n < 0 || !has_id(ids, n, prog_id[dir]))
 			return false;
 	}
 	return true;
@@ -434,15 +480,16 @@ static bool attached(unsigned int ifindex)
 /*
  * At startup and every interval: the programs must be on the uplink. The
  * device may not exist yet, may have been created anew under its name (netifd
- * does that to a VLAN on every ifup; the new device has no filters), or
- * somebody removed the qdisc. Returns true when they were attached now.
+ * does that to a VLAN on every ifup; the new device has no programs), or
+ * somebody detached them. Returns true when they were attached now.
  *
- * An attempt that fails half way (one filter in, the other refused) changes
- * the device's filters and so notifies us like anybody else's change. A
- * notification right after such a failure therefore starts no new attempt at
- * once, or the daemon would spin: the attempt is made ATTACH_RETRY_MS after
- * the failed one (dp_retry_due), and at every tick. Any other failure (the
- * device is just going away) is tried again with the next notification.
+ * An attempt that fails half way (the ingress program on, the egress one
+ * refused) is not repeated with the next link notification but
+ * ATTACH_RETRY_MS later (dp_retry_due), and at every tick: a hook that
+ * refuses keeps refusing, and a device that changes while the uplink is
+ * being set up would otherwise make the daemon try on every notification.
+ * Any other failure (the device is just going away) is tried again with the
+ * next notification.
  */
 static uint64_t failed_at;
 static bool retry_wanted;
@@ -493,8 +540,8 @@ bool dp_tick(void)
 	}
 	failed_at = 0;
 	if (attached_ifindex == ifindex)
-		logmsg(LOG_WARNING, "attached to uplink %s (ifindex %u) again: the filters were "
-		       "gone (something removed them: nothing was accepted on the mark meanwhile)",
+		logmsg(LOG_WARNING, "attached to uplink %s (ifindex %u) again: the programs were "
+		       "gone (something detached them: nothing was accepted on the mark meanwhile)",
 		       cfg.uplink, ifindex);
 	else
 		logmsg(LOG_NOTICE, "attached to uplink %s (ifindex %u)%s", cfg.uplink, ifindex,
@@ -507,18 +554,18 @@ bool dp_tick(void)
 }
 
 /*
- * Link notifications. A device that is created anew has no filters, and with
+ * Link notifications. A device that is created anew has no programs, and with
  * forwarded IPv6 untracked every reply through it is rejected until they are
  * back: the interval tick alone would leave the gateway closed for up to
  * interval seconds. So the main loop looks (dp_tick, udp_tick) whenever a
- * link comes, goes or changes, and whenever a qdisc or filter does (ours may
- * have been removed).
+ * link comes, goes or changes. Attaching and detaching tcx programs sends no
+ * notification: somebody detaching ours is noticed at the next tick.
  */
 static int link_fd = -1;
 
 int dp_link_open(void)
 {
-	struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_LINK | RTMGRP_TC };
+	struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_LINK };
 
 	link_fd = socket(AF_NETLINK, SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC, NETLINK_ROUTE);
 	if (link_fd < 0 || bind(link_fd, (struct sockaddr *)&sa, sizeof(sa))) {
@@ -555,24 +602,33 @@ bool dp_link_changed(void)
 	return any;
 }
 
-/* the detach command: filters off the uplink, maps unpinned */
+/* the detach command: our programs (by name: this process loaded none) off
+ * the uplink's hooks, other programs there untouched, maps unpinned */
 int dp_detach(void)
 {
 	unsigned int ifindex = if_nametoindex(cfg.uplink);
-	struct bpf_tc_hook hook;
-	int dir, err, ret = 0;
+	__u32 ids[TCX_MAX];
+	int dir, i, n, fd, err, ret = 0;
 
 	for (dir = 0; ifindex && dir < 2; dir++) {
-		LIBBPF_OPTS(bpf_tc_opts, opts, .handle = TC_HANDLE, .priority = TC_PRIO);
-
-		tc_hook(&hook, ifindex, dir);
-		quiet = true;
-		err = bpf_tc_detach(&hook, &opts);
-		quiet = false;
-		if (err && err != -ENOENT && err != -EINVAL) {
-			fprintf(stderr, "%s: detach %s: %s\n", cfg.uplink,
-				dir ? "egress" : "ingress", strerror(-err));
+		n = hook_progs(ifindex, dir, ids);
+		if (n < 0) {
+			fprintf(stderr, "%s: programs on %s: %s\n", cfg.uplink,
+				dir ? "egress" : "ingress", strerror(-n));
 			ret = 1;
+			continue;
+		}
+		for (i = 0; i < n; i++) {
+			fd = ours_by_name(ids[i], dir);
+			if (fd < 0)
+				continue;
+			err = bpf_prog_detach_opts(fd, ifindex, tcx_type[dir], NULL);
+			close(fd);
+			if (err && err != -ENOENT) {
+				fprintf(stderr, "%s: detach %s: %s\n", cfg.uplink,
+					dir ? "egress" : "ingress", strerror(-err));
+				ret = 1;
+			}
 		}
 	}
 	unpin_all();
