@@ -31,6 +31,17 @@ def measured(r):
                                     for st in steps))
 
 
+def per_packet(r):
+    """a flood's cost in the kernel of the gateway that forwarded it"""
+    f, p = r["flow"], r["flow"]["p"]
+    if p["kind"] != "udp_flood":
+        return "-"
+    up = p["dir"] == "up"
+    pps = ((r["server"] if up else r["client"]) or {}).get("delivered_pps", 0)
+    k = ((r["cpu_ms"] or {}).get(f["fwd"] if up else f["rev"]) or {}).get("kernel")
+    return "%d" % (k * 1e6 / (pps * p["seconds"])) if pps and k is not None else "n/a"
+
+
 def render_alone(run):
     out = ["== %s, %s, fleet %s ==" % (run["scenario"], run["impl"], run["fleet"])]
     rows = []
@@ -39,13 +50,16 @@ def render_alone(run):
         others = [n for n in cpu if n not in (f["fwd"], f["rev"])]
 
         def show(n):
-            return "%d / %d" % tuple(cpu[n]) if n in cpu else "n/a"
+            """user / system time of the implementation's processes + the kernel's packet path"""
+            w = cpu.get(n) or {}
+            return "%s + %s" % ("%d / %d" % tuple(w["cpu"]) if w.get("cpu") else "n/a",
+                                w["kernel"] if w.get("kernel") is not None else "n/a")
         rows.append([f["traffic"], "asym" if f["asym"] else "sym",
-                     "FAIL: " + "; ".join(r["bad"]) if r["bad"] else measured(r),
+                     "FAIL: " + "; ".join(r["bad"]) if r["bad"] else measured(r), per_packet(r),
                      show(f["fwd"]), show(f["rev"]) if f["asym"] else "-",
                      show(others[0]) if others else "-"])
-    out.append(table(rows, ["traffic", "path", "result", "cpu ms user / sys: fwd gw", "return gw",
-                            "idle peer"]))
+    out.append(table(rows, ["traffic", "path", "result", "kernel ns/packet",
+                            "ms user / sys + kernel: fwd gw", "return gw", "idle peer"]))
     return "\n".join(out)
 
 

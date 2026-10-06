@@ -18,6 +18,7 @@ TOPOLOGY = dict(
     clients=dict(A=0),
     servers=dict(A=0),
     offloads=False,
+    kernel_cpu=True,
 )
 GW = list(TOPOLOGY["gateways"])
 FLEETS = dict(

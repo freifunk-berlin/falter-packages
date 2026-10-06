@@ -15,6 +15,8 @@ only); the bridges add nothing, so a path's delay is the sum of its links.
 A flow's client routes the flow's server address via the forward gateway, its
 server routes the client address via the return gateway.
 """
+import fcntl
+import glob
 import os
 import re
 
@@ -40,6 +42,7 @@ class Gateway:
         os.makedirs(self.dir, exist_ok=True)
         self.log = os.path.join(self.dir, "log")
         self.cgroup = lab.cgroup(name)
+        self.napi = []
 
     def spawn(self, *argv):
         """a process of the implementation on this gateway: logged, and
@@ -59,6 +62,21 @@ class Gateway:
             return int(st["user_usec"]) / 1000, int(st["system_usec"]) / 1000
         except (OSError, TypeError, KeyError):
             return None
+
+    def kernel_ms(self):
+        """CPU time of the kernel's packet processing for this gateway: what
+        arrives on mesh0 and wan0 is handled by threads of their own (threaded
+        NAPI), through firewall, connection tracking, tc programs and
+        forwarding. None unless the topology asks for kernel_cpu."""
+        if not self.napi:
+            return None
+        ns = 0
+        for pid in self.napi:
+            try:
+                ns += int(open("/proc/%s/schedstat" % pid).read().split()[0])
+            except (OSError, ValueError):
+                pass
+        return ns / 1e6
 
     def sync_traffic(self):
         """(packets, bytes) the gateway sent on the sync path: IPv4 on the uplink"""
@@ -167,7 +185,36 @@ class Lab:
             if ms:
                 node.run("tc", "qdisc", "add", "dev", dev, "root", "netem", "delay", "%gms" % ms,
                          "limit", "100000")
+        if topology.get("kernel_cpu"):
+            self._threaded_napi()
         self._warm_up(ends)
+
+    def _threaded_napi(self):
+        """give every gateway's two interfaces a kernel thread for their
+        receive path and remember the threads. veth has NAPI only with GRO on,
+        and only for senders without TSO. The threads are named after the
+        device, which every lab on the host has: they are found as the ones
+        that appear when the switch is flipped, under a host-wide lock."""
+        def threads():
+            out = set()
+            for p in glob.glob("/proc/[0-9]*/comm"):
+                try:
+                    if open(p).read().startswith("napi/"):
+                        out.add(p.split("/")[2])
+                except OSError:
+                    pass
+            return out
+        with open("/tmp/gwlab-napi.lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            for g in self.gw.values():
+                for br, dev in (("m", g.mesh_if), ("i", g.uplink_if)):
+                    self.hub.run("ethtool", "-K", "%s-%s" % (br, g.name), "tso", "off", check=False)
+                    g.node.run("ethtool", "-K", dev, "gro", "on", check=False)
+                    before = threads()
+                    # sysfs shows the devices of the namespace it was mounted in
+                    g.node.run("unshare", "-m", "sh", "-c", "mount -t sysfs sysfs /sys && "
+                               "echo 1 > /sys/class/net/%s/threaded" % dev, check=False)
+                    g.napi += sorted(threads() - before)
 
     def _warm_up(self, ends):
         """resolve every neighbour now: a cold path costs the first packet of

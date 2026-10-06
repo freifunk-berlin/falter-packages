@@ -85,10 +85,12 @@ def lab(args, opts):
         if alone:                               # CPU per gateway while each flow ran
             for f in flows:
                 time.sleep(max(0, job["t0"] + f["start"] - time.monotonic()))
-                a = {n: g.cpu_ms() for n, g in lb.gw.items()}
+                a = {n: (g.cpu_ms(), g.kernel_ms()) for n, g in lb.gw.items()}
                 time.sleep(max(0, job["t0"] + f["start"] + span(f["p"]) - time.monotonic()))
-                windows[f["id"]] = {n: [round(x - y) for x, y in zip(g.cpu_ms(), a[n])]
-                                    for n, g in lb.gw.items() if a[n]}
+                windows[f["id"]] = {
+                    n: dict(cpu=[round(x - y) for x, y in zip(g.cpu_ms(), a[n][0])] if a[n][0] else None,
+                            kernel=round(g.kernel_ms() - a[n][1]) if a[n][1] is not None else None)
+                    for n, g in lb.gw.items()}
         for a in agents:
             a.wait()
         seen = {"client": {}, "server": {}}
