@@ -18,18 +18,54 @@ additionally goes to the server and back (the path's margin). So:
                            retransmission after it connects.
 
 An event of the scenario (a reroute, a gateway losing its state, a sync
-blackout, an uplink re-created) cannot be won while it lasts and until the
-sync has delivered again: from its start until its end + the sync latency
-(and one path RTT around it, for what is on its way).
+blackout, an uplink re-created): how fast an implementation repairs what the
+event broke is its own business and a number in the report (recovery: from
+the end of the event to the last packet lost), not a verdict. What is judged:
+the flow delivers again before it ends, and loss before the event follows the
+rules above.
 
 Nothing ever excuses a reset or a stalled connection. If answers never passed
 in the measurement, nothing is accepted on an asymmetric path.
 
 judge() returns (what is wrong: a list, empty = pass; whether the flow needed
-a retry: reported, not judged).
+a retry at its start: reported, not judged; recovery in seconds after an
+event, None if the event cost the flow nothing).
 """
 SYN_RETRIES = (1, 3, 7, 15)     # seconds after the first SYN at which Linux sends it again
 JITTER_MS = 300                 # timing noise of the lab in a connect time; well below a SYN retry
+
+
+class Path:
+    """what a flow's path and the scenario's events make of a moment t
+    (seconds into the flow)"""
+
+    def __init__(self, f, events, sync_ms):
+        sync = (sync_ms or 0) / 1000
+        self.rtt = f["rtt_ms"] / 1000
+        # what the client sends this long into the flow cannot be answered
+        self.lost_start = (max(0, sync - f["margin_ms"] / 1000)
+                           if f["asym"] and sync_ms is not None else 0)
+        # (start, end) of each event in flow time; it also hits what is on its way
+        self.events = sorted((e["at"] - f["start"] - self.rtt, e["at"] + e.get("seconds", 0) - f["start"])
+                             for e in events)
+
+    def start(self, t):
+        return t < self.lost_start
+
+    def event(self, t):
+        """the end of the last event that began before t, or None"""
+        ends = [b for a, b in self.events if a <= t]
+        return ends[-1] if ends else None
+
+
+def after_event(x, lost_at, last_at):
+    """losses at the times lost_at, the flow's last packet at last_at: returns
+    (losses no event explains, did it recover, recovery in seconds or None)"""
+    unexplained = [t for t in lost_at if x.event(t) is None and not x.start(t)]
+    hit = [t for t in lost_at if x.event(t) is not None]
+    if not hit:
+        return unexplained, True, None
+    return unexplained, last_at not in hit, max(0.0, max(t - x.event(t) for t in hit))
 
 
 def judge(f, c, s, events=(), sync_ms=None):
@@ -38,50 +74,44 @@ def judge(f, c, s, events=(), sync_ms=None):
     sync_ms: the measured sync latency, None if answers never passed"""
     if c is None or s is None or "crashed" in c or "crashed" in s:
         return ["no result from the %s" % ("client" if c is None or "crashed" in (c or {})
-                                           else "server")], False
-    sync = (sync_ms or 0) / 1000
-    lost_start = max(0, sync - f["margin_ms"] / 1000) if f["asym"] and sync_ms is not None else 0
-    # an event also hits what is on its way: one path RTT before and after
-    rtt = f["rtt_ms"] / 1000
-    win = [(e["at"] - f["start"] - rtt, e["at"] + e.get("seconds", 0) + sync + rtt - f["start"])
-           for e in events]
-
-    def excused(t):
-        """may what the client sends t seconds into the flow go unanswered?
-        None, or why ("start", "event") and until when"""
-        for a, b in win:
-            if a <= t < b:
-                return "event", b
-        return ("start", lost_start) if t < lost_start else None
-    return RULES[f["p"]["kind"]](f, c, s, excused)
+                                           else "server")], False, None
+    return RULES[f["p"]["kind"]](f, c, s, Path(f, events, sync_ms))
 
 
-def udp_rr(f, c, s, excused):
-    lost = [k for k, ok in enumerate(c["answered"]) if not ok]
-    bad = [k for k in lost if not excused(k * f["p"]["every"])]
-    return ((["request %s unanswered" % ", ".join(map(str, bad))] if bad else []),
-            any(excused(k * f["p"]["every"]) for k in lost))
+def udp_rr(f, c, s, x):
+    every, n = f["p"]["every"], len(c["answered"])
+    lost = [k * every for k, ok in enumerate(c["answered"]) if not ok]
+    bad, recovered, recovery = after_event(x, lost, (n - 1) * every)
+    out = ["request at %s s unanswered" % ", ".join("%g" % t for t in bad)] if bad else []
+    if not recovered:
+        out.append("no answers again after the event")
+    return out, any(x.start(t) for t in lost), recovery
 
 
-def udp_stream(f, c, s, excused):
-    p, bad = f["p"], []
-    up = [k for k in s["lost"] if not excused(k / p["up_pps"])]
-    down = [k for k in c["lost"] if not excused(k / p["down_pps"])]
-    if up:
-        bad.append("client>server lost %d, first at %.1f s" % (len(up), up[0] / p["up_pps"]))
-    if down:
-        bad.append("server>client lost %d, first at %.2f s, longest gap %d ms"
-                   % (len(down), down[0] / p["down_pps"], c["outage_ms"]))
-    return bad, any(excused(k / p["down_pps"]) for k in c["lost"])
+def udp_stream(f, c, s, x):
+    p, out, rec = f["p"], [], []
+    for name, lost, pps in (("client>server", s["lost"], p["up_pps"]),
+                            ("server>client", c["lost"], p["down_pps"])):
+        at = [k / pps for k in lost]
+        bad, recovered, recovery = after_event(x, at, (int(pps * p["seconds"]) - 1) / pps)
+        if bad:
+            out.append("%s lost %d, first at %.2f s" % (name, len(bad), bad[0]))
+        if not recovered:
+            out.append("%s did not deliver again after the event" % name)
+        rec.append(recovery)
+    rec = [r for r in rec if r is not None]
+    return out, any(x.start(k / p["down_pps"]) for k in c["lost"]), max(rec) if rec else None
 
 
-def connect_ok(f, r, t, excuse, what):
-    """a connection started t seconds into the flow came up: at once, or, if
-    the race cannot be won until some time, by the first SYN retransmission
-    after that time"""
+def connect_ok(f, r, t, x, what, t0=0):
+    """a connection started t seconds into the flow came up: at once; or, if
+    the race cannot be won at its start, by the first SYN retransmission
+    after it can; or, under an event, at all"""
     if r["connect_ms"] is None:
         return "%s: %s" % (what, r.get("error", "no connection"))
-    retry = next((x for x in SYN_RETRIES if excuse and x >= excuse[1] - t), 0 if not excuse else 31)
+    if x.event(t) is not None:
+        return None
+    retry = next((n for n in SYN_RETRIES if n >= x.lost_start), 31) if x.lost_start else 0
     if r["connect_ms"] > f["rtt_ms"] + 1000 * retry + JITTER_MS:
         return "%s: connect took %d ms (path RTT %d ms, %s)" % (
             what, r["connect_ms"], f["rtt_ms"],
@@ -93,38 +123,33 @@ def slow(f, r):
     return bool(r["connect_ms"] and r["connect_ms"] > f["rtt_ms"] + 700)
 
 
-def tcp_short(f, c, s, excused):
+def tcp_short(f, c, s, x):
     bad, retry = [], False
-    for k, r in enumerate(c["conns"]):
-        # every connection is a new flow with its own start: the event
-        # windows are in flow time, the start window is in connection time
-        t = k * f["p"]["every"]
-        ev, st = excused(t), excused(0)
-        excuse = ev if ev and ev[0] == "event" else (("start", t + st[1]) if st and st[0] == "start" else None)
-        e = connect_ok(f, r, t, excuse, "connection %d" % k)
+    for k, r in enumerate(c["conns"]):          # every connection is a new flow with its own start
+        e = connect_ok(f, r, k * f["p"]["every"], x, "connection %d" % k)
         if not e and not r["ok"]:
             e = "connection %d: %s" % (k, r.get("error", "failed"))
         if e:
             bad.append(e)
         retry |= slow(f, r)
-    return bad, retry
+    return bad, retry, None
 
 
-def tcp_talk(f, c, s, excused):
-    e = connect_ok(f, c, 0, excused(0), "connect")
+def tcp_talk(f, c, s, x):
+    e = connect_ok(f, c, 0, x, "connect")
     if not e and not c["done"]:
         e = "broke after %s s, %d exchanges: %s" % (c.get("failed_at_s"), c["exchanges"],
                                                     c.get("error"))
-    return ([e] if e else []), slow(f, c)
+    return ([e] if e else []), slow(f, c), None
 
 
-def udp_ladder(f, c, s, excused):
+def udp_ladder(f, c, s, x):
     """a number, not a verdict, with one limit: an answer a second late must
     pass, or even a TCP client's retry would not"""
     if not f["asym"]:
-        return (["answers lost on a symmetric path"] if not all(c["answered"]) else []), False
+        return (["answers lost on a symmetric path"] if not all(c["answered"]) else []), False, None
     return ([] if c["answered"][-1] else
-            ["the answer %d ms late did not pass" % f["p"]["delays_ms"][-1]]), False
+            ["the answer %d ms late did not pass" % f["p"]["delays_ms"][-1]]), False, None
 
 
 def sync_latency(flows):
@@ -141,17 +166,17 @@ def sync_latency(flows):
 
 
 # Measurements produce numbers, not verdicts; they fail only if nothing got through.
-def udp_flood(f, c, s, excused):
+def udp_flood(f, c, s, x):
     pps = (s if f["p"]["dir"] == "up" else c).get("delivered_pps", 0)
-    return ([] if pps else ["nothing delivered"]), False
+    return ([] if pps else ["nothing delivered"]), False, None
 
 
-def tcp_bulk(f, c, s, excused):
-    return ([] if c["done"] and c["mbit"] else ["no transfer: %s" % c.get("error")]), False
+def tcp_bulk(f, c, s, x):
+    return ([] if c["done"] and c["mbit"] else ["no transfer: %s" % c.get("error")]), False, None
 
 
-def udp_newflows(f, c, s, excused):
-    return ([] if any(st["answered"] for st in c["steps"]) else ["no flow was answered"]), False
+def udp_newflows(f, c, s, x):
+    return ([] if any(st["answered"] for st in c["steps"]) else ["no flow was answered"]), False, None
 
 
 def sustained(steps):

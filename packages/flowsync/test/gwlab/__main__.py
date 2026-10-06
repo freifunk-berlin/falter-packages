@@ -144,11 +144,12 @@ def lab(args, opts):
     res = []
     for f in flows:
         c, s = seen["client"].get(f["id"]), seen["server"].get(f["id"])
-        bad, retry = expect.judge(f, c, s, events, sync_ms)
-        res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, cpu_ms=windows.get(f["id"])))
+        bad, retry, recovery = expect.judge(f, c, s, events, sync_ms)
+        res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, recovery=recovery,
+                        cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,
-                       alone=alone, sync_ms=sync_ms, ladder=ladder, gateways=gws, flows=res), fh, indent=1)
+                       alone=alone, events=len(events), sync_ms=sync_ms, ladder=ladder, gateways=gws, flows=res), fh, indent=1)
     return 0
 
 

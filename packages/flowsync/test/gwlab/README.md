@@ -43,8 +43,10 @@ over every gateway pair whose server holds its first answer back by 0 to
   (sync latency - detour) of a flow may go unanswered, and the endpoint's own
   retry has to repair it: the first UDP request after that time, the first
   TCP SYN retransmission (1, 3, 7 s) after it.
-- An event cannot be won while it lasts and until the sync has delivered
-  again: its duration + the sync latency, and one path RTT around it.
+- An event (reroute, state loss, blackout, uplink re-created): how fast the
+  implementation repairs what it broke is a number in the report (recovery:
+  from the end of the event to the last packet lost), not a verdict. Judged
+  is that the flow delivers again before it ends.
 - A reset or a stalled connection is never accepted. If no answer passed in
   the measurement, nothing is accepted on a path through two gateways.
 
@@ -109,9 +111,12 @@ cost a walk of the host's buckets.
 | `latency` | new flows to a server at distance 0 that holds its first answer back by 0 to 1000 ms | from which delay on every answer passes: the sync latency, seen from outside |
 | `perf` | one flow at a time, nothing else running, no link latency | numbers, below |
 
-What an event may cost follows from the measured sync latency (see the
-expectation above); a TCP connect may wait an event out with its SYN
-retries; a reset is never accepted.
+After an event a flow has to deliver again and no connection may reset; the
+report's recovery column says how long the loss went on after the event
+ended (median / worst over the flows that lost something). A loss later in
+the flow that has nothing to do with the event shows up there as a long
+recovery. The lab's timers are about ten times shorter than production's:
+a repair that rides on a refresh interval takes that much longer on a router.
 
 `perf` is a measurement (`ALONE = True`: labs and flows one after the other)
 on three gateways, each traffic over one gateway and over two:

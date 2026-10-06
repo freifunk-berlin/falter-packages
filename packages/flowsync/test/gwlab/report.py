@@ -94,8 +94,13 @@ def render(run):
             max([c.get("outage_ms", 0) for c in cl] + [0]),
             "%d / %d" % (statistics.median(cms), max(cms)) if cms else "-",
         ])
+        if run.get("events"):
+            rec = [r["recovery"] for r in rs if r.get("recovery") is not None]
+            rows[-1].append("%.1f / %.1f (%d flows)" % (statistics.median(rec), max(rec), len(rec))
+                            if rec else "-")
     out.append(table(rows, ["traffic", "path", "return gw", "flows", "pass", "FAIL", "needed retry",
-                            "lost c>s", "lost s>c", "worst gap ms", "connect ms p50 / max"]))
+                            "lost c>s", "lost s>c", "worst gap ms", "connect ms p50 / max"]
+                     + (["recovery s p50 / max"] if run.get("events") else [])))
     out.append("")
     rows = []
     for name, g in run["gateways"].items():
