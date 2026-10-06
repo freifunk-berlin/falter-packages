@@ -1,7 +1,7 @@
 """The two tables of a lab run, and the failures."""
 import statistics
 
-from .expect import sustained
+from .expect import sustained, sync_latency
 
 
 def table(rows, head):
@@ -100,6 +100,14 @@ def render(run):
                      "%.0f / %.0f" % tuple(cpu) if cpu else "n/a",
                      g["sync_tx"][0], "%.0f" % (g["sync_tx"][1] / 1000)])
     out.append(table(rows, ["gateway", "rules", "offload", "cpu ms user / sys", "sync pkts", "sync kB"]))
+    lat = sync_latency(run["flows"])
+    if lat:
+        out.append("")
+        out.append("sync latency, %d asymmetric paths: answers passed by delay: %s"
+                   % (lat["flows"], ", ".join("%g ms: %d" % (d, n)
+                                              for d, n in zip(lat["delays_ms"], lat["passed"]))))
+        out.append("every answer passed from %s on" % ("%g ms" % lat["all_from_ms"]
+                                                       if lat["all_from_ms"] is not None else "no delay"))
     bad = [r for r in run["flows"] if r["bad"]]
     for r in bad[:12]:
         out.append("FAIL %s (path RTT %d ms): %s" % (r["flow"]["id"], r["flow"]["rtt_ms"],

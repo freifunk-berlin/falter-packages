@@ -14,6 +14,7 @@ Traffic kinds (p["kind"]):
   tcp_short   connections, every, request, response: a new connection (new
               client port) each time
   tcp_talk    seconds, every: one connection, 1 KiB each way per exchange
+  udp_ladder  delays_ms: a new flow per delay, the server answers that much later
 Measurements, run one at a time (counted on the interface, not by a reader):
   udp_flood     dir, seconds, size: datagrams as fast as one core sends them
   tcp_bulk      seconds: the server sends at full speed
@@ -187,6 +188,44 @@ def c_tcp_talk(f, p, t0, grace):
     r["retrans"] = retrans(s)
     s.close()
     return r
+
+
+def c_udp_ladder(f, p, t0, grace):
+    """one new flow (a new client port) per delay: the server holds its
+    answer back that long. Is it let through?"""
+    sleep_until(t0)
+    answered = []
+    for k, ms in enumerate(p["delays_ms"]):
+        s = sock(socket.SOCK_DGRAM, f["c"], f["cport"] + k)
+        s.connect((f["s"], f["sport"]))
+        try:
+            s.send(struct.pack("!d", ms / 1000))
+            answered.append(bool(select.select([s], [], [], ms / 1000 + f["rtt_ms"] / 1000 + 0.4)[0]))
+        except OSError:
+            answered.append(False)
+        s.close()
+    return dict(answered=answered)
+
+
+def s_udp_ladder(f, p, t0, grace):
+    """answer every datagram after the delay it asks for"""
+    s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
+    end, due = t0 + sum(p["delays_ms"]) / 1000 + len(p["delays_ms"]) * 0.6 + 2, []
+    while mono() < end:
+        wait = 0.2 if not due else max(0, min(due)[0] - mono())
+        if select.select([s], [], [], wait)[0]:
+            try:
+                d, addr = s.recvfrom(64)
+                due.append((mono() + struct.unpack("!d", d[:8])[0], addr))
+            except (OSError, struct.error):
+                pass
+        for item in [x for x in due if x[0] <= mono()]:
+            due.remove(item)
+            try:
+                s.sendto(b"answer", item[1])
+            except OSError:
+                pass
+    return {}
 
 
 # ----------------------------------------------------------- measurements
@@ -402,9 +441,11 @@ def s_tcp(f, p, t0, grace):
 
 KINDS = {
     "client": dict(udp_rr=c_udp_rr, udp_stream=c_udp_stream, tcp_short=c_tcp_short, tcp_talk=c_tcp_talk,
-                   udp_flood=c_udp_flood, tcp_bulk=c_tcp_bulk, udp_newflows=c_udp_newflows),
+                   udp_flood=c_udp_flood, tcp_bulk=c_tcp_bulk, udp_newflows=c_udp_newflows,
+                   udp_ladder=c_udp_ladder),
     "server": dict(udp_rr=s_udp_rr, udp_stream=s_udp_stream, tcp_short=s_tcp, tcp_talk=s_tcp,
-                   udp_flood=s_udp_flood, tcp_bulk=s_tcp, udp_newflows=s_udp_newflows),
+                   udp_flood=s_udp_flood, tcp_bulk=s_tcp, udp_newflows=s_udp_newflows,
+                   udp_ladder=s_udp_ladder),
 }
 
 

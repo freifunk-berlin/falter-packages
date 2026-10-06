@@ -100,6 +100,28 @@ def tcp_talk(f, c, s, excused):
     return ([e] if e else []), slow(f, c)
 
 
+def udp_ladder(f, c, s, excused):
+    """a number, not a verdict, with one limit: an answer a second late must
+    pass, or even a TCP client's retry would not"""
+    if not f["asym"]:
+        return (["answers lost on a symmetric path"] if not all(c["answered"]) else []), False
+    return ([] if c["answered"][-1] else
+            ["the answer %d ms late did not pass" % f["p"]["delays_ms"][-1]]), False
+
+
+def sync_latency(flows):
+    """from the ladders of the asymmetric flows: per delay how many answers
+    passed, and the shortest delay from which all did"""
+    rs = [r for r in flows if r["flow"]["p"]["kind"] == "udp_ladder" and r["flow"]["asym"] and r["client"]
+          and "answered" in r["client"]]
+    if not rs:
+        return None
+    delays = rs[0]["flow"]["p"]["delays_ms"]
+    passed = [sum(r["client"]["answered"][k] for r in rs) for k in range(len(delays))]
+    ok = [d for k, d in enumerate(delays) if all(n == len(rs) for n in passed[k:])]
+    return dict(flows=len(rs), delays_ms=delays, passed=passed, all_from_ms=ok[0] if ok else None)
+
+
 # Measurements produce numbers, not verdicts; they fail only if nothing got through.
 def udp_flood(f, c, s, excused):
     pps = (s if f["p"]["dir"] == "up" else c).get("delivered_pps", 0)
@@ -122,4 +144,4 @@ def sustained(steps):
 
 
 RULES = dict(udp_rr=udp_rr, udp_stream=udp_stream, tcp_short=tcp_short, tcp_talk=tcp_talk,
-             udp_flood=udp_flood, tcp_bulk=tcp_bulk, udp_newflows=udp_newflows)
+             udp_flood=udp_flood, tcp_bulk=tcp_bulk, udp_newflows=udp_newflows, udp_ladder=udp_ladder)

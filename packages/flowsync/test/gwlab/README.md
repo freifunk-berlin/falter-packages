@@ -82,12 +82,41 @@ scaled about ten times shorter than production's, and the conntrack hash
 table is shared by all namespaces of the host, which makes every table dump
 cost a walk of the host's buckets.
 
-## Not there yet
+## Scenarios
 
-- Scenarios with events: reroute, state loss (`lose_state` exists), a sync
-  blackout, the uplink re-created.
-- Measurement scenarios, run alone: per-packet cost, bulk goodput, new flows
-  per second.
-- Kernel packet-path CPU per gateway (the cgroup only sees processes, and a
-  BPF data path has its cost in the kernel).
-- Sync latency measured black-box (a server that delays its first answer).
+    python3 -m gwlab steady|reroute|stateloss|blackout|uplink|latency|perf --impl NAME
+
+| Scenario | What happens | Result |
+|---|---|---|
+| `steady` | 400 flows over every gateway pair, three fleets | pass / FAIL per flow |
+| `reroute` | 20 s in every return path moves to the next gateway, 40 s in every forward path | pass / FAIL |
+| `stateloss` | gw2 loses every flow it knows (the implementation's `lose_state`) | pass / FAIL |
+| `blackout` | gw2 is cut off from the sync while every flow starts | pass / FAIL |
+| `uplink` | gw2's uplink device is deleted and created again (new ifindex, same MAC) | pass / FAIL |
+| `latency` | new flows to a server at distance 0 that holds its first answer back by 0 to 1000 ms | from which delay on every answer passes: the sync latency, seen from outside |
+| `perf` | one flow at a time, nothing else running, no link latency | numbers, below |
+
+An event may cost packets from its start until 5 s after its end (the lab's
+timers are about ten times shorter than production's); a TCP connect may wait
+an event out; a reset is never excused.
+
+`perf` is a measurement (`ALONE = True`: labs and flows one after the other)
+on three gateways, each traffic over one gateway and over two:
+
+| Traffic | Result |
+|---|---|
+| `flood_up`, `flood_down` | packets per second through the path, and the kernel's ns per packet on the gateway that forwarded them |
+| `bulk` | Mbit/s of one TCP download |
+| `newflows` | new flows per second (500 to 12000) whose answer, 50 ms later, still gets through |
+
+Next to each: CPU time of the implementation's processes (user / system)
+plus the kernel's packet path, for the forward gateway, the return gateway
+and a gateway that only receives the sync. The kernel number comes from
+giving each gateway interface a receive thread of its own (threaded NAPI)
+and reading the threads' CPU time: firewall, connection tracking, tc
+programs and forwarding of that gateway, whatever the implementation.
+
+The numbers compare implementations; they are not a router's. Compare only
+runs from the same environment (all in the VM, or all on the host) on an
+otherwise idle machine: the same kernel path measured 579 and 747 ns per
+packet in two runs on a loaded host.

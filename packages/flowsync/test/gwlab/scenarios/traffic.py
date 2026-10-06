@@ -8,6 +8,8 @@ TRAFFIC = dict(
     udp_rr=dict(kind="udp_rr", requests=10, every=1),
     # a call or a QUIC download: both ends send for 50 s
     udp_stream=dict(kind="udp_stream", up_pps=10, down_pps=20, seconds=50),
+    # how late may the first answer be for the return gateway to know the flow?
+    ladder=dict(kind="udp_ladder", delays_ms=[0, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]),
 
     # measurements, for scenarios that run alone
     # small packets as fast as one core pushes them through the path
