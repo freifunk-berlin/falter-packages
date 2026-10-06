@@ -14,7 +14,9 @@ FLUSH = ("import socket, struct; s = socket.socket(socket.AF_NETLINK, socket.SOC
 
 def install(gw, extra_tables=""):
     gw.node.sysctl(**{"net.netfilter.nf_conntrack_" + k: v for k, v in gw.timers.conntrack().items()},
-                   **{"net.netfilter.nf_conntrack_checksum": 0})
+                   **{"net.netfilter.nf_conntrack_checksum": 0,
+                      # liberal: conntrack does not check TCP sequence numbers against what it saw
+                      "net.netfilter.nf_conntrack_tcp_be_liberal": int(gw.policy["liberal"])})
     p = gw.policy
     gw.node.nft("""
 table inet fw {

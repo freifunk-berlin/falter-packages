@@ -34,7 +34,7 @@ class Gateway:
     def __init__(self, lab, name, i, spec, policy):
         self.lab, self.name, self.i, self.timers = lab, name, i, lab.timers
         self.mesh_ms, self.uplink_ms = spec["mesh"], spec["uplink"]
-        self.policy = {"bypass": False, "offload": False, **policy}
+        self.policy = {"bypass": False, "offload": False, "liberal": False, **policy}
         self.node = Node.create(name)
         self.mesh6, self.uplink6, self.addr4 = "fd00:1::1:%x" % i, "fd00:2::1:%x" % i, "10.0.0.%d" % i
         self.peers4 = []
