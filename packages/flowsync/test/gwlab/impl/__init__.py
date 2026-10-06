@@ -11,10 +11,13 @@ peers' sync addresses, a policy and a directory) and never looks inside:
   start(gw)       start syncing (processes via gw.spawn, so their CPU is counted)
   stop(gw)
   lose_state(gw)  forget every flow, as a flush or a reboot would
+  bypassed(gw)    packets its firewall let through without knowing their flow
+                  (the stateless accept), per (source, destination)
 
 Options come from the command line (--set key=value), e.g. the binary to test.
 """
 import importlib
+import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,6 +44,20 @@ class Impl:
 
     def lose_state(self, gw):
         raise NotImplementedError
+
+    def bypassed(self, gw):
+        """{(source, destination): packets} from the set the firewalls here
+        keep for their stateless accept"""
+        try:
+            out = json.loads(gw.node.run("nft", "-j", "list", "set", "inet", "fw", "bypassed"))
+        except (RuntimeError, ValueError):
+            return {}
+        res = {}
+        for item in out["nftables"]:
+            for e in item.get("set", {}).get("elem", []):
+                e = e["elem"]
+                res[tuple(e["val"]["concat"])] = e.get("counter", {}).get("packets", 0)
+        return res
 
     def broken(self, timers):
         """reasons why this implementation's own timers no longer relate to

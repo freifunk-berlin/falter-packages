@@ -11,6 +11,7 @@ import sys
 import time
 
 from . import TEST, Impl, children
+from .ctfw import BYPASS, BYPASSED_SET
 from ..ns import kill
 
 MARK = 0x01000000
@@ -23,6 +24,7 @@ RULES = """
 table inet fw {
 	counter fwd_ack {}
 	counter fwd_rej {}
+%(set)s
 	chain forward {
 		type filter hook forward priority 0; policy drop;
 		meta nfproto ipv6 meta mark & 0x%(mark)08x == 0x%(mark)08x accept comment "flowsync"
@@ -66,11 +68,8 @@ class IMPL(Impl):
         return argv
 
     def install(self, gw):
-        bypass = ("\t\tmeta nfproto ipv6 tcp flags & ack == ack limit rate 5000/second "
-                  "burst 2500 packets counter name fwd_ack accept\n"
-                  "\t\tmeta nfproto ipv6 tcp flags & rst == rst limit rate 1000/second "
-                  "burst 500 packets accept") if gw.policy["bypass"] else ""
-        gw.node.nft(RULES % dict(mark=MARK, bypass=bypass))
+        gw.node.nft(RULES % dict(mark=MARK, set=BYPASSED_SET,
+                                 bypass=BYPASS if gw.policy["bypass"] else ""))
 
     def start(self, gw):
         argv = [sys.executable, os.path.join(TEST, "ptyrun.py"), self.bin,

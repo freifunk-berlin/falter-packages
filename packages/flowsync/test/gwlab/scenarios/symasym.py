@@ -11,11 +11,7 @@ first and the egress follows.
 Every client to every server, starting on each of the five gateways. The
 gateway a path moves to never saw the flow start."""
 from ..scenario import grid
-from .gw5 import FLEETS as GW5, GW, TOPOLOGY  # noqa: F401
-
-# besides the usual fleets: nothing stateless, but conntrack does not check TCP
-# sequence numbers against what it saw (nf_conntrack_tcp_be_liberal)
-FLEETS = dict(GW5, liberal={g: dict(bypass=False, liberal=True) for g in GW})
+from .gw5 import FLEETS, GW, TOPOLOGY  # noqa: F401
 
 FLOWS = [f for f in grid(traffic=["tcp_talk", "udp_stream"], client="AB", server="AB", fwd=GW, rev=GW)
          if f["fwd"] == f["rev"]]

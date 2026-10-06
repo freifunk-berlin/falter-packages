@@ -24,6 +24,12 @@ the end of the event to the last packet lost), not a verdict. What is judged:
 the flow delivers again before it ends, and loss before the event follows the
 rules above.
 
+The stateless accept for TCP (a fleet's bypass) may carry a flow exactly
+where loss is accepted above: at a start that cannot win the race, around an
+event. A flow that still needs it afterwards fails: the gateway its packets
+pass has no state for it, and the stateless rule only hides that while its
+budget lasts.
+
 Nothing ever excuses a reset or a stalled connection. If answers never passed
 in the measurement, nothing is accepted on an asymmetric path.
 
@@ -76,6 +82,17 @@ def judge(f, c, s, events=(), sync_ms=None):
         return ["no result from the %s" % ("client" if c is None or "crashed" in (c or {})
                                            else "server")], False, None
     return RULES[f["p"]["kind"]](f, c, s, Path(f, events, sync_ms))
+
+
+def bypass(f, quiet, sync_ms):
+    """quiet: (from, to, packets) for every stretch of the run without an event
+    and after the starts in which the gateways let packets of this flow through
+    statelessly. A flow that needs that has no state where its packets go: it
+    only looks fine as long as the stateless rule's budget lasts."""
+    if f["p"]["kind"] == "tcp_short" and Path(f, (), sync_ms).lost_start:
+        return []           # its connections start all the time, and may lose that race
+    return ["%d packets passed only through the stateless bypass, %d to %d s into the run"
+            % (n, a, b) for a, b, n in quiet]
 
 
 def udp_rr(f, c, s, x):

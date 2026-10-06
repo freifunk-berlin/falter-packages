@@ -113,6 +113,21 @@ def lab(args, opts):
             at += span(f["p"]) + 2
         cpu0 = {n: g.cpu_ms() for n, g in lb.gw.items()}
         windows = {}
+        shots = []                              # (seconds after t0, {(source, destination): packets bypassed})
+
+        def bypassed(t0):
+            total = {}
+            for g in lb.gw.values():
+                for k, n in impl.bypassed(g).items():
+                    total[k] = total.get(k, 0) + n
+            shots.append((time.monotonic() - t0, total))
+        # the stateless accept may carry a flow where the race cannot be won: at
+        # its start and around an event. In between it must not be needed:
+        # look at its counters when things have settled and before the next event
+        settle = (sync_ms or 0) / 1000 + 1      # the sync, and the endpoints' first retry
+        looks = [max(f["start"] for f in flows) + settle] if flows else []
+        for e in sorted(events, key=lambda e: e["at"]):
+            looks += [e["at"] - 0.3, e["at"] + e["seconds"] + settle]
 
         def during(t0):
             todo = []                           # (seconds after t0, what happens)
@@ -131,6 +146,8 @@ def lab(args, opts):
                     todo.append((e["at"] + e["seconds"], lambda g=g: lb.sync_blackout(g, False)))
                 else:
                     raise SystemExit("unknown event %r" % e["do"])
+            if not alone:
+                todo += [(at, lambda: bypassed(t0)) for at in looks]
             for at, act in sorted(todo, key=lambda x: x[0]):
                 time.sleep(max(0, t0 + at - time.monotonic()))
                 act()
@@ -144,7 +161,10 @@ def lab(args, opts):
                                 kernel=round(g.kernel_ms() - a[n][1]) if a[n][1] is not None else None)
                         for n, g in lb.gw.items()}
 
-        seen = traffic(lb, flows, out, "flows", during)
+        t_first = [0]
+        seen = traffic(lb, flows, out, "flows", lambda t0: (t_first.__setitem__(0, t0), during(t0)))
+        if not alone:
+            bypassed(t_first[0])
         gws = {}
         for n, g in lb.gw.items():
             c1 = g.cpu_ms()
@@ -158,7 +178,14 @@ def lab(args, opts):
     for f in flows:
         c, s = seen["client"].get(f["id"]), seen["server"].get(f["id"])
         bad, retry, recovery = expect.judge(f, c, s, events, sync_ms)
+        # the quiet stretches: from a look after things settled to the next look before an event
+        key, quiet = (f["s"], f["c"]), []
+        for (ta, a), (tb, b) in zip(shots[0::2], shots[1::2]):
+            if tb > ta and b.get(key, 0) > a.get(key, 0):
+                quiet.append((round(ta), round(tb), b.get(key, 0) - a.get(key, 0)))
+        bad += expect.bypass(f, quiet, sync_ms)
         res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, recovery=recovery,
+                        bypassed=shots[-1][1].get(key, 0) if shots else 0,
                         cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,

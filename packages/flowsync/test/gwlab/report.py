@@ -98,6 +98,7 @@ def render(run):
             sum(len(s.get("lost", [])) for s in sv),
             sum(len(c.get("lost", [])) + c.get("answered", []).count(False) for c in cl),
             max([c.get("outage_ms", 0) for c in cl] + [0]),
+            sum(r.get("bypassed", 0) for r in rs),
             "%d / %d" % (statistics.median(cms), max(cms)) if cms else "-",
         ])
         if run.get("events"):
@@ -105,7 +106,7 @@ def render(run):
             rows[-1].append("%.1f / %.1f (%d flows)" % (statistics.median(rec), max(rec), len(rec))
                             if rec else "-")
     out.append(table(rows, ["traffic", "path", "return gw", "flows", "pass", "FAIL", "needed retry",
-                            "lost c>s", "lost s>c", "worst gap ms", "connect ms p50 / max"]
+                            "lost c>s", "lost s>c", "worst gap ms", "bypassed pkts", "connect ms p50 / max"]
                      + (["recovery s p50 / max"] if run.get("events") else [])))
     out.append("")
     rows = []

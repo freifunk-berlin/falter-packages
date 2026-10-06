@@ -23,7 +23,7 @@ gateway. Implementations that need real root (BPF) run through `vm.sh`
 
 | File | What it is |
 |---|---|
-| `scenarios/gw5.py` | the topology (five gateways, ms per link, two clients, two servers) and the fleets: which gateway has the stateless ACK/RST bypass (`bypass`), which offloads (`offload`), which lets conntrack skip its TCP sequence check (`liberal`) |
+| `scenarios/gw5.py` | the topology (five gateways, ms per link, two clients, two servers) and the fleets: which gateway has the stateless ACK/RST bypass (`bypass`), which offloads (`offload`) |
 | `scenarios/traffic.py` | what a flow does: `tcp_short`, `tcp_talk`, `udp_rr`, `udp_stream` |
 | `scenarios/steady.py` | a scenario: the flows as a grid of traffic x client x server x forward gateway x return gateway |
 | `expect.py` | what "works" means, for any implementation |
@@ -133,7 +133,7 @@ what expires before what stays as on a gateway, and a run takes minutes.
 | `stateloss` | gw2 loses every flow it knows (the implementation's `lose_state`) | pass / FAIL |
 | `blackout` | gw2 is cut off from the sync while every flow starts | pass / FAIL |
 | `uplink` | gw2's uplink device is deleted and created again (new ifindex, same MAC) | pass / FAIL |
-| `symasym` | flows start on one gateway, are split over two and end on one again, twice: egress first, then ingress first. Extra fleet `liberal` | pass / FAIL |
+| `symasym` | flows start on one gateway, are split over two and end on one again, twice: egress first, then ingress first. | pass / FAIL |
 | `restart` | the sync software on gw2 is stopped and started again | pass / FAIL |
 | `idle` | connections fall silent for ten minutes, then the server speaks; ten more, then the client | pass / FAIL |
 | `syncloss` | gw2's sync path loses 30 % of its packets, all the time | pass / FAIL against the sync latency measured under that loss |
