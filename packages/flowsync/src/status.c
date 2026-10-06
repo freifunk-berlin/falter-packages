@@ -39,11 +39,12 @@ void log_counters(void)
 #undef X
 	if (len < sizeof(buf))
 		snprintf(buf + len, sizeof(buf) - len, " refresh_ms=%llu loop_max_ms=%llu "
-			 "local=%llu remote=%llu attached=%d fw_ok=%d",
+			 "local=%llu remote=%llu attached=%d fw_ok=%d alive=%d",
 			 (unsigned long long)gauge.refresh_ms,
 			 (unsigned long long)gauge.loop_max_ms,
 			 (unsigned long long)gauge.local,
-			 (unsigned long long)gauge.remote, gauge.attached, gauge.fw_ok);
+			 (unsigned long long)gauge.remote, gauge.attached, gauge.fw_ok,
+			 gauge.alive);
 	logmsg(LOG_INFO, "%s", buf);
 }
 
@@ -87,6 +88,7 @@ void write_status(void)
 	}
 	fprintf(f, "attached %d\n", gauge.attached);
 	fprintf(f, "fw_ok %d\n", gauge.fw_ok);
+	fprintf(f, "alive %d\n", gauge.alive);
 	fprintf(f, "bypass %d\n", gauge.bypass);
 	fprintf(f, "refresh_running %d\n", gauge.refresh_running);
 	fprintf(f, "refresh_entries %llu\n", (unsigned long long)gauge.refresh_entries);

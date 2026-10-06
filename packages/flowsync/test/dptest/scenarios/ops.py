@@ -13,7 +13,8 @@ from .common import rejects, replies, synced
 def daemon_down(env):
     """All daemons stop. New flows on a symmetric path still work (the
     programs stay on the uplink), an asymmetric flow lives until its copy
-    expires. After the restart the first round brings it back at once."""
+    expires; the alive elements expire, so what leaves is tracked again.
+    After the restart the first round brings the peer's flow back at once."""
     g0, g1 = env.g[:2]
     env.start()
     fa = env.flow("udp", fw=g0, rev=g1)
@@ -25,6 +26,8 @@ def daemon_down(env):
     fs.send()
     env.check("daemons down: a new symmetric flow passes (of 3)", replies(env, fs), 3)
     env.check("the asymmetric one still passes on g1's copy (of 3)", replies(env, fa), 3)
+    env.wait_for("the alive elements expire within alive_timeout", 12,
+                 lambda: not any(g.alive() for g in env.g), step=0.5)
     lp = env.loop(100, 1, fa.send)
     env.sleep(env.E + 2)
     env.check("after an element_timeout without announcements: rejected (of 2)",
@@ -32,6 +35,7 @@ def daemon_down(env):
     env.start()
     env.wait_for("restarted: g1 holds the flow again", 2, lambda: g1.ft(fa).remote, step=0.05)
     env.check("replies pass g1 again (of 3)", replies(env, fa), 3)
+    env.wait_for("the alive elements are back", 5, lambda: all(g.alive() for g in env.g), step=0.2)
     lp.stop()
 
 
@@ -93,8 +97,9 @@ def recreate_wan(env, g):
 @scenario(gateways=2)
 def uplink_recreate(env):
     """g0's uplink device is created anew. The daemon attaches the programs
-    to the new device as soon as it appears; old and new flows work, and the
-    flows from before are still in the map."""
+    to the new device as soon as it appears and writes the alive element for
+    its new index within a refresh; old and new flows work, and the flows
+    from before are still in the map."""
     g0, g1 = env.g[:2]
     env.start()
     f = env.flow("udp", fw=g0, rev=g0)
@@ -105,11 +110,52 @@ def uplink_recreate(env):
     f.reroute()
     env.wait_for("the daemon attached again at once (a link notification, not its tick)", 1,
                  lambda: g0.log().count("attached to uplink") >= 2, step=0.05)
+    env.wait_for("the alive element for the new device within a refresh", 5, g0.alive, step=0.2)
     env.check("the old flow passes again without a new packet out (of 3)", replies(env, f), 3)
     n = env.flow("udp", fw=g0, rev=g1)
     n.send()
     synced(env, n)
     env.check("a new flow is learned and announced", replies(env, n), 3)
+
+
+@scenario(gateways=2)
+def dead_uplink(env):
+    """No daemon, and the uplink device is created anew: no programs, the
+    table in place. The new device's index is not in the alive set, so what
+    leaves through it is tracked from the first packet and conntrack carries
+    a new symmetric flow at once; the old index's element expires on its own.
+    Nothing waits for a human. (Fails on the unconditional notrack table.)"""
+    g0 = env.g[0]
+    env.start()
+    f = env.flow("udp", fw=g0, rev=g0)
+    f.send()
+    env.check("replies pass (of 3)", replies(env, f), 3)
+    for g in env.g:
+        g.stop()
+    recreate_wan(env, g0)
+    f.reroute()
+    env.check("the table is still there, no programs on the new device",
+              [own_table(g0), "3780" in g0.node.run("tc", "filter", "show", "dev", "wan0",
+                                                     "egress", check=False)], [True, False])
+    n = env.flow("udp", fw=g0, rev=g0)
+    n.send()
+    env.check("a new symmetric flow passes on conntrack at once (of 3)", replies(env, n), 3)
+    env.check("conntrack accepted them", g0.fwc("est"), 3)
+    env.wait_for("the old index's element expires", 12,
+                 lambda: not re.search(r"timeout \d", g0.node.run("nft", "list", "set", "ip6",
+                                                                "flowsync", "alive", check=False)),
+                 step=0.5)
+    env.start()
+    env.wait_for("the daemon is back, and the element for the new device", 5, g0.alive, step=0.2)
+    env.check("nothing rejected", rejects(env), 0)
+
+
+def cpu_ticks(g):
+    """user + system clock ticks the daemon has used"""
+    pid = children(g.proc.pid)[0]         # ptyrun's child: the daemon
+    with open("/proc/%d/stat" % pid) as st:
+        f = st.read().rsplit(")", 1)[1].split()
+    return int(f[11]) + int(f[12])
 
 
 def rule_present(g):
@@ -119,11 +165,14 @@ def rule_present(g):
 @scenario(gateways=2)
 def rules(env):
     """What the datapath needs is put back when it disappears: the accept
-    rule after a firewall reload without it, the notrack table, and the
+    rule after a firewall reload without it, the notrack table with its alive
+    element, and the
     programs on the uplink."""
     g0 = env.g[0]
     env.start()
     f = env.flow("udp", fw=g0, rev=g0)
+    f.send()                # learned before the first reply, whatever the neighbours' timing
+    env.sleep(0.2)
     lp = env.loop(100, 1, f.send)
     env.check("replies pass (of 3)", replies(env, f), 3)
 
@@ -137,9 +186,9 @@ def rules(env):
     env.true("it sits behind the MSS clamp and before the established rule",
              chain.index("maxseg") < chain.index("flowsync") < chain.index("ct state"))
 
-    g0.node.sh("nft delete table inet flowsync")
-    env.wait_for("the notrack table is back", 2,
-                 lambda: g0.node.ok("nft", "list", "table", "inet", "flowsync"), step=0.1)
+    g0.node.sh("nft delete table ip6 flowsync")
+    env.wait_for("the notrack table is back", 2, lambda: own_table(g0), step=0.1)
+    env.wait_for("with the alive element", 5, g0.alive, step=0.2)
 
     g0.node.sh("tc filter del dev wan0 ingress; tc filter del dev wan0 egress")
     env.wait_for("the programs are back at once", 1,
@@ -176,31 +225,31 @@ def rules_idle(env):
 @scenario(gateways=2)
 def bootstrap(env):
     """The first start on a gateway that tracked its flows with conntrack: the
-    accept rule and the programs come at once, the notrack table one interval
-    later, when the running flows have sent a packet and are in the map. A
-    busy flow sees no rejected packet over the change."""
+    accept rule, the programs, the table and the alive element come at once.
+    A flow that was running keeps passing: on conntrack until its next packet
+    puts it in the map, on the mark from then on. Nothing is rejected, no
+    interval passes."""
     g0 = env.g[0]
-    g0.node.sh("nft delete table inet flowsync; nft delete table inet fw")
+    g0.node.sh("nft delete table ip6 flowsync; nft delete table inet fw")
     g0.node.nft(g0.ruleset(accept_rule=False))
     f = env.flow("udp", fw=g0, rev=g0)
     f.send()
     env.check("before: conntrack accepts the replies (of 3)", replies(env, f), 3)
     env.check("accepted as established", g0.fwc("est"), 3)
     d0 = f.delivered("rev")
-    lp = env.loop(100, 0.5, f.send)
-    rl = env.loop(1000, 0.1, lambda: f.send("rev"))
+    rl = env.loop(1000, 0.1, lambda: f.send("rev"))    # the client stays silent
     env.start()
-    env.sleep(1)
-    env.check("no notrack table in the first interval",
-              g0.node.ok("nft", "list", "table", "inet", "flowsync"), False)
-    env.wait_for("the notrack table is there after one interval", env.I + 3,
-                 lambda: g0.node.ok("nft", "list", "table", "inet", "flowsync"), step=0.2)
+    env.wait_for("the table and the alive element are there within a second", 2,
+                 lambda: own_table(g0) and g0.alive(), step=0.1)
     env.sleep(2)
+    env.check("the silent flow's replies kept arriving, on conntrack",
+              f.delivered("rev") - d0, lambda n: n >= 15)
+    f.send()                                            # learned, untracked from here
+    env.wait_for("the flow is in the map", 1, lambda: g0.ft(f).local, step=0.05)
+    env.sleep(0.5)
     rl.stop()
-    lp.stop()
     env.sleep(0.3)
     env.check("nothing rejected over the change", g0.fwc("rej"), 0)
-    env.check("replies kept arriving", f.delivered("rev") - d0, lambda n: n >= 30)
     e0 = g0.fwc("est")
     env.check("replies pass on the mark now (of 3)", replies(env, f), 3)
     env.check("conntrack no longer sees them", g0.fwc("est") - e0, 0)
@@ -261,7 +310,7 @@ def forward_chain(g):
 
 
 def own_table(g):
-    return g.node.ok("nft", "list", "table", "inet", "flowsync")
+    return g.node.ok("nft", "list", "table", "ip6", "flowsync")
 
 
 @scenario(gateways=2)
@@ -285,11 +334,11 @@ def mark_mismatch(env):
 @scenario(gateways=2)
 def fail_open(env):
     """The programs cannot be attached (a foreign filter sits where the
-    egress program belongs): nothing would learn new flows, and with forwarded
-    IPv6 untracked every reply would be rejected. After one interval the
-    daemon takes its notrack table away and conntrack carries the flows on a
-    symmetric path, as before flowsync. Once the programs are back the table
-    returns, again one interval later."""
+    egress program belongs). The daemon keeps the alive element out of the
+    set, so what leaves is tracked and conntrack carries the flows on a
+    symmetric path, as before flowsync; the stale element of the last run is
+    taken away at the first look. Once the programs are back, the element
+    follows within a refresh."""
     g0 = env.g[0]
     env.start()
     g0.stop()           # or it would have its program back before the other filter is in
@@ -297,26 +346,28 @@ def fail_open(env):
                "protocol all matchall action ok")
     g0.start()
     env.wait_for("the daemon cannot attach", 3, lambda: "attach egress" in g0.log(), step=0.1)
-    env.wait_for("the notrack table is gone after an interval", env.I + 3,
-                 lambda: not own_table(g0), step=0.2)
-    env.check("the daemon says so", g0.log(), "falling back to conntrack")
+    c0 = cpu_ticks(g0)
+    env.wait_for("the table is there, the alive element is not", 3,
+                 lambda: own_table(g0) and not g0.alive(), step=0.2)
+    env.check("the daemon says so", g0.log(), "alive element removed")
     f = env.flow("udp", fw=g0, rev=g0)
     f.send()
     env.check("a new symmetric flow passes (of 3)", replies(env, f), 3)
     env.check("conntrack accepted the replies", g0.fwc("est"), 3)
     g0.tick()
-    env.check("status: not attached, rules not in place", [g0.st("attached"), g0.st("fw_ok")],
-              [0, 0])
-    env.check("the daemon does not spin on its own failed attempts (log lines)",
-              g0.log().count("attach egress"), lambda n: n <= 3)
+    env.check("status: not attached, rules in place, not alive",
+              [g0.st("attached"), g0.st("fw_ok"), g0.st("alive")], [0, 1, 0])
+    # a daemon that retries on every notification of its own half-done attach
+    # burns a CPU (about 90 ticks a second); its log would not show it
+    env.check("the daemon does not spin on its own failed attempts (CPU ticks while "
+              "it could not attach)", cpu_ticks(g0) - c0, lambda n: n < 30)
 
     g0.node.sh("tc filter del dev wan0 egress prio 3780")
     env.wait_for("the programs are back within moments, not at the next tick", 2.5,
                  lambda: g0.log().count("attached to uplink") >= 2, step=0.05)
-    env.check("no notrack table yet: the flows must be learned first", own_table(g0), False)
+    env.wait_for("the alive element follows within a refresh", 5, g0.alive, step=0.2)
     lp = env.loop(100, 0.5, f.send)
-    env.wait_for("the notrack table is back after an interval", env.I + 3, lambda: own_table(g0),
-                 step=0.2)
+    env.sleep(1)
     e0 = g0.fwc("est")
     env.check("replies pass, and not on conntrack any more (of 3)",
               [replies(env, f), g0.fwc("est") - e0], [3, 0])
@@ -327,9 +378,9 @@ def fail_open(env):
 @scenario(gateways=2)
 def load_failure(env):
     """A daemon that cannot load its programs (here: no object file) leaves
-    the programs of the last run on the uplink with their flow tables, and
-    hands forwarded IPv6 back to conntrack. The next start that works finds
-    every flow."""
+    the programs of the last run on the uplink with their flow tables and the
+    table; the alive element expires on its own, so what leaves is tracked.
+    The next start that works finds every flow and refreshes the element."""
     g0, g1 = env.g[:2]
     env.start()
     fa = env.flow("udp", fw=g0, rev=g1)
@@ -342,17 +393,19 @@ def load_failure(env):
     env.wait_for("the daemon says why it gives up", 3,
                  lambda: "/nonexistent/flowsync.o" in g1.log(), step=0.1)
     env.wait_for("and is gone", 3, lambda: not children(g1.proc.pid), step=0.1)
-    env.check("it took the notrack table with it: nobody looks after the programs now",
-              own_table(g1), False)
+    env.check("the table stays", own_table(g1), True)
     env.check("the flow tables are still there: the peer's flow, its own",
               [g1.ft(fa).remote, g1.ft(fs).local], [True, True])
-    env.check("replies pass, both flows (of 6)", replies(env, fa) + replies(env, fs), 6)
+    env.check("replies pass on the last run's programs, both flows (of 6)",
+              replies(env, fa) + replies(env, fs), 6)
+    env.wait_for("the alive element expires: nobody refreshes it", 12, lambda: not g1.alive(),
+                 step=0.5)
+    env.check("nothing rejected", rejects(env), 0)
     g1.start()
     env.wait_for("a start that works", 5, g1.up)
-    env.check("found both flows", [g1.ft(fa).remote, g1.ft(fs).local], [True, True])
-    env.wait_for("the notrack table is back after an interval", env.I + 3, lambda: own_table(g1),
-                 step=0.2)
-    env.check("nothing rejected", rejects(env), 0)
+    env.check("its own flow is still there", g1.ft(fs).local, True)
+    env.wait_for("the peer's flow is back (resync)", 3, lambda: g1.ft(fa).remote, step=0.05)
+    env.wait_for("the alive element is back", 5, g1.alive, step=0.2)
 
 
 @scenario(gateways=2)

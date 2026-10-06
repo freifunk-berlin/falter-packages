@@ -89,6 +89,8 @@ static int apply_option(const char *name, const char *val)
 		return opt_uint(name, val, 1, 1000000, &cfg.tx_rate, 10);
 	} else if (!strcmp(name, "rcvbuf")) {
 		return opt_uint(name, val, 4096, INT_MAX / 2, &cfg.rcvbuf, 10);
+	} else if (!strcmp(name, "alive_timeout")) {
+		return opt_uint(name, val, 3, 3600, &cfg.alive_timeout, 10);
 	} else if (!strcmp(name, "uplink")) {
 		if (!*val || strlen(val) >= sizeof(cfg.uplink)) {
 			logmsg(LOG_ERR, "option %s: invalid device name '%s'", name, val);
@@ -163,7 +165,7 @@ static const struct {
 	{ 'I', "interface",        "interface",        "DEV",   "accept sync datagrams on this device only" },
 	{ 'U', "uplink",           "uplink",           "DEV",
 	  "the device to the Internet, where the programs attach (interface)" },
-	{ 'p', "port",             "port",             "N",     "UDP port (3780)" },
+	{ 'p', "port",             "port",             "N",     "UDP port (3994)" },
 	{ 'i', "interval",         "interval",         "SEC",   "refresh and log interval (30)" },
 	{ 't', "element-timeout",  "element_timeout",  "SEC",   "lifetime of a peer's flow after its last announcement (90)" },
 	{ 'l', "batch-lines",      "batch_lines",      "N",     "records per datagram, 1..34 (30)" },
@@ -171,6 +173,8 @@ static const struct {
 	{ 'R', "resync-rate",      "resync_rate",      "N",
 	  "the same for a round that answers a resync request, 0: 4 x tx_rate (0)" },
 	{ 'B', "rcvbuf",           "rcvbuf",           "BYTES", "socket receive buffers (8388608)" },
+	{ 'A', "alive-timeout",    "alive_timeout",    "SEC",
+	  "forwarded IPv6 stays untracked this long after the programs were last seen (10)" },
 	{ 'm', "mark",             "mark",             "HEX",   "packet mark of accepted packets (0x01000000)" },
 	{ 'F', "max-flows",        "max_flows",        "N",     "most flows of our own: the local map (131072)" },
 	{ 'C', "max-remote",       "max_remote",       "N",     "most flows held for the peers: the remote map (131072)" },
@@ -234,12 +238,13 @@ int parse_args(int argc, char **argv)
 	int c, ret = 0;
 
 	memset(&cfg, 0, sizeof(cfg));
-	cfg.port = 3780;
+	cfg.port = 3994;
 	cfg.interval = 30;
 	cfg.element_timeout = 90;
 	cfg.batch_lines = MAX_BATCH;
 	cfg.tx_rate = 500;
 	cfg.rcvbuf = 8388608;
+	cfg.alive_timeout = 10;
 	cfg.mark = 0x01000000;
 	cfg.max_flows = 131072;
 	cfg.max_remote = 131072;

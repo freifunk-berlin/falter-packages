@@ -3,11 +3,18 @@
 /*
  * The nftables rules the datapath needs, and keeping them in place.
  *
- * 1. Our own table: forwarded IPv6 bypasses conntrack (notrack for every
- *    packet whose destination is not this host). Installed one interval after
- *    the programs were attached, so that flows from before have sent a
- *    packet and are in the local map by then; until then conntrack still
- *    accepts their replies.
+ * 1. Our own table (ip6 flowsync): two notrack rules at prerouting.
+ *    - A packet the ingress program marked is untracked: its flow is in the
+ *      tables, the firewall accepts it on the mark.
+ *    - A packet routed out of the uplink is untracked while the uplink's
+ *      interface index is in the set `alive`. The element lives
+ *      alive_timeout seconds; the daemon refreshes it every third of that,
+ *      each time after seeing both programs on the uplink, and deletes it
+ *      the moment it finds them gone. Without the daemon, or without the
+ *      programs, the element expires and conntrack tracks the forwarded
+ *      flows as it did before flowsync: replies of a flow it saw leave pass
+ *      on `ct state established`. An expired element never rejects
+ *      anything, it only tracks; so the switch is tight and nothing waits.
  * 2. One rule in the firewall's forward chain: accept what the ingress
  *    program marked. An accept in a table of our own would not do, the
  *    firewall's chain still sees the packet and rejects it. The package
@@ -15,22 +22,20 @@
  *    on, and after every reload); here it is checked and, if it is missing
  *    or names another mark than ours, put right.
  *
- * The table makes the gateway depend on the programs: what conntrack no
- * longer sees, only they can accept. When they cannot be on the uplink, or
- * the rule cannot be put in, for a whole interval, the table is taken away
- * again and conntrack carries the flows on a symmetric path, as it did before
- * flowsync. It comes back as at the first start.
- *
- * Both are looked at when the ruleset changes (a netlink notification), when
- * the programs come or go, and when time has made a step due; every interval
- * only while something is wrong or there are no notifications. The rules are
- * read and written with the nft tool: two short runs per look.
+ * Both are looked at when the ruleset changes (a netlink notification that
+ * is not our own element refresh), when the programs come or go, and every
+ * interval while something is wrong or there are no notifications. The
+ * table and the rule are read and written with the nft tool; the element is
+ * written over netlink by the daemon itself, without a fork, every few
+ * seconds.
  */
 
 #include <errno.h>
 #include <fcntl.h>
+#include <net/if.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netlink.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,17 +45,23 @@
 
 #include "flowsync.h"
 
-#define OWN_TABLE	"flowsync"
+#define OWN_TABLE	NFNL_TABLE
+#define ALIVE_SET	NFNL_ALIVE_SET
 #define RULE_TAG	"comment \"flowsync\""
 #define RULE_FILE	"/usr/share/nftables.d/chain-pre/forward/10-flowsync.nft"
 #define SETTLE_MS	500
+#define ACK_WAIT_MS	200
 
-static int gen_fd = -1;
+static int gen_fd = -1;		/* ruleset change notifications */
+static int alive_fd = -1;	/* our element writes */
+static uint32_t alive_port;	/* that socket's port id: our own notifications */
 static bool dirty = true;
 static uint64_t dirty_at;
-static uint64_t works_since;	/* the datapath accepts its flows since; 0: it does not */
-static uint64_t broken_since;	/* ... cannot since; 0: it can */
-static uint64_t due;		/* a look that time alone makes necessary; 0: none */
+static uint64_t retry;		/* a failed write is tried again then; 0: none */
+static uint64_t alive_at;	/* the element was last written */
+static bool alive_set = true;	/* ... and not deleted since; an earlier run may have
+				 * left one: taken away at the first look without programs */
+static unsigned int alive_ifindex;	/* the index it was written for */
 
 /* run nft; script goes to its stdin if given, its stdout into out. Returns
  * its exit status, -1 if it could not be run. */
@@ -121,39 +132,102 @@ fail:
 
 static bool own_table_present(void)
 {
-	char *argv[] = { "nft", "list", "table", "inet", OWN_TABLE, NULL };
+	char *argv[] = { "nft", "list", "table", "ip6", OWN_TABLE, NULL };
 
 	return nft(argv, NULL, NULL, 0) == 0;
 }
 
 /*
- * "unicast": routed, not one of our addresses and not multicast, i.e. what
- * will be forwarded. The second chain is never run; a conntrack expression
- * anywhere in the ruleset keeps the kernel's defragmentation hooked in, which
- * the marks of fragmented packets rely on (see bpf/flowsync.bpf.c).
+ * The table, created or replaced in one transaction (add on an existing
+ * table is nothing, delete takes it away, the definition brings it back:
+ * there is no moment without it). With the programs on the uplink the
+ * element comes along, so that a replace never drops the heartbeat. The
+ * second chain is never run: a conntrack expression anywhere in the ruleset
+ * keeps the kernel's defragmentation hooked in, which the marks of
+ * fragmented packets rely on (see bpf/flowsync.bpf.c).
  */
-static int own_table_install(void)
+static int own_table_apply(void)
 {
 	char *argv[] = { "nft", "-f", "-", NULL };
-	static const char script[] =
-		"table inet " OWN_TABLE " {\n"
-		"	chain prerouting {\n"
-		"		type filter hook prerouting priority raw; policy accept;\n"
-		"		meta nfproto ipv6 fib daddr type unicast notrack\n"
-		"	}\n"
-		"	chain defrag {\n"
-		"		ct state untracked accept\n"
-		"	}\n"
-		"}\n";
+	char script[1024], elem[96] = "";
+	unsigned int ifindex = gauge.attached ? dp_ifindex() : 0;
 
-	return nft(argv, script, NULL, 0);
+	if (ifindex)
+		snprintf(elem, sizeof(elem), "\t\telements = { %u timeout %lus expires %lus }\n",
+			 ifindex, cfg.alive_timeout, cfg.alive_timeout);
+	snprintf(script, sizeof(script),
+		 "add table ip6 " OWN_TABLE "\n"
+		 "delete table ip6 " OWN_TABLE "\n"
+		 "table ip6 " OWN_TABLE " {\n"
+		 "	set " ALIVE_SET " {\n"
+		 "		type iface_index\n"
+		 "		flags timeout\n"
+		 "%s"
+		 "	}\n"
+		 "	chain prerouting {\n"
+		 "		type filter hook prerouting priority raw; policy accept;\n"
+		 "		meta mark & 0x%08lx == 0x%08lx notrack\n"
+		 "		fib daddr oif @" ALIVE_SET " notrack\n"
+		 "	}\n"
+		 "	chain defrag {\n"
+		 "		ct state untracked accept\n"
+		 "	}\n"
+		 "}\n", elem, cfg.mark, cfg.mark);
+	if (nft(argv, script, NULL, 0))
+		return -1;
+	alive_set = ifindex != 0;
+	if (ifindex) {
+		alive_at = mono_ms();
+		alive_ifindex = ifindex;
+	}
+	return 0;
 }
 
 static int own_table_remove(void)
 {
-	char *argv[] = { "nft", "delete", "table", "inet", OWN_TABLE, NULL };
+	char *argv[] = { "nft", "delete", "table", "ip6", OWN_TABLE, NULL };
 
 	return nft(argv, NULL, NULL, 0);
+}
+
+/* write the element (add) or take it away; 0, or -errno */
+static int alive_write(bool add, unsigned int ifindex)
+{
+	static uint32_t seq = 1;
+	char buf[512];
+	struct nlmsghdr *h;
+	struct nlmsgerr *e;
+	struct pollfd pfd = { .fd = alive_fd, .events = POLLIN };
+	size_t len;
+	ssize_t n;
+	int err = 0;
+
+	if (alive_fd < 0)
+		return -EBADF;
+	len = nfnl_alive_msg(buf, sizeof(buf), add, ifindex, cfg.alive_timeout, seq, alive_port);
+	seq += 3;
+	if (!len)
+		return -EMSGSIZE;
+	if (send(alive_fd, buf, len, 0) < 0)
+		return -errno;
+	/* the ack of the one message that asked for it */
+	for (;;) {
+		if (poll(&pfd, 1, ACK_WAIT_MS) <= 0)
+			return -ETIMEDOUT;
+		n = recv(alive_fd, buf, sizeof(buf), MSG_DONTWAIT);
+		if (n < 0) {
+			if (errno == EINTR || errno == EAGAIN)
+				continue;
+			return -errno;
+		}
+		for (h = (struct nlmsghdr *)buf; NLMSG_OK(h, (size_t)n); h = NLMSG_NEXT(h, n)) {
+			if (h->nlmsg_type != NLMSG_ERROR)
+				continue;
+			e = NLMSG_DATA(h);
+			err = e->error;
+			return err;
+		}
+	}
 }
 
 /*
@@ -235,21 +309,21 @@ static int fw_rules_fix(const char *listing, bool *replaced)
 	return nft(argv, script, NULL, 0) ? -1 : 1;
 }
 
+/* the rule and the table: there, or put there; what fails is tried again
+ * after an interval, without waiting for a change */
 static void fw_check(void)
 {
 	static char buf[65536];
 	static uint64_t last_log;
-	static bool inserted_before;
-	uint64_t now = mono_ms(), wait = cfg.interval * 1000;
-	/* can the datapath accept what conntrack no longer sees? */
-	bool works = gauge.attached, ok = true, have, replaced;
+	static bool inserted_before, table_before;
+	uint64_t now = mono_ms();
+	bool ok = true, replaced;
 	int r;
 
 	dirty = false;
-	due = 0;
+	retry = 0;
 
 	if (fw_chain_list(buf, sizeof(buf))) {
-		/* no chain rejects anything either: nothing to fall back from */
 		ok = false;
 		if (log_ok(&last_log))
 			logmsg(LOG_ERR, "no chain forward in table inet %s: nothing accepts the "
@@ -257,7 +331,7 @@ static void fw_check(void)
 	} else {
 		r = fw_rules_fix(buf, &replaced);
 		if (r < 0) {
-			ok = works = false;
+			ok = false;
 			if (log_ok(&last_log))
 				logmsg(LOG_ERR, "could not add the accept rule to inet %s forward",
 				       cfg.fw_table);
@@ -278,70 +352,45 @@ static void fw_check(void)
 		}
 	}
 
-	if (works) {
-		broken_since = 0;
-		if (!works_since)
-			works_since = now;
+	if (own_table_present()) {
+		table_before = true;
 	} else {
-		works_since = 0;
-		if (!broken_since)
-			broken_since = now;
-	}
-
-	have = own_table_present();
-	if (works && !have) {
-		/* not before the programs are on the uplink, and learning for one
-		 * interval: without them nothing would be accepted any more */
-		if (now - works_since < wait) {
-			due = works_since + wait;
-		} else if (own_table_install()) {
+		if (own_table_apply()) {
+			ok = false;
 			if (log_ok(&last_log))
-				logmsg(LOG_ERR, "could not install table inet " OWN_TABLE
+				logmsg(LOG_ERR, "could not install table ip6 " OWN_TABLE
 				       " (kmod-nft-fib?)");
 		} else {
-			have = true;
-			logmsg(LOG_NOTICE, "table inet " OWN_TABLE " installed: forwarded IPv6 "
-			       "bypasses conntrack");
-		}
-	} else if (!works && have) {
-		/* not at once: netifd creating the uplink anew is over in a moment,
-		 * and the flows would have to be learned again */
-		if (now - broken_since < wait) {
-			due = broken_since + wait;
-		} else if (!own_table_remove()) {
-			have = false;
-			logmsg(LOG_ERR, "%s for %lu s: table inet " OWN_TABLE " removed, falling back "
-			       "to conntrack (flows on a symmetric path only) until that is over",
-			       gauge.attached ? "no accept rule in the firewall" :
-			       "the programs are not on the uplink", cfg.interval);
+			cnt.fw_repaired++;
+			logmsg(table_before ? LOG_WARNING : LOG_NOTICE,
+			       "table ip6 " OWN_TABLE " %s: forwarded IPv6 bypasses conntrack "
+			       "while the programs are on the uplink", table_before ?
+			       "was gone, installed again (something deleted it: conntrack "
+			       "tracked forwarded IPv6 meanwhile)" : "installed");
+			table_before = true;
 		}
 	}
-	if (!works || !have)
-		ok = false;
-	/* what failed is tried again, without waiting for a change */
-	if (!ok && !due)
-		due = now + wait;
+	if (!ok)
+		retry = now + cfg.interval * 1000;
 	gauge.fw_ok = ok;
 	logmsg(LOG_DEBUG, "rules: looked, %s", ok ? "in place" : "not in place");
 }
 
-/*
- * The daemon cannot start. Programs of an earlier run may still be on the
- * uplink, but nobody would put them back when they go: forwarded IPv6 is
- * conntrack's again.
- */
-void fw_fallback(void)
-{
-	if (own_table_present() && !own_table_remove())
-		logmsg(LOG_ERR, "table inet " OWN_TABLE " removed: falling back to conntrack "
-		       "(flows on a symmetric path only)");
-}
-
-/* ruleset change notifications */
+/* ruleset change notifications, and the socket for the element */
 int fw_open(void)
 {
 	struct sockaddr_nl sa = { .nl_family = AF_NETLINK,
 				  .nl_groups = 1u << (NFNLGRP_NFTABLES - 1) };
+	struct sockaddr_nl me = { .nl_family = AF_NETLINK };
+	socklen_t mlen = sizeof(me);
+
+	alive_fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_NETFILTER);
+	if (alive_fd < 0 || bind(alive_fd, (struct sockaddr *)&me, sizeof(me)) ||
+	    getsockname(alive_fd, (struct sockaddr *)&me, &mlen)) {
+		logmsg(LOG_ERR, "nftables socket: %s", strerror(errno));
+		return -1;
+	}
+	alive_port = me.nl_pid;
 
 	gen_fd = socket(AF_NETLINK, SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC, NETLINK_NETFILTER);
 	if (gen_fd < 0 || bind(gen_fd, (struct sockaddr *)&sa, sizeof(sa))) {
@@ -359,14 +408,37 @@ int fw_fd(void)
 	return gen_fd;
 }
 
-/* something changed the ruleset (or the socket overran: the same to us) */
+/*
+ * Something changed the ruleset. Our own element writes notify us too, three
+ * times every few seconds; they carry our port id and are not a change to
+ * look at. What the nft tool wrote for us is, like anybody's change: the
+ * look finds nothing to do. An overrun is a change: something may be lost.
+ */
 void fw_handle(void)
 {
 	char buf[8192];
+	struct nlmsghdr *h;
+	bool foreign = false;
+	ssize_t n;
 
-	while (recv(gen_fd, buf, sizeof(buf), MSG_DONTWAIT) > 0 || errno == ENOBUFS)
-		;
-	if (!dirty) {
+	for (;;) {
+		n = recv(gen_fd, buf, sizeof(buf), MSG_DONTWAIT);
+		if (n < 0) {
+			if (errno == ENOBUFS) {
+				foreign = true;
+				continue;
+			}
+			if (errno == EINTR)
+				continue;
+			break;
+		}
+		if (n == 0)
+			break;
+		for (h = (struct nlmsghdr *)buf; NLMSG_OK(h, (size_t)n); h = NLMSG_NEXT(h, n))
+			if (h->nlmsg_pid != alive_port)
+				foreign = true;
+	}
+	if (foreign && !dirty) {
 		dirty = true;
 		dirty_at = mono_ms();
 	}
@@ -374,9 +446,7 @@ void fw_handle(void)
 
 /*
  * Main loop, every iteration: look once a change of the ruleset has settled,
- * when the programs came or went, and when a step is due. Our own changes
- * notify us too and cost one more look, which finds nothing to do: dropping
- * those notifications unseen would drop a foreign change that came with them.
+ * when the programs came or went, and when a failed write is due again.
  * Without notifications: every interval.
  */
 void fw_tick(void)
@@ -386,11 +456,59 @@ void fw_tick(void)
 	uint64_t now = mono_ms();
 
 	if ((dirty && now - dirty_at >= SETTLE_MS) || gauge.attached != was_attached ||
-	    (due && now >= due) || (gen_fd < 0 && now - last >= cfg.interval * 1000)) {
+	    (retry && now >= retry) || (gen_fd < 0 && now - last >= cfg.interval * 1000)) {
 		last = now;
 		was_attached = gauge.attached;
 		fw_check();
 	}
+}
+
+/*
+ * Main loop, every iteration: the heartbeat. While the rules are in place,
+ * every third of alive_timeout: look at the uplink (dp_tick: cheap while the
+ * programs are there) and, if both programs are on it, write the element.
+ * The moment they are not, take the element away; the next refresh after
+ * they are back puts it there again.
+ */
+void fw_alive_tick(void)
+{
+	static uint64_t last_log;
+	uint64_t now = mono_ms(), refresh = cfg.alive_timeout * 1000 / 3;
+	int err;
+
+	if (gauge.fw_ok && (!alive_set || now - alive_at >= refresh)) {
+		dp_tick();
+		if (gauge.attached) {
+			alive_ifindex = dp_ifindex();
+			err = alive_write(true, alive_ifindex);
+			if (err) {
+				if (log_ok(&last_log))
+					logmsg(LOG_WARNING, "alive element: %s", strerror(-err));
+				/* not written: let it expire rather than pretend */
+				alive_set = false;
+			} else {
+				alive_at = now;
+				if (!alive_set)
+					logmsg(LOG_NOTICE, "uplink %s (ifindex %u) alive: forwarded "
+					       "IPv6 bypasses conntrack", cfg.uplink, dp_ifindex());
+				alive_set = true;
+			}
+		}
+	}
+	if (alive_set && (!gauge.attached || !gauge.fw_ok)) {
+		/* an element of an earlier run is the current device's, unless the
+		 * device went with it: then there is nothing to delete */
+		if (!alive_ifindex)
+			alive_ifindex = if_nametoindex(cfg.uplink);
+		err = alive_write(false, alive_ifindex);
+		if (err && err != -ENOENT && log_ok(&last_log))
+			logmsg(LOG_WARNING, "alive element: delete: %s", strerror(-err));
+		alive_set = false;
+		logmsg(LOG_NOTICE, "%s: alive element removed, conntrack tracks forwarded IPv6 "
+		       "until the programs are back", gauge.attached ? "rules not in place" :
+		       "the programs are not on the uplink");
+	}
+	gauge.alive = alive_set;
 }
 
 /* the detach command: our table and the accept rule go */

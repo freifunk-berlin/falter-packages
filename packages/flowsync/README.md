@@ -8,8 +8,9 @@ enters through gateway B. Both run a stateful firewall towards the mesh: a
 packet from the Internet is forwarded only if it belongs to a flow a client
 started. With flowsync that state is not a conntrack entry:
 
-- **Forwarded IPv6 bypasses conntrack** (`notrack`). conntrack stays in charge
-  of what the gateway itself sends and receives, and of IPv4.
+- **Forwarded IPv6 bypasses conntrack** (`notrack`) while the programs are on
+  the uplink. conntrack stays in charge of what the gateway itself sends and
+  receives, and of IPv4.
 - **Two tc programs on the uplink device** keep and consult two BPF maps.
   *Egress*: every forwarded IPv6 packet leaving through the uplink keeps its
   flow alive in the **local** map. *Ingress*: a packet from the uplink whose
@@ -54,13 +55,18 @@ OpenWrt package build is untested (see "Open points").
   loads the programs anew, reuses the maps and replaces the filters in place.
 - **No flow, no way in.** What the programs do not mark meets the stateless
   rules and the reject, as unsolicited traffic does.
-- **Without a working datapath, back to conntrack.** With forwarded IPv6
-  untracked, only the programs can accept a reply. When they cannot be on the
-  uplink, or the accept rule cannot be put into the firewall, for a whole
-  `interval`, the daemon takes its notrack table away: conntrack carries the
-  flows on a symmetric path, as it did before flowsync, and the asymmetric
-  ones wait. The table returns one `interval` after the datapath works again.
-  A daemon that cannot start at all removes the table on its way out.
+- **Without the programs, back to conntrack, by itself.** With forwarded
+  IPv6 untracked, only the programs can accept a reply. So what leaves
+  through the uplink is untracked only while its interface index is in a
+  set with a timeout, `alive_timeout` (10 s), which the daemon refreshes every
+  third of that, each time after seeing both programs on the uplink, and
+  deletes the moment it finds them gone; what comes in is untracked on the
+  mark. An expired element tracks, it never rejects: without the daemon, or
+  without the programs, conntrack carries the flows on a symmetric path
+  within `alive_timeout`, as it did before flowsync, and the asymmetric ones
+  wait. Flows conntrack carried keep passing on their entries after the
+  programs are back, until they are in the map. No interval, no learning
+  phase, nothing a human has to end.
 - **One thread, no blocking.** New-flow events, datagrams and the map walks
   are driven from one `poll()` loop.
 
@@ -129,18 +135,33 @@ transport header themselves.
 Two things in nftables, both kept in place by the daemon (it is told when the
 ruleset changes, and looks every `interval`):
 
-1. **Table `inet flowsync`**, the daemon's own, untouched by `fw4 reload`:
+1. **Table `ip6 flowsync`**, the daemon's own, untouched by `fw4 reload`:
 
+       set alive {
+           type iface_index
+           flags timeout
+       }
        chain prerouting {
            type filter hook prerouting priority raw; policy accept;
-           meta nfproto ipv6 fib daddr type unicast notrack
+           meta mark & 0x01000000 == 0x01000000 notrack
+           fib daddr oif @alive notrack
        }
 
-   `unicast` is what will be forwarded: routed, not one of the gateway's
-   addresses, not multicast. At the first start it is installed one
-   `interval` after the programs were attached: by then the flows that were
-   running under conntrack have sent a packet and are in the local map, and
-   until then conntrack still accepts their replies.
+   A packet the ingress program marked is untracked: its flow is in the
+   tables. A packet routed out of an interface in `alive` is untracked: that
+   is the uplink, while the daemon vouches for it. The daemon writes the
+   element over netlink (no fork) every `alive_timeout`/3 seconds with
+   `timeout` and `expires` set, right after `dp_tick()` found both programs
+   on the uplink; it deletes it at once when they are not there. Without a
+   refresh the element is gone after `alive_timeout`, and what leaves is
+   tracked: conntrack has an entry for the flow when an unmarked reply comes
+   back. Family `ip6`, so the rules need no `meta nfproto`; the device's
+   index rather than its name, so the lookup compares four bytes. The daemon
+   installs the table at start if it is missing, in one transaction that
+   replaces whatever was there (`add table`, `delete table`, the definition),
+   with the element included when the programs are attached. Its own
+   element writes carry its netlink port id and do not count as a ruleset
+   change; what it writes through `nft` does, and costs one look.
 
 2. **One rule in fw4's `forward` chain**:
 
@@ -168,9 +189,13 @@ The ingress program clears the mark bit on every IPv6 packet from the uplink
 before it decides, so nothing can bring the mark in from outside.
 
 With conntrack out of the forward path, fw4's `ct state established,related`
-rule no longer matches forwarded IPv6. What the gateways' ruleset does besides
-that is stateless already (zone forwardings, `inbound_allow`, the ICMPv6
-rule, the MSS clamp, the ACK/RST budget) and works as before.
+rule no longer matches forwarded IPv6 to or from the uplink; it is what
+carries the symmetric flows whenever the element is absent. Forwarding
+between mesh interfaces is tracked as before flowsync. What the gateways'
+ruleset does besides that is stateless already (zone forwardings,
+`inbound_allow`, the ICMPv6 rule, the MSS clamp, the ACK/RST budget) and
+works as before; `drop_invalid` must stay off, since conntrack sees only one
+direction of a flow it tracks while the programs come and go.
 
 ### Bypass
 
@@ -188,6 +213,7 @@ and takes the normal path:
 | not bypassed | because |
 |---|---|
 | packets without a flow | the firewall decides: stateless rules, reject |
+| frames addressed to another host's MAC (a NIC in promiscuous mode receives them) | the stack drops them; tc sees them first |
 | anything but TCP and UDP directly behind the IPv6 header | fragments must be reassembled before the firewall; extension headers and other protocols are rare |
 | TCP segments with SYN, FIN or RST | the firewall clamps the MSS on SYNs |
 | hop limit 0 or 1 | the stack sends the ICMPv6 error |
@@ -211,8 +237,10 @@ What it costs:
   a setup needs the bypass off. bbb-configs has none.
 - **The uplink must be an Ethernet-like device** (the daemon checks and leaves
   the bypass off otherwise): the helper takes a link-layer header off the
-  packet. The outgoing device may be anything with a neighbour layer; tunnel
-  devices have not been tried.
+  packet. The outgoing device may be anything with a neighbour layer: veth,
+  an IPv4 GRE tunnel and a WireGuard device have been tried (dptest
+  `bypass_gre`, `bypass_wg`), which is what the gateways' mesh traffic goes
+  into.
 - The egress side of the outgoing device (its qdisc and tc filters) is passed
   as usual.
 
@@ -266,8 +294,9 @@ that server to that client in, not one port.
 
 - UDP socket on `bind_address`:`port`, bound to the `interface` device and
   reopened when that device is created anew (netifd does that to a VLAN on
-  every `ifup`). Datagrams from addresses not listed as `peer` are dropped,
-  and so are IPv6 datagrams whose source is a v4-mapped address.
+  every `ifup`). Datagrams from addresses not listed as `peer` are dropped.
+  IPv4 peers are matched as v4-mapped addresses; an IPv6 datagram whose
+  source is a v4-mapped address is dropped too, no peer sends one.
 - Every record that passes the policy is written to the remote map, alive for
   `element_timeout` from now; one system call per burst of datagrams. An
   announcement of a flow that is there sets its time anew.
@@ -317,24 +346,25 @@ The daemon is configured on the command line only. The init script renders
 
 | option | UCI option | default | meaning |
 |---|---|---|---|
-| `-b, --bind ADDR` | `bind_address` | any | local address of the sync socket; peers check the source address, so set it to the address the peers list |
+| `-b, --bind ADDR` | `bind_address` | any | local address of the sync socket, IPv4 or IPv6 (the socket is dual-stack); peers check the source address, so set it to the address the peers list |
 | `-I, --interface DEV` | `interface` | any | sync datagrams are accepted only when they arrive on this device. The UCI option may name the logical interface, the init script passes its device |
 | `-U, --uplink DEV` | `uplink` | `interface` | the device forwarded traffic leaves to the Internet on; the tc programs attach there. Waited for if it does not exist yet, followed when it is created anew |
 | `--bypass` | `bypass` | off | forward accepted TCP and UDP packets from the uplink's tc hook, past netfilter (see "Bypass") |
-| `-p, --port N` | `port` | `3780` | UDP port, the same on all gateways |
+| `-p, --port N` | `port` | `3994` | UDP port, the same on all gateways (IANA-unassigned; conntrackd's 3780 is not) |
 | `-i, --interval SEC` | `interval` | `30` | seconds between rounds and counter logs |
 | `-t, --element-timeout SEC` | `element_timeout` | `90` | lifetime of a peer's flow after its last announcement; at least `3 x interval` |
 | `-l, --batch-lines N` | `batch_lines` | `30` | records per datagram, 1..34 |
 | `-r, --tx-rate N` | `tx_rate` | `500` | refresh datagrams per second, per peer |
 | `-R, --resync-rate N` | `resync_rate` | `0` | the same for a round that answers a resync request; `0`: four times `tx_rate` |
 | `-B, --rcvbuf BYTES` | `rcvbuf` | `8388608` | receive buffer of the sync socket |
+| `-A, --alive-timeout SEC` | `alive_timeout` | `10` | how long what leaves through the uplink stays untracked after the daemon last saw the programs on it; refreshed every third of it. Expiry tracks, it never rejects |
 | `-m, --mark HEX` | `mark` | `0x01000000` | packet mark of accepted packets; the fw4 include must name the same value |
 | `-F, --max-flows N` | `max_flows` | `131072` | size of the local map. It is an LRU: when full, the flow that has been idle longest makes room. About 100 bytes per entry, allocated at start |
 | `-C, --max-remote N` | `max_remote` | `131072` | size of the remote map; when full, new flows are refused |
 | `--udp-timeout SEC` etc. | `udp_timeout`, `tcp_timeout`, `tcp_syn_timeout`, `tcp_close_timeout`, `other_timeout` | see above | lifetime of a local flow after its last packet out |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp`, `esp`, `gre`, `ipip`, `ip6ip6`, `l2tp` | synced protocols: these names, `sctp`, or a protocol number. Giving the option replaces the default list |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | UDP server ports never synced |
-| `-e, --peer ADDR` | `peer` (list) | - | the other gateways (max. 32) |
+| `-e, --peer ADDR` | `peer` (list) | - | the other gateways (max. 32), IPv4 or IPv6, all of one family, the same as `bind_address` |
 | `-x, --prefix CIDR` | `prefix` (list) | - | synced client prefixes |
 | `-X, --exclude CIDR` | `exclude` (list) | - | client prefixes not synced |
 | `-D, --exclude-dst CIDR` | `exclude_dst` (list) | - | server prefixes not synced |
@@ -369,11 +399,17 @@ Stopping the service leaves the programs on the uplink and the maps in place.
 `/etc/init.d/flowsync detach` takes everything away (programs, maps, the
 table, the rule): forwarded IPv6 is conntrack's again from the next packet,
 and flows that were running have no conntrack entry until their client sends
-again. Removing the package does the same first.
+again. Removing the package does the same first. Upgrading it does not: the
+package restarts the service, the new daemon loads the new programs and
+replaces the filters in place, the maps and the alive element stay.
 
-A service that stays stopped keeps what it left: nobody puts the programs
-back when the uplink device is created anew, and with the notrack table in
-place every reply is rejected from then on. Stop it for good with `detach`.
+A service that stays stopped keeps what it left, but not the switch: the
+alive element expires after `alive_timeout`, and from then on what leaves
+through the uplink is tracked, so conntrack carries the symmetric flows and
+the asymmetric ones wait for the daemon. A device created anew has a new
+index, so it is tracked from its first packet. Nothing is rejected for
+longer than `alive_timeout`, and nothing needs a human. Stop it for good
+with `detach`.
 
 The rules are looked at when the ruleset changes (a netlink notification),
 when the programs come or go, and every `interval` only while something is
@@ -386,7 +422,8 @@ The status file (`flowsync status`), written every `interval`:
 |---|---|
 | `attached` | the programs are on the uplink |
 | `bypass` | the bypass is on |
-| `fw_ok` | both rules are in place (0 while the daemon has fallen back to conntrack) |
+| `fw_ok` | the accept rule and the table are in place |
+| `alive` | the uplink's element is in the set: what leaves through it is untracked (0 while conntrack carries) |
 | `local` / `remote` | live flows in the local / remote map at the last round |
 | `tx_events` | flows announced from their first packet |
 | `tx_refresh` | records announced by the rounds |
@@ -406,8 +443,9 @@ and one line per peer, `peer <address> rx <datagrams> age <seconds> tx_errors <n
 
 ## Migration from conntrackd
 
-flowsync and conntrackd (with samplicator) both use UDP port 3780 and cannot
-read each other's datagrams. While the fleet is mixed, every asymmetric flow
+flowsync (UDP port 3994) and conntrackd with samplicator (3780) cannot read
+each other's datagrams, and need not share a port: both can be installed and
+running on a gateway during the flip. While the fleet is mixed, every asymmetric flow
 whose forward and reply gateway run different software has no state on the
 reply gateway: with k of n gateways migrated that is 2k(n-k)/(n(n-1)) of
 those flows, 33 % for one of six, 60 % for three of six. So no canary and no
@@ -421,16 +459,28 @@ rollout over days:
   samplicator and start flowsync on all gateways within seconds.
 
 On a gateway that carries traffic the first start hands forwarded IPv6 over
-from conntrack one `interval` after the programs are attached (see "The
-rules"); a flow that stays silent through that interval loses its way back
-in until its client sends again. Going back is `/etc/init.d/flowsync detach`
+from conntrack flow by flow: a flow is untracked from its next packet out,
+and until then conntrack accepts its replies on the entry it has (see "The
+rules"). Nothing is cut. Going back is `/etc/init.d/flowsync detach`
 (conntrack tracks forwarded IPv6 again from the next packet; flows that were
 running have no entry until their client sends) and starting conntrackd.
+
+Which addresses: the peers' uplink addresses, IPv4 or IPv6, and
+`bind_address` the gateway's own. IPv6 needs a route from the uplink address
+to every peer; a source-specific default route for the mesh prefix alone
+does not give one when the uplink address lies outside that prefix, and an
+address inside it on `lo` is reached over the mesh, not the `interface`
+device. The uplink IPv4 addresses, as conntrackd used them, are the safe
+choice; they need an input rule for flowsync's port from the peers'
+addresses on the uplink zone, conntrackd's rule goes with it afterwards. The
+firewall must also drop forwarded UDP to the peers' sync port from the mesh
+zone, or any mesh host is a peer (see "Known limits").
 
 bbb-configs has to render the options this version has (`uplink` where it is
 not the sync interface, `mark` if the default bit is taken, the timeouts if
 they should differ) and to stop rendering conntrackd's. Keep the stateless
-ACK/RST accept and the firewall rule for the sync port. The conntrack-based
+ACK/RST accept; the firewall rule for the sync port is a new one, for
+flowsync's port. The conntrack-based
 flowsync, which was never deployed, is on branch `flowsync-conntrack`.
 
 ## Known limits
@@ -454,14 +504,11 @@ flowsync, which was never deployed, is on branch `flowsync-conntrack`.
   uplink address (bbb-configs does, for IPv4) rewrites a mesh host's datagram
   to exactly that address and sends it out of the uplink: any mesh host can
   then send announcements to every gateway but its own exit. Only the
-  firewall can stop that (no forwarding to the peers' sync port).
+  firewall can stop that: no forwarding to the peers' sync port (see
+  "Migration from conntrackd").
 - **`max_remote` refuses in arrival order**; there is no limit per client.
 - **Flow offloading** needs conntrack and cannot be used for forwarded IPv6
   on a gateway that runs this.
-- **The first start cuts flows that stay silent**: a flow that sends no
-  packet out during the first `interval` is not in the local map when the
-  notrack table is installed, and its replies are rejected until its client
-  sends again.
 - Adding or removing a gateway requires re-rendering all gateways.
 
 ## Open points
@@ -469,19 +516,20 @@ flowsync, which was never deployed, is on branch `flowsync-conntrack`.
 Not done or not verified yet:
 
 - The package builds with the snapshot SDK and its BPF toolchain for x86_64,
-  mipsel_24kc and aarch64_generic (what the repository's CI builds), kernel
-  6.18 headers. It has not been built for mips64_octeonplus or against 6.12,
-  and no built package has been installed anywhere.
-- Nothing has run on kernel 6.12, on a big-endian target or on the
+  mipsel_24kc, aarch64_generic and mips64_octeonplus (what the repository's
+  CI builds), kernel 6.18 headers; the unit test built by the SDK's toolchain
+  passes under qemu on mips64 big-endian and mipsel. It has not been built
+  against 6.12, and no built package has been installed anywhere.
+- The daemon and the programs have not run on kernel 6.12 or on the
   edgerouter-4. The per-packet cost of the programs is unmeasured.
 - The mark a reassembled packet inherits is kernel behaviour read from the
   6.18 source and tested on 7.3.
-- The notrack rule covers all forwarded IPv6, also between mesh interfaces;
-  bbb-configs' own `NOTRACK` rules become redundant, and its ruleset should be
-  read once more for anything that still expects conntrack state there.
-- The bypass has forwarded to veth devices only. Forwarding into GRE or
-  WireGuard devices, which is where the gateways' mesh traffic goes, is
-  untested, and so is its gain on the gateways' hardware.
+- The notrack rules cover what leaves through the uplink and what comes in
+  marked; forwarding between mesh interfaces is tracked as before, so
+  bbb-configs' own `NOTRACK` rules keep their job. The per-packet cost of
+  the set lookup on the outbound side is unmeasured.
+- The bypass has forwarded into veth, GRE and WireGuard devices in the VM
+  only; its gain on the gateways' hardware is unmeasured.
 - A device that is both uplink and carries tunnel traffic sees the tunnel's
   outer packets only; inner packets are looked at where they leave an uplink.
 

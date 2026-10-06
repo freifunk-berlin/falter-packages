@@ -9,7 +9,7 @@ is specific to this one and cannot be judged from the endpoints.
 | what the flow tables hold, accept and expire; nothing passes without a flow | `sym`, `asym`, `unsolicited`, `expiry`, `server_cannot_hold`, `idle_peers` |
 | which flows are synced: policy, protocols without ports | `policy`, `tunnel_protos`, `proto_list`, `other_proto` |
 | what the tc programs parse themselves: fragments, extension headers, TCP flags | `frag_sym`, `frag_asym`, `frag_unsolicited`, `exthdr`, `tcp_state`, `tcp_pickup` |
-| the bypass, and what it must leave to the firewall and to policy routing | `bypass`, `bypass_default_off`, `bypass_normal_path`, `bypass_tcp`, `bypass_fwmark` |
+| the bypass, and what it must leave to the firewall and to policy routing | `bypass`, `bypass_default_off`, `bypass_normal_path`, `bypass_tcp`, `bypass_fwmark`, `bypass_otherhost`, `bypass_gre`, `bypass_wg` |
 | the accept rule: behind the MSS clamp, with the daemon's mark, looked at on changes only | `mss_clamp`, `mss_clamp_bypass`, `rules`, `rules_idle`, `mark_mismatch` |
 | the datapath without its daemon, a reboot, a re-created uplink, rules and programs put back, the first start | `daemon_down`, `restart_keeps`, `reboot`, `uplink_recreate`, `rules`, `bootstrap` |
 | what fails: programs that cannot be attached, a daemon that cannot load them, a table of another size | `fail_open`, `load_failure`, `resize` |
@@ -41,7 +41,7 @@ and `g<i>.log` (the daemon's debug log) in the directory the summary names
                   s0 |          s1 |          s2 |
                eth0 10.0.0.1  eth0 10.0.0.2  eth0 10.0.0.3
                  +------+      +------+      +------+
-                 |  g0  |      |  g1  |      |  g2  |   flowsync on each, port 3780
+                 |  g0  |      |  g1  |      |  g2  |   flowsync on each, port 3994
                  +------+      +------+      +------+
           mesh0 fd00:i:1::1 \    |    / wan0 fd00:i:2::1   <- the uplink: tc programs
                              \   |   /
@@ -57,9 +57,9 @@ and `g<i>.log` (the daemon's debug log) in the directory the summary names
   puts it there), `ct state established,related accept`, `iifname mesh0
   accept`, reject. No stateless ACK/RST accept: nothing may pass without a
   flow. Counters `fwd_mark`, `fwd_est`, `fwd_rej` tell which rule took a
-  packet. The daemon's own table (`notrack`) is there from the start, so
-  conntrack never accepts a reply in the daemon's place; `bootstrap` removes
-  it to test the first start.
+  packet. The daemon's own table is there from the start, without the alive
+  element, which the daemon writes; `bootstrap` removes the table to test the
+  first start, `dead_uplink` leaves it without a daemon.
 - The sync device (eth0) and the uplink (wan0) are different devices here
   (`-I eth0 -U wan0`); on the gateways, and in gwlab, they are the same.
 - Every flow has its own client and server address; CL routes the server via
@@ -73,6 +73,10 @@ and `g<i>.log` (the daemon's debug log) in the directory the summary names
   application received.
 - Scaled timers: interval 3 s, element_timeout 9 s, local flows UDP 12 s,
   TCP 40 s (SYN only 10 s, closing 8 s), other protocols 15 s.
+- `bypass_gre` and `bypass_wg` put a tunnel over the mesh link of a gateway,
+  IPv4 outer, as the gateways have toward each other (GRE, MTU 1476) and from
+  the corerouters (WireGuard, MTU 1280; set up with pyroute2, no `wg` needed),
+  and route a flow's client through it.
 - Between scenarios a worker stops the daemons, runs `flowsync detach` on
   every gateway (programs, maps and rules gone) and loads the rulesets anew.
 

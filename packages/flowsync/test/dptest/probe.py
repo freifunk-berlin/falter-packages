@@ -32,6 +32,8 @@ namespace. Addresses are IPv6 (IPv4 as ::ffff:a.b.c.d).
                  packet), chain (hop-by-hop, destination options, fragment)
   probe.py v6proto <src> <dst> <proto> <count>               packets of an IP protocol without
                  ports (e.g. 47), 16 bytes of payload each
+  probe.py l2udp <dev> <src> <sport> <dst> <dport>           one UDP datagram in an Ethernet
+                 frame addressed to another host's MAC, sent out of dev
 
   probe.py --mark N <command> ...                            the same with SO_MARK N on every
                  socket, to pick a policy route (the test topology routes
@@ -404,6 +406,23 @@ def v6ext(src, sport, dst, dport, kind):
         raise SystemExit("unknown kind %s" % kind)
 
 
+def l2udp(dev, src, sport, dst, dport):
+    # what a NIC in promiscuous mode picks up for another host on the link:
+    # the stack drops it, a tc program sees it first
+    s6, d6 = socket.inet_pton(socket.AF_INET6, src), socket.inet_pton(socket.AF_INET6, dst)
+    data = b"x" * 8
+    ulen = 8 + len(data)
+    udp = struct.pack("!HHHH", int(sport), int(dport), ulen, 0) + data
+    c = _csum(s6 + d6 + struct.pack("!I3xB", ulen, 17) + udp) or 0xffff
+    udp = udp[:6] + struct.pack("!H", c) + udp[8:]
+    ip6 = struct.pack("!IHBB", 6 << 28, ulen, 17, 64) + s6 + d6
+    frame = bytes.fromhex("02deadbeef00") + bytes.fromhex("02aabbccdd01") + b"\x86\xdd"
+    s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+    s.bind((dev, 0))
+    s.send(frame + ip6 + udp)
+    s.close()
+
+
 def v6proto(src, dst, proto, count):
     for _ in range(int(count)):
         _v6send(src, dst, int(proto), b"p" * 16)
@@ -455,4 +474,5 @@ if __name__ == "__main__":
     {"recv": recv, "send": send, "burst": burst, "flood": flood, "xchg": xchg, "echo": echo,
      "tcpsrv": tcpsrv, "tcpcli": tcpcli, "tcpmss": tcpmss, "tcpecho": tcpecho, "tcptalk": tcptalk,
      "tcppush": tcppush, "tcpread": tcpread, "spoof": spoof, "tcp": tcp, "icmp6": icmp6, "raw": raw,
-     "v6udp": v6udp, "v6ext": v6ext, "v6proto": v6proto, "tcpflood": tcpflood}[cmd](*args)
+     "v6udp": v6udp, "v6ext": v6ext, "v6proto": v6proto, "l2udp": l2udp,
+     "tcpflood": tcpflood}[cmd](*args)

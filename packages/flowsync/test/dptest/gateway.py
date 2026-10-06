@@ -7,21 +7,25 @@ import time
 
 from .ns import kill
 
-PORT = 3780
+PORT = 3994
 PREFIX = "2001:db8:100::/44"        # synced client prefix
 XDST = "2001:db8::/32"              # the mesh: never synced as a server
 SERVER_NET = "2a00:1450:4001::/48"  # where the test's servers live
 MARK = 0x01000000
 MSS = 1416                          # the gateways' clamp: what fits their GRE tunnels
 
-# what the daemon installs one interval after its first start (fw.c); the
-# tests put it there from the beginning, so that conntrack never accepts a
-# reply in the daemon's place
+# what the daemon installs at its start (fw.c), without the alive element:
+# the daemon writes that one, and until it does conntrack tracks what leaves
 OWN_TABLE = """
-table inet flowsync {
+table ip6 flowsync {
+	set alive {
+		type iface_index
+		flags timeout
+	}
 	chain prerouting {
 		type filter hook prerouting priority raw; policy accept;
-		meta nfproto ipv6 fib daddr type unicast notrack
+		meta mark & 0x01000000 == 0x01000000 notrack
+		fib daddr oif @alive notrack
 	}
 	chain defrag {
 		ct state untracked accept
@@ -108,7 +112,7 @@ class Gateway:
         """fw4 as on the gateways: the MSS clamp on every forwarded SYN first
         (bbb-configs' chain-prepend include), forward policy reject,
         established accept (conntrack sees nothing forwarded once the daemon's
-        table is in), the mesh may go anywhere. No stateless budget for TCP
+        table is in), the mesh (mesh0, or a tunnel over it) may go anywhere. No stateless budget for TCP
         segments with ACK or RST: nothing here may pass without a flow. The
         accept rule for marked packets is the one the package ships as an
         fw4 include."""
@@ -122,7 +126,7 @@ table inet fw {
 		meta nfproto ipv6 tcp flags syn tcp option maxseg size set %(mss)d
 %(accept)s
 		ct state established,related counter name fwd_est accept
-		iifname "mesh0" accept
+		iifname { "mesh0", "tun0", "tun1", "tun2" } accept
 		counter name fwd_rej
 		meta l4proto tcp reject with tcp reset
 		reject
@@ -266,6 +270,18 @@ table inet sync {
         """conntrack entries on the gateway (the sync socket's own included)"""
         return int(self.node.read("/proc/sys/net/netfilter/nf_conntrack_count") or 0)
 
+    def ifindex(self, dev="wan0"):
+        out = self.node.run("ip", "-o", "link", "show", dev, check=False)
+        return int(out.split(":")[0]) if out and out[0].isdigit() else 0
+
+    def alive(self):
+        """the alive element for the current uplink device is in the daemon's
+        set: what leaves through it is untracked"""
+        out = self.node.run("nft", "list", "set", "ip6", "flowsync", "alive", check=False)
+        # nft prints the element as the device's name while the device exists,
+        # as its number once it is gone
+        return re.search(r'(?:"?wan0"?|\b%d) timeout \d' % self.ifindex(), out) is not None
+
     def fwc(self, name):
         """a forward chain counter: mark (accepted on a flow), est (accepted
         by conntrack), rej"""
@@ -298,7 +314,7 @@ table inet sync {
         self.stop()
         self.detach()
         self.node.sh("nft delete table inet fw; nft delete table inet sync; "
-                     "nft delete table inet flowsync", check=False)
+                     "nft delete table ip6 flowsync", check=False)
         self.node.sh("ip link del dum0 2>/dev/null", check=False)
         self.setup()
         self.opts = []

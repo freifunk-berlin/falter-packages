@@ -48,11 +48,22 @@ endef
 # stopping the service leaves the programs on the uplink, the maps and the
 # rules (replies keep passing across a restart). With the package gone nobody
 # would look after them: take them away first, forwarded IPv6 is conntrack's
-# again. (apk runs this behind the default prerm, which stops and disables
+# again. Not on an upgrade: opkg runs the old package's prerm then (apk runs
+# pre-upgrade/post-upgrade instead), and the datapath stays for the new
+# daemon. (apk runs this behind the default prerm, which stops and disables
 # the service; detach stops it itself.)
 define Package/flowsync/prerm
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/flowsync detach
+[ "$${PKG_UPGRADE}" = 1 ] || [ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/flowsync detach
+exit 0
+endef
+
+# after an upgrade the default postinst's "start" changes nothing on a
+# running service: restart it, so that the new daemon loads the new object
+# and replaces the filters in place (the maps and the alive element stay)
+define Package/flowsync/postinst
+#!/bin/sh
+[ "$${PKG_UPGRADE}" = 1 ] && [ -z "$${IPKG_INSTROOT}" ] && /etc/init.d/flowsync restart
 exit 0
 endef
 

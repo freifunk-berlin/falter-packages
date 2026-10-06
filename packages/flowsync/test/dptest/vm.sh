@@ -21,7 +21,7 @@ fi
 
 mountpoint -q /sys/fs/bpf || mount -t bpf bpf /sys/fs/bpf
 for m in sch_ingress cls_bpf nf_tables nft_fib_inet nft_ct nft_reject_inet nft_numgen \
-	nft_limit sch_netem veth bridge; do
+	nft_limit sch_netem veth bridge ip_gre wireguard; do
 	modprobe $m 2> /dev/null
 done
 sysctl -qw net.core.rmem_max=16777216 net.core.wmem_max=16777216

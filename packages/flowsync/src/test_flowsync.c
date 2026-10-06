@@ -13,8 +13,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <endian.h>
+
 #include "flowsync.h"
 #include "dp.h"
+#include <linux/netfilter.h>
+#include <linux/netfilter/nfnetlink.h>
+#include <linux/netfilter/nf_tables.h>
+#include <linux/netlink.h>
 
 /* config.c sets it; status.c, which defines it, needs the datapath */
 const char *status_path;
@@ -307,6 +313,10 @@ static void test_config(void)
 		       "-U", "wan", "-I", "eth0", "--tcp-timeout", "300", "check", NULL };
 	char *a3[] = { "flowsync", "-x", "2001:db8::/32", "-e", "192.0.2.1", "-i", "0x10",
 		       "check", NULL };
+	/* IPv4 peers and bind address: v4-mapped, of one family */
+	char *a4[] = { "flowsync", "-b", "10.0.0.1", "-e", "10.0.0.2", "-e", "10.0.0.3", "check",
+		       NULL };
+	char *a5[] = { "flowsync", "-b", "10.0.0.1", "-e", "fd00::2", "check", NULL };
 
 	optind = 1;
 	CHECK(parse_args(14, a1) == 13);
@@ -320,7 +330,99 @@ static void test_config(void)
 	CHECK(!strcmp(cfg.uplink, "wan") && !strcmp(cfg.ifname, "eth0"));
 	optind = 1;
 	CHECK(parse_args(8, a3) < 0);				/* not a decimal number */
+	optind = 1;
+	CHECK(parse_args(8, a4) == 7);
+	CHECK(cfg.bind_set && IN6_IS_ADDR_V4MAPPED(&cfg.bind) && cfg.n_peer == 2 &&
+	      IN6_IS_ADDR_V4MAPPED(&cfg.peer[0]) && IN6_IS_ADDR_V4MAPPED(&cfg.peer[1]));
+	CHECK(cfg.port == 3994);				/* the default, not conntrackd's 3780 */
+	optind = 1;
+	CHECK(parse_args(6, a5) < 0);				/* different address families */
 	setup_cfg();
+}
+
+/* the alive element batch, as the kernel will parse it: three messages, the
+ * middle one for ip6 flowsync/alive with key, timeout and expiration */
+static const struct nlattr *attr_find(const struct nlattr *a, size_t len, uint16_t type)
+{
+	while (len >= NLA_HDRLEN && a->nla_len >= NLA_HDRLEN && a->nla_len <= len) {
+		if ((a->nla_type & NLA_TYPE_MASK) == type)
+			return a;
+		len -= NLA_ALIGN(a->nla_len);
+		a = (const struct nlattr *)((const char *)a + NLA_ALIGN(a->nla_len));
+	}
+	return NULL;
+}
+
+static void test_nfnl(void)
+{
+	char buf[512];
+	const struct nlmsghdr *h;
+	const struct nfgenmsg *g;
+	const struct nlattr *a, *elems, *elem, *key, *val, *to, *ex;
+	size_t len, n = 0;
+	uint64_t be;
+	uint32_t idx;
+
+	len = nfnl_alive_msg(buf, sizeof(buf), true, 7, 10, 100, 4242);
+	CHECK(len > 0);
+	for (h = (const struct nlmsghdr *)buf; NLMSG_OK(h, len); h = NLMSG_NEXT(h, len), n++) {
+		CHECK(h->nlmsg_pid == 4242 && h->nlmsg_seq == 100 + n);
+		if (n != 1) {
+			CHECK(h->nlmsg_type == (n ? NFNL_MSG_BATCH_END : NFNL_MSG_BATCH_BEGIN));
+			continue;
+		}
+		CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_NEWSETELEM));
+		CHECK(h->nlmsg_flags == (NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE));
+		g = NLMSG_DATA(h);
+		CHECK(g->nfgen_family == NFPROTO_IPV6);
+		a = (const struct nlattr *)((const char *)g + NLMSG_ALIGN(sizeof(*g)));
+		len = 0;		/* reuse: attribute bytes */
+		len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*g));
+		CHECK(attr_find(a, len, NFTA_SET_ELEM_LIST_TABLE) &&
+		      !strcmp((const char *)attr_find(a, len, NFTA_SET_ELEM_LIST_TABLE) + NLA_HDRLEN,
+			      "flowsync"));
+		CHECK(attr_find(a, len, NFTA_SET_ELEM_LIST_SET) &&
+		      !strcmp((const char *)attr_find(a, len, NFTA_SET_ELEM_LIST_SET) + NLA_HDRLEN,
+			      "alive"));
+		elems = attr_find(a, len, NFTA_SET_ELEM_LIST_ELEMENTS);
+		CHECK(elems && (elems->nla_type & NLA_F_NESTED));
+		elem = attr_find((const struct nlattr *)((const char *)elems + NLA_HDRLEN),
+				 elems->nla_len - NLA_HDRLEN, NFTA_LIST_ELEM);
+		CHECK(elem != NULL);
+		key = attr_find((const struct nlattr *)((const char *)elem + NLA_HDRLEN),
+				elem->nla_len - NLA_HDRLEN, NFTA_SET_ELEM_KEY);
+		CHECK(key != NULL);
+		val = attr_find((const struct nlattr *)((const char *)key + NLA_HDRLEN),
+				key->nla_len - NLA_HDRLEN, NFTA_DATA_VALUE);
+		CHECK(val && val->nla_len == NLA_HDRLEN + 4);
+		memcpy(&idx, (const char *)val + NLA_HDRLEN, 4);
+		CHECK(idx == 7);
+		to = attr_find((const struct nlattr *)((const char *)elem + NLA_HDRLEN),
+			       elem->nla_len - NLA_HDRLEN, NFTA_SET_ELEM_TIMEOUT);
+		ex = attr_find((const struct nlattr *)((const char *)elem + NLA_HDRLEN),
+			       elem->nla_len - NLA_HDRLEN, NFTA_SET_ELEM_EXPIRATION);
+		CHECK(to && ex && to->nla_len == NLA_HDRLEN + 8);
+		memcpy(&be, (const char *)to + NLA_HDRLEN, 8);
+		CHECK(be64toh(be) == 10000);
+		memcpy(&be, (const char *)ex + NLA_HDRLEN, 8);
+		CHECK(be64toh(be) == 10000);
+		len = (const char *)buf + nfnl_alive_msg(buf, sizeof(buf), true, 7, 10, 100, 4242) -
+		      (const char *)h;	/* the walk goes on from here */
+	}
+	CHECK(n == 3);
+	/* a delete carries the key only */
+	len = nfnl_alive_msg(buf, sizeof(buf), false, 7, 10, 200, 4242);
+	h = (const struct nlmsghdr *)(buf + NLMSG_SPACE(sizeof(struct nfgenmsg)));
+	CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_DELSETELEM));
+	CHECK(h->nlmsg_flags == (NLM_F_REQUEST | NLM_F_ACK));
+	g = NLMSG_DATA(h);
+	a = (const struct nlattr *)((const char *)g + NLMSG_ALIGN(sizeof(*g)));
+	elems = attr_find(a, h->nlmsg_len - NLMSG_LENGTH(sizeof(*g)), NFTA_SET_ELEM_LIST_ELEMENTS);
+	elem = attr_find((const struct nlattr *)((const char *)elems + NLA_HDRLEN),
+			 elems->nla_len - NLA_HDRLEN, NFTA_LIST_ELEM);
+	CHECK(elem && !attr_find((const struct nlattr *)((const char *)elem + NLA_HDRLEN),
+				 elem->nla_len - NLA_HDRLEN, NFTA_SET_ELEM_TIMEOUT));
+	CHECK(!nfnl_alive_msg(buf, 64, true, 7, 10, 1, 1));	/* does not fit: 0 */
 }
 
 int main(void)
@@ -332,6 +434,7 @@ int main(void)
 	test_wire();
 	test_ttl();
 	test_config();
+	test_nfnl();
 	printf("%s: %u checks, %u failures\n", failures ? "FAIL" : "ok", checks, failures);
 	return failures ? 1 : 0;
 }

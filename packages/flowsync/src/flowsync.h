@@ -70,6 +70,10 @@
 #define BPF_OBJECT	"/lib/bpf/flowsync.o"
 #define PIN_DIR		"/sys/fs/bpf/flowsync"
 #define FW_TABLE	"fw4"
+/* our own nftables table and the set that holds the uplink while the
+ * programs are seen on it (fw.c, nfnl.c) */
+#define NFNL_TABLE	"flowsync"
+#define NFNL_ALIVE_SET	"alive"
 
 struct prefix {
 	struct in6_addr addr;
@@ -97,6 +101,7 @@ struct config {
 	/* lifetime of a local flow after its last packet out, seconds */
 	unsigned long t_udp, t_tcp, t_tcp_syn, t_tcp_close, t_other;
 	unsigned long resync_rate;	/* tx_rate of a round answering a resync request */
+	unsigned long alive_timeout;	/* seconds the uplink stays untracked without a refresh */
 	bool proto[256];
 	unsigned int n_proto;
 	uint8_t skip_port[65536 / 8];
@@ -138,6 +143,7 @@ struct gauges {
 	bool attached;			/* the tc programs are on the uplink */
 	bool bypass;			/* the bypass is on */
 	bool fw_ok;			/* the nftables rules are in place */
+	bool alive;			/* the uplink's element is in the set: outbound untracked */
 };
 
 extern struct config cfg;
@@ -212,6 +218,7 @@ struct dp_ent {
 int dp_open(bool load);
 bool dp_tick(void);
 bool dp_retry_due(void);
+unsigned int dp_ifindex(void);
 int dp_link_open(void);
 int dp_link_fd(void);
 bool dp_link_changed(void);
@@ -235,8 +242,12 @@ int fw_open(void);
 int fw_fd(void);
 void fw_handle(void);
 void fw_tick(void);
+void fw_alive_tick(void);
 void fw_remove(void);
-void fw_fallback(void);
+
+/* nfnl.c */
+size_t nfnl_alive_msg(char *buf, size_t cap, bool add, unsigned int ifindex,
+		      unsigned long timeout_s, uint32_t seq, uint32_t port);
 
 /* tx.c */
 void tx_event(const struct flow *f);

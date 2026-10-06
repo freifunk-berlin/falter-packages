@@ -134,7 +134,7 @@ def lab(args, opts):
             for e in events:
                 g = lb.gw.get(e.get("gw"))
                 if e["do"] == "reroute":
-                    todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"])))
+                    todo.append((e["at"], lambda e=e: lb.reroute(flows, e["leg"], e.get("step", 1))))
                 elif e["do"] == "lose_state":
                     todo.append((e["at"], lambda g=g: impl.lose_state(g)))
                 elif e["do"] == "restart":

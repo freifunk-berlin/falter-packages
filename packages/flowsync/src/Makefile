@@ -5,7 +5,7 @@
 -include local.mk
 
 PROG = flowsync
-OBJS = main.o util.o policy.o config.o wire.o udp.o dp.o fw.o tx.o rx.o resync.o status.o
+OBJS = main.o util.o policy.o config.o wire.o udp.o dp.o fw.o nfnl.o tx.o rx.o resync.o status.o
 
 # the tc programs, loaded by the daemon from /lib/bpf/flowsync.o (--bpf-object).
 # On OpenWrt the package Makefile builds them with the BPF toolchain instead
@@ -16,7 +16,7 @@ BPF_CFLAGS ?= -O2 -g -Wall
 
 # unit test for everything that needs no kernel
 TEST = test_flowsync
-TEST_OBJS = test_flowsync.o util.o policy.o config.o wire.o
+TEST_OBJS = test_flowsync.o util.o policy.o config.o wire.o nfnl.o
 TEST_RUNNER ?=
 
 PKG_CONFIG ?= pkg-config

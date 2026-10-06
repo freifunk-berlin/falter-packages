@@ -105,7 +105,6 @@ static int cmd_run(void)
 
 	if (!cfg.uplink[0]) {
 		logmsg(LOG_ERR, "no uplink device: set uplink (or interface)");
-		fw_fallback();
 		return 1;
 	}
 	sigaction(SIGTERM, &sa, NULL);
@@ -122,15 +121,11 @@ static int cmd_run(void)
 	peers_init();
 	udp_fd = udp_open(true);
 	/* an interface that does not exist yet is waited for (udp_tick) */
-	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open() || dp_link_open()) {
-		fw_fallback();
+	if ((udp_fd < 0 && errno != ENODEV) || dp_open(true) || fw_open() || dp_link_open())
 		return 1;
-	}
 	dp_tick();
-	if (drop_privileges()) {
-		fw_fallback();
+	if (drop_privileges())
 		return 1;
-	}
 	resync_init();
 	if (!cfg.ifname[0])
 		logmsg(LOG_WARNING, "no interface set: datagrams with a peer's source address are "
@@ -143,6 +138,10 @@ static int cmd_run(void)
 	next_tick = mono_ms();
 	while (!stop) {
 		now = mono_ms();
+		/* the rules and the alive element first: the status file of the
+		 * first tick says what is in place */
+		fw_tick();
+		fw_alive_tick();
 		if (now >= next_tick) {
 			gauge.loop_max_ms = loop_max;
 			loop_max = 0;
@@ -177,7 +176,6 @@ static int cmd_run(void)
 			write_status();
 			next_tick = now + cfg.interval * 1000;
 		}
-		fw_tick();
 		/* before the checks below: a queue that this sends empty lets them
 		 * pull the next round now, not at the next unrelated wake-up */
 		if (refresh_pending())
@@ -262,7 +260,8 @@ static int cmd_run(void)
 	}
 
 	/* the programs stay on the uplink and the maps pinned: local flows and,
-	 * until they expire, the peers' keep passing while we are down */
+	 * until they expire, the peers' keep passing while we are down; the alive
+	 * element expires and conntrack takes the rest */
 	refresh_close();
 	log_counters();
 	logmsg(LOG_NOTICE, "stopped");
@@ -482,23 +481,16 @@ static int cmd_announce(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	const char *cmd;
-	bool daemon = false;
 	int i;
 
 	/* the daemon logs to syslog unless run from a terminal */
 	for (i = 1; i < argc; i++)
-		if (!strcmp(argv[i], "run")) {
+		if (!strcmp(argv[i], "run"))
 			log_open(true);
-			daemon = true;
-		}
 
 	i = parse_args(argc, argv);
-	if (i < 0) {
-		/* a daemon that cannot start, as in cmd_run() */
-		if (daemon)
-			fw_fallback();
+	if (i < 0)
 		return 1;
-	}
 	if (i >= argc) {
 		usage(stderr);
 		return 1;

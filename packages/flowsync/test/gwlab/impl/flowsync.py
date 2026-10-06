@@ -38,10 +38,15 @@ table inet fw {
 		reject
 	}
 }
-table inet flowsync {
+table ip6 flowsync {
+	set alive {
+		type iface_index
+		flags timeout
+	}
 	chain prerouting {
 		type filter hook prerouting priority raw; policy accept;
-		meta nfproto ipv6 fib daddr type unicast notrack
+		meta mark & 0x01000000 == 0x01000000 notrack
+		fib daddr oif @alive notrack
 	}
 	chain defrag {
 		ct state untracked accept

@@ -264,13 +264,13 @@ class Lab:
     # ------------------------------------------------------------- events
     # What a scenario can do to the lab while traffic runs. None of it knows
     # the implementation (losing state is the implementation's own verb).
-    def reroute(self, flows, leg):
+    def reroute(self, flows, leg, step=1):
         """every flow's forward (leg "fwd") or return ("rev") path moves to
-        the next gateway"""
+        the next gateway (step 1) or back to the previous one (-1)"""
         names = list(self.gw)
         cmds = {}
         for f in flows:
-            new = self.gw[names[(names.index(f[leg]) + 1) % len(names)]]
+            new = self.gw[names[(names.index(f[leg]) + step) % len(names)]]
             f[leg] = new.name
             if leg == "fwd":
                 cmds.setdefault(self.clients[f["client"]], []).append(

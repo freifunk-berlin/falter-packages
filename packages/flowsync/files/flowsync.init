@@ -71,6 +71,7 @@ render_options() {
 	_opt "$add" batch_lines batch-lines
 	_opt "$add" tx_rate tx-rate
 	_opt "$add" rcvbuf rcvbuf
+	_opt "$add" alive_timeout alive-timeout
 	_opt "$add" mark mark
 	_opt "$add" max_flows max-flows
 	_opt "$add" max_remote max-remote

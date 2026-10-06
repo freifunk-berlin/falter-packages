@@ -24,6 +24,11 @@ jobs:
             target: x86-64
             runtime_test: false
 
+          # the gateways' EdgeRouter 4: big-endian MIPS64
+          - arch: mips64_octeonplus
+            target: octeon-generic
+            runtime_test: false
+
     steps:
       - uses: actions/checkout@v5
         with:

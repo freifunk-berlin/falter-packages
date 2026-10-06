@@ -33,6 +33,7 @@
 #define MAX_EXT		6	/* extension headers walked before giving up */
 
 #define AF_INET6	10
+#define PACKET_HOST	0
 
 #define TCP_FIN		0x01
 #define TCP_SYN		0x02
@@ -265,11 +266,13 @@ int fs_egress(struct __sk_buff *skb)
  * limit and hand the packet to the neighbour layer of the outgoing device.
  * netfilter, conntrack's hooks and the stack's forwarding path never see it.
  *
- * Only what needs none of them: TCP and UDP directly behind the IPv6 header
- * (so no fragments), no SYN, FIN or RST (the firewall clamps the MSS on SYNs),
- * a hop limit that survives, a route out of another device, and a packet
- * that fits that device. Everything else returns -1 and takes the normal
- * path with its mark, which also sends the ICMPv6 errors there are to send.
+ * Only what needs none of them: a frame addressed to this device (the stack
+ * drops what a promiscuous NIC picks up for other hosts; tc sees it first),
+ * TCP and UDP directly behind the IPv6 header (so no fragments), no SYN, FIN
+ * or RST (the firewall clamps the MSS on SYNs), a hop limit that survives, a
+ * route out of another device, and a packet that fits that device.
+ * Everything else returns -1 and takes the normal path with its mark, which
+ * also sends the ICMPv6 errors there are to send.
  *
  * The uplink must be an Ethernet-like device (the daemon checks): the helper
  * needs a link-layer header to take off, and the hop limit is written at
@@ -283,7 +286,7 @@ static __always_inline int bypass(struct __sk_buff *skb, const struct fs_key *k,
 	__u32 mtu = 0;
 	__u8 hop;
 
-	if (!pk->plain || pk->hop_limit <= 1)
+	if (skb->pkt_type != PACKET_HOST || !pk->plain || pk->hop_limit <= 1)
 		return -1;
 	if (k->proto == IPPROTO_TCP && (tf & (TCP_SYN | TCP_FIN | TCP_RST)))
 		return -1;

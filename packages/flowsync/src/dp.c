@@ -47,6 +47,7 @@ static int prog_fd[2] = { -1, -1 };	/* ingress, egress */
 static __u32 prog_id[2];
 static struct ring_buffer *rb;
 static unsigned int attached_ifindex;
+static unsigned int last_ifindex;	/* the device we were attached to before it went */
 static struct fs_cfg dcfg;
 
 /* the remote entries of one receive pass, written with one system call */
@@ -451,6 +452,12 @@ bool dp_retry_due(void)
 	return retry_wanted && mono_ms() - failed_at >= ATTACH_RETRY_MS;
 }
 
+/* the uplink's index while the programs are on it, 0 otherwise */
+unsigned int dp_ifindex(void)
+{
+	return attached_ifindex;
+}
+
 bool dp_tick(void)
 {
 	static uint64_t last_log;
@@ -463,6 +470,8 @@ bool dp_tick(void)
 			logmsg(LOG_WARNING, "uplink %s does not exist (yet): nothing attached",
 			       cfg.uplink);
 		gauge.attached = false;
+		if (attached_ifindex)
+			last_ifindex = attached_ifindex;
 		attached_ifindex = 0;
 		return false;
 	}
@@ -476,14 +485,20 @@ bool dp_tick(void)
 	err = attach(ifindex, gauge.attached || log_ok(&last_log));
 	if (err) {
 		gauge.attached = false;
+		if (attached_ifindex)
+			last_ifindex = attached_ifindex;
 		attached_ifindex = 0;
 		failed_at = err == -2 ? now : 0;
 		return false;
 	}
 	failed_at = 0;
-	logmsg(LOG_NOTICE, "attached to uplink %s (ifindex %u)%s", cfg.uplink, ifindex,
-	       attached_ifindex == ifindex ? ": the filters were gone" :
-	       attached_ifindex ? ": the device was created anew" : "");
+	if (attached_ifindex == ifindex)
+		logmsg(LOG_WARNING, "attached to uplink %s (ifindex %u) again: the filters were "
+		       "gone (something removed them: nothing was accepted on the mark meanwhile)",
+		       cfg.uplink, ifindex);
+	else
+		logmsg(LOG_NOTICE, "attached to uplink %s (ifindex %u)%s", cfg.uplink, ifindex,
+		       attached_ifindex || last_ifindex ? ": the device was created anew" : "");
 	attached_ifindex = ifindex;
 	gauge.attached = true;
 	apply_bypass();
