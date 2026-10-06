@@ -30,6 +30,13 @@ function exec(cmd) {
 	return '';
 }
 
+function olsrd_running() {
+	let services = ubus.call('service', 'list', { name: 'olsrd' });
+	for (let name, instance in services?.olsrd?.instances)
+		if (instance.running) return true;
+	return false;
+}
+
 function parse_olsr_links(json_str) {
 	if (!json_str) return [];
 	let data = json(json_str);
@@ -209,7 +216,9 @@ function build_json_data() {
 		return null;
 	}
 	
-	let olsr_links = parse_olsr_links(exec('uclient-fetch -q -O - http://127.0.0.1:9090/links'));
+	let olsr_links = [];
+	if (olsrd_running())
+		olsr_links = parse_olsr_links(exec('uclient-fetch -q -O - http://127.0.0.1:9090/links'));
 	let local_ips = {};
 	let babel_links = [];
 	let bird_status = exec('birdc show status');
@@ -267,7 +276,7 @@ function build_json_data() {
 		if (v) json_data.freifunk.community[community_keys[i]] = v;
 	}
 	
-	let olsr_cfg = exec('uclient-fetch -q -O - http://127.0.0.1:9090/config');
+	let olsr_cfg = olsrd_running() ? exec('uclient-fetch -q -O - http://127.0.0.1:9090/config') : '';
 	if (olsr_cfg) {
 		let cfg_json = json(olsr_cfg);
 		if (cfg_json) json_data.olsr.ipv4Config = cfg_json;
