@@ -91,7 +91,7 @@ class Lab:
                 self.servers[name] = Endpoint(name, k, "server", ms)
             for g in self.gw.values():
                 g.peers4 = [p.addr4 for p in self.gw.values() if p is not g]
-            self._build()
+            self._build(topology)
         except Exception:
             self.close()
             raise
@@ -122,7 +122,7 @@ class Lab:
             return None
 
     # -------------------------------------------------------------- build
-    def _build(self):
+    def _build(self, topology):
         ends = list(self.clients.values()) + list(self.servers.values())
         nodad = {"net.ipv6.conf.default.accept_dad": 0, "net.ipv6.conf.all.accept_dad": 0,
                  "net.ipv6.conf.default.dad_transmits": 0}
@@ -159,6 +159,9 @@ class Lab:
         for e in ends:
             e.node.ip(["link set lo up", "link set eth0 up", "addr add %s/64 dev eth0 nodad" % e.lan6])
         for node, dev, ms in delay:
+            if topology.get("offloads") is False:
+                # packets as a router sees them, not 64 KiB aggregates
+                node.run("ethtool", "-K", dev, "tso", "off", "gso", "off", "gro", "off", check=False)
             if ms:
                 node.run("tc", "qdisc", "add", "dev", dev, "root", "netem", "delay", "%gms" % ms,
                          "limit", "100000")

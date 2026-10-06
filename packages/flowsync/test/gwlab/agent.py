@@ -14,6 +14,11 @@ Traffic kinds (p["kind"]):
   tcp_short   connections, every, request, response: a new connection (new
               client port) each time
   tcp_talk    seconds, every: one connection, 1 KiB each way per exchange
+Measurements, run one at a time (counted on the interface, not by a reader):
+  udp_flood     dir, seconds, size: datagrams as fast as one core sends them
+  tcp_bulk      seconds: the server sends at full speed
+  udp_newflows  rates, step_seconds, reply_delay: one datagram per new source
+                port at each rate; the server answers each after reply_delay
 Losses are split at "grace" seconds into the flow: before it is the start of
 the flow, after it the flow has to be clean.
 """
@@ -187,6 +192,149 @@ def c_tcp_talk(f, p, t0, grace):
     return r
 
 
+# ----------------------------------------------------------- measurements
+# These run alone. What arrives is counted on the endpoint's interface, not
+# by a reader in Python, so the endpoint is not what limits the number.
+def rx_packets(dev="eth0"):
+    for line in open("/proc/net/dev"):
+        name, _, rest = line.partition(":")
+        if name.strip() == dev:
+            return int(rest.split()[1])
+    return 0
+
+
+def flood(s, peer, size, until):
+    """as many datagrams as one core sends through the whole path"""
+    data, n = b"f" * size, 0
+    while mono() < until:
+        for _ in range(200):
+            try:
+                s.sendto(data, peer)
+                n += 1
+            except OSError:
+                pass
+    return n
+
+
+def c_udp_flood(f, p, t0, grace):
+    """dir=up: the client floods. dir=down: the client opens the flow and
+    keeps it alive, the server floods back from 2 s on (the sync has had its
+    time); the client counts."""
+    s = sock(socket.SOCK_DGRAM, f["c"], f["cport"])
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+    peer = (f["s"], f["sport"])
+    sleep_until(t0)
+    if p["dir"] == "up":
+        return dict(sent=flood(s, peer, p["size"], t0 + p["seconds"]))
+    rx0, end = None, t0 + 2 + p["seconds"]
+    while True:                                     # count from 0.3 s into the flood to 0.3 s before its end
+        s.sendto(b"open", peer)
+        time.sleep(0.25)
+        now = mono()
+        if rx0 is None and now >= t0 + 2.3:
+            rx0, ta = rx_packets(), now
+        if rx0 is not None and now >= end - 0.3:
+            return dict(delivered_pps=round((rx_packets() - rx0) / (now - ta)))
+
+
+def s_udp_flood(f, p, t0, grace):
+    s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+    if p["dir"] == "up":
+        sleep_until(t0 + 0.3)
+        rx0, ta = rx_packets(), mono()
+        sleep_until(t0 + p["seconds"] - 0.3)
+        return dict(delivered_pps=round((rx_packets() - rx0) / (mono() - ta)))
+    sleep_until(t0 - 0.5)
+    s.settimeout(5)
+    try:
+        _, peer = s.recvfrom(64)
+    except OSError:
+        return dict(sent=0)
+    t1 = mono()
+    sleep_until(t1 + 2)
+    return dict(sent=flood(s, peer, p["size"], t1 + 2 + p["seconds"]))
+
+
+def c_tcp_bulk(f, p, t0, grace):
+    """the server sends as fast as it can for `seconds`"""
+    sleep_until(t0)
+    s = sock(socket.SOCK_STREAM, f["c"], f["cport"])
+    s.settimeout(8)
+    r = dict(done=False, connect_ms=None, mbit=0)
+    t = mono()
+    try:
+        s.connect((f["s"], f["sport"]))
+        r["connect_ms"] = round((mono() - t) * 1000, 1)
+        n, t1 = 0, mono()
+        while True:
+            d = s.recv(1 << 20)
+            if not d:
+                break
+            n += len(d)
+        r["mbit"] = round(n * 8 / (mono() - t1) / 1e6)
+        r["done"] = True
+    except OSError as e:
+        r["error"] = str(e) or type(e).__name__
+    s.close()
+    return r
+
+
+def udp_header(sport, dport, n):
+    return struct.pack("!HHHH", sport, dport, 8 + n, 0)
+
+
+def c_udp_newflows(f, p, t0, grace):
+    """new flows at a rising rate: one datagram per new source port. The
+    server answers each after reply_delay; an answer arrives only if the
+    return gateway knows the flow by then."""
+    s = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_UDP)
+    s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_CHECKSUM, 6)
+    s.bind((f["c"], 0))
+    sleep_until(t0)
+    port, steps = 1024, []
+    for rate in p["rates"]:
+        rx0, t1, n = rx_packets(), mono(), int(rate * p["step_seconds"])
+        for k in range(n):
+            d = t1 + k / rate - mono()
+            if d > 0:
+                time.sleep(d)
+            try:
+                s.sendto(udp_header(port, f["sport"], 8) + b"newflow!", (f["s"], 0))
+            except OSError:
+                pass
+            port = port + 1 if port < 65535 else 1024
+        sent_in = mono() - t1
+        time.sleep(p["reply_delay"] + 0.7)
+        steps.append(dict(rate=rate, sent=n, answered=rx_packets() - rx0,
+                          achieved=round(n / sent_in)))
+    return dict(steps=steps)
+
+
+def s_udp_newflows(f, p, t0, grace):
+    import collections
+    s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 << 20)
+    end = t0 + len(p["rates"]) * (p["step_seconds"] + p["reply_delay"] + 1.2) + 2
+    due, n = collections.deque(), 0
+    while mono() < end:
+        wait = 0.2 if not due else max(0, due[0][0] - mono())
+        if select.select([s], [], [], wait)[0]:
+            for _ in range(64):
+                try:
+                    d, addr = s.recvfrom(64, socket.MSG_DONTWAIT)
+                except OSError:
+                    break
+                due.append((mono() + p["reply_delay"], addr))
+                n += 1
+        while due and due[0][0] <= mono():
+            try:
+                s.sendto(b"answer", due.popleft()[1])
+            except OSError:
+                pass
+    return dict(seen=n)
+
+
 # ---------------------------------------------------------------- server
 def s_udp_rr(f, p, t0, grace):
     s = sock(socket.SOCK_DGRAM, f["s"], f["sport"])
@@ -214,13 +362,18 @@ def s_tcp(f, p, t0, grace):
     ls = sock(socket.SOCK_STREAM, f["s"], f["sport"])
     ls.listen(16)
     ls.settimeout(0.5)
-    span = p["seconds"] if p["kind"] == "tcp_talk" else p["connections"] * p["every"]
+    span = p["seconds"] if "seconds" in p else p["connections"] * p["every"]
     end, stat, workers = t0 + span + 8, dict(accepted=0, errors=0), []
 
     def serve(c):
         c.settimeout(10)
         try:
-            if p["kind"] == "tcp_short":
+            if p["kind"] == "tcp_bulk":
+                chunk, until = b"b" * 65536, mono() + p["seconds"]
+                while mono() < until:
+                    c.sendall(chunk)
+                stat["retrans"] = retrans(c)
+            elif p["kind"] == "tcp_short":
                 n = 0
                 while n < p["request"]:
                     d = c.recv(65536)
@@ -252,8 +405,10 @@ def s_tcp(f, p, t0, grace):
 
 
 KINDS = {
-    "client": dict(udp_rr=c_udp_rr, udp_stream=c_udp_stream, tcp_short=c_tcp_short, tcp_talk=c_tcp_talk),
-    "server": dict(udp_rr=s_udp_rr, udp_stream=s_udp_stream, tcp_short=s_tcp, tcp_talk=s_tcp),
+    "client": dict(udp_rr=c_udp_rr, udp_stream=c_udp_stream, tcp_short=c_tcp_short, tcp_talk=c_tcp_talk,
+                   udp_flood=c_udp_flood, tcp_bulk=c_tcp_bulk, udp_newflows=c_udp_newflows),
+    "server": dict(udp_rr=s_udp_rr, udp_stream=s_udp_stream, tcp_short=s_tcp, tcp_talk=s_tcp,
+                   udp_flood=s_udp_flood, tcp_bulk=s_tcp, udp_newflows=s_udp_newflows),
 }
 
 

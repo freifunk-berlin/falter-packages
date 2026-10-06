@@ -16,4 +16,8 @@ def grid(traffic, client, server, fwd, rev):
 
 def span(p):
     """seconds a flow of this traffic lasts"""
+    if p["kind"] == "udp_newflows":
+        return len(p["rates"]) * (p["step_seconds"] + p["reply_delay"] + 1.2) + 1
+    if p["kind"] == "udp_flood":
+        return p["seconds"] + 3
     return p["seconds"] if "seconds" in p else p.get("connections", p.get("requests")) * p["every"]

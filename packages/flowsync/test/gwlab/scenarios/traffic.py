@@ -8,4 +8,14 @@ TRAFFIC = dict(
     udp_rr=dict(kind="udp_rr", requests=10, every=1),
     # a call or a QUIC download: both ends send for 50 s
     udp_stream=dict(kind="udp_stream", up_pps=10, down_pps=20, seconds=50),
+
+    # measurements, for scenarios that run alone
+    # small packets as fast as one core pushes them through the path
+    flood_up=dict(kind="udp_flood", dir="up", seconds=5, size=64),
+    flood_down=dict(kind="udp_flood", dir="down", seconds=5, size=64),
+    # one TCP download at full speed
+    bulk=dict(kind="tcp_bulk", seconds=8),
+    # new flows at a rising rate; the server answers each 50 ms later
+    newflows=dict(kind="udp_newflows", rates=[500, 1000, 2000, 4000, 8000, 12000],
+                  step_seconds=2, reply_delay=0.05),
 )

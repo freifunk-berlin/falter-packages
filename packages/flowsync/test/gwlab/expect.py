@@ -72,4 +72,26 @@ def tcp_talk(f, c, s, grace):
     return ([e] if e else []), bool(c["connect_ms"] and c["connect_ms"] > f["rtt_ms"] + 700)
 
 
-RULES = dict(udp_rr=udp_rr, udp_stream=udp_stream, tcp_short=tcp_short, tcp_talk=tcp_talk)
+# Measurements produce numbers, not verdicts; they fail only if nothing got through.
+def udp_flood(f, c, s, grace):
+    pps = (s if f["p"]["dir"] == "up" else c).get("delivered_pps", 0)
+    return ([] if pps else ["nothing delivered"]), False
+
+
+def tcp_bulk(f, c, s, grace):
+    return ([] if c["done"] and c["mbit"] else ["no transfer: %s" % c.get("error")]), False
+
+
+def udp_newflows(f, c, s, grace):
+    return ([] if any(st["answered"] for st in c["steps"]) else ["no flow was answered"]), False
+
+
+def sustained(steps):
+    """the highest rate of new flows that was sent as asked and answered to 99 %"""
+    ok = [st["achieved"] for st in steps
+          if st["answered"] >= 0.99 * st["sent"] and st["achieved"] >= 0.9 * st["rate"]]
+    return max(ok) if ok else 0
+
+
+RULES = dict(udp_rr=udp_rr, udp_stream=udp_stream, tcp_short=tcp_short, tcp_talk=tcp_talk,
+             udp_flood=udp_flood, tcp_bulk=tcp_bulk, udp_newflows=udp_newflows)

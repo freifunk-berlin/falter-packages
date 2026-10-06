@@ -45,8 +45,10 @@ def lab(args, opts):
             impl.start(g)
         flows = [dict(f) for f in sc.FLOWS if args.flow in f["id"]]
         lb.place(flows)
+        alone, at = getattr(sc, "ALONE", False), 0.0
         for n, f in enumerate(flows):
-            f["start"] = 0.01 * n               # not all in the same instant
+            f["start"] = at if alone else 0.01 * n      # one after the other / not all in the same instant
+            at += span(f["p"]) + 2
         time.sleep(2)                           # the implementations settle
         cpu0 = {n: g.cpu_ms() for n, g in lb.gw.items()}
         job = dict(t0=time.monotonic() + 3, grace=expect.GRACE)
@@ -61,6 +63,14 @@ def lab(args, opts):
                 agents.append(e.node.spawn(sys.executable, os.path.join(HERE, "agent.py"), role, jf, rf,
                                            log=os.path.join(out, "%s.log" % e.node.name)))
                 parts.append(rf)
+        windows = {}
+        if alone:                               # CPU per gateway while each flow ran
+            for f in flows:
+                time.sleep(max(0, job["t0"] + f["start"] - time.monotonic()))
+                a = {n: g.cpu_ms() for n, g in lb.gw.items()}
+                time.sleep(max(0, job["t0"] + f["start"] + span(f["p"]) - time.monotonic()))
+                windows[f["id"]] = {n: [round(x - y) for x, y in zip(g.cpu_ms(), a[n])]
+                                    for n, g in lb.gw.items() if a[n]}
         for a in agents:
             a.wait()
         seen = {"client": {}, "server": {}}
@@ -81,10 +91,10 @@ def lab(args, opts):
     for f in flows:
         c, s = seen["client"].get(f["id"]), seen["server"].get(f["id"])
         bad, retry = expect.judge(f, c, s)
-        res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry))
+        res.append(dict(flow=f, client=c, server=s, bad=bad, retry=retry, cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,
-                       gateways=gws, flows=res), fh, indent=1)
+                       alone=alone, gateways=gws, flows=res), fh, indent=1)
     return 0
 
 
@@ -109,9 +119,11 @@ def main():
         raise SystemExit("%s needs real root: run it in a VM" % args.impl)
     args.out = os.path.abspath(args.out or tempfile.mkdtemp(prefix="gwlab."))
     fleets = args.fleet or list(sc.FLEETS)
-    longest = max(span(f["p"]) for f in sc.FLOWS if args.flow in f["id"])
+    alone = getattr(sc, "ALONE", False)
+    spans = [span(f["p"]) for f in sc.FLOWS if args.flow in f["id"]]
+    secs = (sum(spans) + 2 * len(spans) + 15) * len(fleets) if alone else max(spans) + 20
     print("%s on %s: fleets %s, about %d s; results in %s"
-          % (args.scenario, args.impl, ", ".join(fleets), longest + 20, args.out), flush=True)
+          % (args.scenario, args.impl, ", ".join(fleets), secs, args.out), flush=True)
     wrap = ["unshare", "-n"] if root else ["unshare", "-Urn"]
     if not root and subprocess.run(["systemd-run", "--user", "--scope", "-q", "true"],
                                    capture_output=True).returncode == 0:
@@ -125,6 +137,8 @@ def main():
             argv += ["--set", kv]
         log = open(os.path.join(args.out, fl, "lab.log"), "w")
         procs.append((fl, subprocess.Popen(argv, cwd=os.path.dirname(HERE), stdout=log, stderr=log)))
+        if alone:
+            procs[-1][1].wait()                 # measurements: one lab at a time
     failed = 0
     for fl, p in procs:
         rc = p.wait()

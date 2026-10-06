@@ -1,6 +1,8 @@
 """The two tables of a lab run, and the failures."""
 import statistics
 
+from .expect import sustained
+
 
 def table(rows, head):
     w = [max(len(str(r[i])) for r in [head] + rows) for i in range(len(head))]
@@ -15,8 +17,42 @@ def connects(res):
     return [r["connect_ms"] for r in c.get("conns", [c]) if r.get("connect_ms") is not None]
 
 
+def measured(r):
+    """a measurement's result in words"""
+    f, c, s = r["flow"], r["client"] or {}, r["server"] or {}
+    kind = f["p"]["kind"]
+    if kind == "udp_flood":
+        return "%d kpps" % ((s if f["p"]["dir"] == "up" else c).get("delivered_pps", 0) / 1000)
+    if kind == "tcp_bulk":
+        return "%s Mbit/s, connect %d ms" % (c.get("mbit"), c.get("connect_ms") or 0)
+    steps = c.get("steps", [])
+    return "%d flows/s sustained (%s)" % (
+        sustained(steps), ", ".join("%d: %d%%" % (st["achieved"], 100 * st["answered"] / max(1, st["sent"]))
+                                    for st in steps))
+
+
+def render_alone(run):
+    out = ["== %s, %s, fleet %s ==" % (run["scenario"], run["impl"], run["fleet"])]
+    rows = []
+    for r in run["flows"]:
+        f, cpu = r["flow"], r["cpu_ms"] or {}
+        others = [n for n in cpu if n not in (f["fwd"], f["rev"])]
+
+        def show(n):
+            return "%d / %d" % tuple(cpu[n]) if n in cpu else "n/a"
+        rows.append([f["traffic"], "asym" if f["asym"] else "sym",
+                     "FAIL: " + "; ".join(r["bad"]) if r["bad"] else measured(r),
+                     show(f["fwd"]), show(f["rev"]) if f["asym"] else "-",
+                     show(others[0]) if others else "-"])
+    out.append(table(rows, ["traffic", "path", "result", "cpu ms user / sys: fwd gw", "return gw",
+                            "idle peer"]))
+    return "\n".join(out)
+
+
 def render(run):
     """run: what a lab wrote to results.json"""
+    if run.get("alone"):
+        return render_alone(run)
     out = ["== %s, %s, fleet %s: %d flows, %d FAIL =="
            % (run["scenario"], run["impl"], run["fleet"], len(run["flows"]),
               sum(1 for r in run["flows"] if r["bad"]))]
