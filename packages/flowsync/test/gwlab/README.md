@@ -97,26 +97,45 @@ scaled about ten times shorter than production's, and the conntrack hash
 table is shared by all namespaces of the host, which makes every table dump
 cost a walk of the host's buckets.
 
+## Time
+
+Every timer is written in its production value: the gateways' conntrack
+settings in `timers.py`, an implementation's own timers in its adapter (as it
+ships them), a scenario's durations and event times in its traffic. One
+factor divides them all: `--scale N`, default 10 (1 = production time). So
+what expires before what stays as on a gateway, and a run takes minutes.
+
+- Link delays, the sync itself and the endpoints' TCP retransmission timers
+  are real time and do not scale. The larger the scale, the slower a real
+  second of sync latency is against the timers: at 100 it weighs like 100 s.
+  High scales are fair only to implementations that sync in milliseconds.
+- No timer goes below a second (the kernel's and the daemons' are whole
+  seconds). One that would is held at 1 s and named in the report's header.
+- `longlived` runs at scale 100: 4.5 hours of connection in under three
+  minutes. TCP established and unacknowledged keep their ratio there, the
+  UDP timers and flowsync's interval are held at 1 s.
+
 ## Scenarios
 
-    python3 -m gwlab steady|reroute|stateloss|blackout|uplink|latency|perf --impl NAME
+    python3 -m gwlab steady|reroute|stateloss|blackout|uplink|longlived|latency|perf --impl NAME [--scale N]
 
 | Scenario | What happens | Result |
 |---|---|---|
 | `steady` | 400 flows over every gateway pair, three fleets | pass / FAIL per flow |
-| `reroute` | 20 s in every return path moves to the next gateway, 40 s in every forward path | pass / FAIL |
+| `reroute` | a third in every return path moves to the next gateway, two thirds in every forward path | pass / FAIL |
 | `stateloss` | gw2 loses every flow it knows (the implementation's `lose_state`) | pass / FAIL |
 | `blackout` | gw2 is cut off from the sync while every flow starts | pass / FAIL |
 | `uplink` | gw2's uplink device is deleted and created again (new ifindex, same MAC) | pass / FAIL |
+| `longlived` | one connection per gateway pair talks for 2.2 established timeouts, scale 100 | pass / FAIL |
 | `latency` | new flows to a server at distance 0 that holds its first answer back by 0 to 1000 ms | from which delay on every answer passes: the sync latency, seen from outside |
 | `perf` | one flow at a time, nothing else running, no link latency | numbers, below |
 
 After an event a flow has to deliver again and no connection may reset; the
 report's recovery column says how long the loss went on after the event
-ended (median / worst over the flows that lost something). A loss later in
-the flow that has nothing to do with the event shows up there as a long
-recovery. The lab's timers are about ten times shorter than production's:
-a repair that rides on a refresh interval takes that much longer on a router.
+ended (median / worst over the flows that lost something, in real seconds).
+A loss later in the flow that has nothing to do with the event shows up
+there as a long recovery. A repair that rides on a timer takes scale times
+longer on a router.
 
 `perf` is a measurement (`ALONE = True`: labs and flows one after the other)
 on three gateways, each traffic over one gateway and over two:

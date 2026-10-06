@@ -14,6 +14,23 @@ def grid(traffic, client, server, fwd, rev):
     return flows
 
 
+SCALED = ("tcp_short", "tcp_talk", "udp_rr", "udp_stream")      # traffic written in production time
+
+
+def in_lab(p, timers):
+    """a traffic description in lab time"""
+    if p["kind"] not in SCALED:
+        return p
+    p = dict(p)
+    for k in ("seconds", "every"):
+        if k in p:
+            p[k] = timers.span(p[k])
+    for k in ("up_pps", "down_pps"):
+        if k in p:
+            p[k] = p[k] * timers.scale
+    return p
+
+
 def span(p):
     """seconds a flow of this traffic lasts"""
     if p["kind"] == "udp_newflows":

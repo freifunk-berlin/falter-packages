@@ -4,20 +4,16 @@ that keep conntrack as the state (none, flowsync, conntrackd).
 The forward chain as fw4 renders it on the gateways: policy reject, established
 accept, the mesh may go anywhere; per policy the rate-limited stateless accept
 for TCP segments with ACK or RST (bbb-configs) and flow offloading.
-Conntrack timeouts are scaled so that a run of a minute crosses them several
-times (OpenWrt: UDP 60/180 s, TCP established 7440 s, unacknowledged 300 s).
+The conntrack timeouts are production's, divided by the lab's scale (timers.py).
 """
 import sys
-
-TIMEOUTS = dict(udp_timeout=10, udp_timeout_stream=20, tcp_timeout_syn_sent=12,
-                tcp_timeout_established=30, tcp_timeout_unacknowledged=15)
 
 FLUSH = ("import socket, struct; s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, 12); "
          "s.send(struct.pack('=IHHIIBBH', 20, 0x0102, 5, 1, 0, 10, 0, 0)); s.recv(4096)")
 
 
 def install(gw, extra_tables=""):
-    gw.node.sysctl(**{"net.netfilter.nf_conntrack_" + k: v for k, v in TIMEOUTS.items()},
+    gw.node.sysctl(**{"net.netfilter.nf_conntrack_" + k: v for k, v in gw.timers.conntrack().items()},
                    **{"net.netfilter.nf_conntrack_checksum": 0})
     p = gw.policy
     gw.node.nft("""

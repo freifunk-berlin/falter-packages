@@ -5,6 +5,8 @@
   --set KEY=VALUE     an option of the implementation, repeatable (bin=..., see impl/*.py)
   --fleet NAME ..     only these fleets of the scenario (default: all, in parallel)
   --flow TEXT         only flows whose name contains TEXT (e.g. 'tcp_talk:A>gw1>B>gw2')
+  --scale N           production's timers and the scenario's durations divided by N
+                      (default: the scenario's, usually 10; 1 = production time)
   --out DIR           where results and logs go (default: a new directory in /tmp)
 
 One lab per fleet, each in namespaces of its own: unprivileged
@@ -24,7 +26,8 @@ import time
 from . import expect, report
 from .impl import load
 from .lab import Lab
-from .scenario import grid, span
+from .scenario import grid, in_lab, span
+from .timers import Timers
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -82,8 +85,11 @@ def lab(args, opts):
     impl = load(args.impl, opts)
     fleet = sc.FLEETS[args.fleet[0]]
     out = os.path.join(args.out, args.fleet[0])
-    alone, events = getattr(sc, "ALONE", False), getattr(sc, "EVENTS", [])
-    lb = Lab(sc.TOPOLOGY, fleet, out)
+    timers = Timers(args.scale)
+    alone = getattr(sc, "ALONE", False)
+    events = [dict(e, at=timers.span(e["at"]), seconds=timers.span(e.get("seconds", 0)))
+              for e in getattr(sc, "EVENTS", [])]
+    lb = Lab(sc.TOPOLOGY, fleet, out, timers)
     try:
         for g in lb.gw.values():
             if g.policy["offload"] and not impl.offload:
@@ -94,7 +100,7 @@ def lab(args, opts):
         time.sleep(2)                           # the implementations settle
         # verdicts depend on how fast the implementation syncs: measure it first
         sync_ms, ladder = (None, None) if alone else measure_sync(lb, out)
-        flows = [dict(f) for f in sc.FLOWS if args.flow in f["id"]]
+        flows = [dict(f, p=in_lab(f["p"], timers)) for f in sc.FLOWS if args.flow in f["id"]]
         lb.place(flows)
         at = 0.0
         for n, f in enumerate(flows):
@@ -149,7 +155,8 @@ def lab(args, opts):
                         cpu_ms=windows.get(f["id"])))
     with open(os.path.join(out, "results.json"), "w") as fh:
         json.dump(dict(scenario=args.scenario, impl=args.impl, fleet=args.fleet[0], dir=out,
-                       alone=alone, events=len(events), sync_ms=sync_ms, ladder=ladder, gateways=gws, flows=res), fh, indent=1)
+                       alone=alone, events=len(events), scale=timers.scale, clamped=timers.clamped,
+                       sync_ms=sync_ms, ladder=ladder, gateways=gws, flows=res), fh, indent=1)
     return 0
 
 
@@ -160,6 +167,7 @@ def main():
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--fleet", nargs="*", default=[])
     ap.add_argument("--flow", default="")
+    ap.add_argument("--scale", type=float)
     ap.add_argument("--out")
     ap.add_argument("--inside", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
@@ -175,7 +183,8 @@ def main():
     args.out = os.path.abspath(args.out or tempfile.mkdtemp(prefix="gwlab."))
     fleets = args.fleet or list(sc.FLEETS)
     alone = getattr(sc, "ALONE", False)
-    spans = [span(f["p"]) for f in sc.FLOWS if args.flow in f["id"]]
+    args.scale = args.scale or getattr(sc, "SCALE", 10)
+    spans = [span(in_lab(f["p"], Timers(args.scale))) for f in sc.FLOWS if args.flow in f["id"]]
     secs = (sum(spans) + 2 * len(spans) + 15) * len(fleets) if alone else max(spans) + 35
     print("%s on %s: fleets %s, about %d s; results in %s"
           % (args.scenario, args.impl, ", ".join(fleets), secs, args.out), flush=True)
@@ -187,7 +196,7 @@ def main():
     for fl in fleets:
         os.makedirs(os.path.join(args.out, fl), exist_ok=True)
         argv = wrap + [sys.executable, "-m", "gwlab", args.scenario, "--inside", "--impl", args.impl,
-                       "--fleet", fl, "--flow", args.flow, "--out", args.out]
+                       "--fleet", fl, "--flow", args.flow, "--out", args.out, "--scale", str(args.scale)]
         for kv in args.set:
             argv += ["--set", kv]
         log = open(os.path.join(args.out, fl, "lab.log"), "w")

@@ -10,7 +10,7 @@ import time
 from . import TEST, Impl, children, ctfw
 from ..ns import kill
 
-INTERVAL, ELEMENT_TIMEOUT = 3, 9        # scaled like the conntrack timeouts (production 30 / 90 s)
+INTERVAL, ELEMENT_TIMEOUT = 30, 90      # its own timers as shipped (seconds); the lab scales them
 
 
 class IMPL(Impl):
@@ -27,7 +27,10 @@ class IMPL(Impl):
                 "-b", gw.addr4, "-I", gw.uplink_if]
         for p in gw.peers4:
             argv += ["-e", p]
-        argv += ["-x", gw.client_net, "-D", gw.mesh_net, "-i", INTERVAL, "-t", ELEMENT_TIMEOUT,
+        interval = gw.timers.s("flowsync interval", INTERVAL)
+        # the daemon insists on three intervals, also where the scale holds both at 1 s
+        element = max(gw.timers.s("flowsync element_timeout", ELEMENT_TIMEOUT), 3 * interval)
+        argv += ["-x", gw.client_net, "-D", gw.mesh_net, "-i", interval, "-t", element,
                  "-s", os.path.join(gw.dir, "status"), "run"]
         self.procs[gw.name] = gw.spawn(*argv)
 

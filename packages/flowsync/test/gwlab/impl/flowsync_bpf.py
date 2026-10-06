@@ -14,9 +14,10 @@ from . import TEST, Impl, children
 from ..ns import kill
 
 MARK = 0x01000000
-INTERVAL, ELEMENT_TIMEOUT = 3, 9
-# lifetimes of a flow after its last packet out, scaled (production 180, 7440, 120, 120, 600 s)
-TIMEOUTS = {"udp": 12, "tcp": 40, "tcp-syn": 10, "tcp-close": 8, "other": 15}
+# its own timers as shipped (seconds); the lab scales them
+INTERVAL, ELEMENT_TIMEOUT = 30, 90
+# lifetimes of a flow after its last packet out
+TIMEOUTS = {"udp": 180, "tcp": 7440, "tcp-syn": 120, "tcp-close": 120, "other": 600}
 
 RULES = """
 table inet fw {
@@ -61,7 +62,7 @@ class IMPL(Impl):
                 "--pin-dir", "/sys/fs/bpf/gwlab-%d-%s" % (os.getpid(), gw.name),
                 "--bpf-object", self.obj]
         for k, v in TIMEOUTS.items():
-            argv += ["--%s-timeout" % k, v]
+            argv += ["--%s-timeout" % k, gw.timers.s("flowsync-bpf %s timeout" % k, v)]
         return argv
 
     def install(self, gw):
@@ -76,7 +77,10 @@ class IMPL(Impl):
                 "-b", gw.addr4, "-I", gw.uplink_if]
         for p in gw.peers4:
             argv += ["-e", p]
-        argv += ["-x", gw.client_net, "-D", gw.mesh_net, "-i", INTERVAL, "-t", ELEMENT_TIMEOUT,
+        interval = gw.timers.s("flowsync-bpf interval", INTERVAL)
+        # the daemon insists on three intervals, also where the scale holds both at 1 s
+        element = max(gw.timers.s("flowsync-bpf element_timeout", ELEMENT_TIMEOUT), 3 * interval)
+        argv += ["-x", gw.client_net, "-D", gw.mesh_net, "-i", interval, "-t", element,
                  "-s", os.path.join(gw.dir, "status")] + self.base(gw) + ["run"]
         self.procs[gw.name] = gw.spawn(*argv)
 

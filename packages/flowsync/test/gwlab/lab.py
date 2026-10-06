@@ -32,7 +32,7 @@ class Gateway:
     client_net, mesh_net = CLIENT_NET, MESH_NET
 
     def __init__(self, lab, name, i, spec, policy):
-        self.lab, self.name, self.i = lab, name, i
+        self.lab, self.name, self.i, self.timers = lab, name, i, lab.timers
         self.mesh_ms, self.uplink_ms = spec["mesh"], spec["uplink"]
         self.policy = {"bypass": False, "offload": False, **policy}
         self.node = Node.create(name)
@@ -94,8 +94,8 @@ class Endpoint:
 
 
 class Lab:
-    def __init__(self, topology, fleet, workdir):
-        self.dir = workdir
+    def __init__(self, topology, fleet, workdir, timers):
+        self.dir, self.timers = workdir, timers
         os.makedirs(workdir, exist_ok=True)
         self._cg = self._cgroup_base()
         self.hub = Node("hub")

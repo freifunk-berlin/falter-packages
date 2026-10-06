@@ -101,7 +101,7 @@ def c_udp_rr(f, p, t0):
             s.send(struct.pack("!I", k) + PAD)
         except OSError:
             refused += 1
-        ok, end = False, t + p.get("wait", 0.8)
+        ok, end = False, t + min(0.8, p["every"])
         while not ok and mono() < end:
             if not select.select([s], [], [], max(0, end - mono()))[0]:
                 break

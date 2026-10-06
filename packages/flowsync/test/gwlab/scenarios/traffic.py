@@ -1,13 +1,20 @@
-"""What a flow does. The kinds are implemented in agent.py."""
+"""What a flow does. The kinds are implemented in agent.py.
+
+The first group is written in production time and runs faster by the lab's
+scale (seconds and intervals divided, packet rates multiplied): at the default
+scale of 10 a flow that talks every 10 s for 10 minutes talks every second
+for one. The rest is real time."""
 TRAFFIC = dict(
     # five separate connections, a request and a response each (web)
-    tcp_short=dict(kind="tcp_short", connections=5, every=2, request=200, response=2000),
-    # one connection talking every second for a minute (ssh, a tunnel)
-    tcp_talk=dict(kind="tcp_talk", seconds=60, every=1),
+    tcp_short=dict(kind="tcp_short", connections=5, every=20, request=200, response=2000),
+    # one connection talking every 10 s for ten minutes (ssh, a tunnel)
+    tcp_talk=dict(kind="tcp_talk", seconds=600, every=10),
+    # one connection talking for 2.2 established timeouts (scenario longlived)
+    tcp_long=dict(kind="tcp_talk", seconds=2.2 * 7440, every=10),
     # ask, get an answer, ten times (an API over UDP)
-    udp_rr=dict(kind="udp_rr", requests=10, every=1),
-    # a call or a QUIC download: both ends send for 50 s
-    udp_stream=dict(kind="udp_stream", up_pps=10, down_pps=20, seconds=50),
+    udp_rr=dict(kind="udp_rr", requests=10, every=10),
+    # both ends keep sending for 2.8 UDP stream timeouts (a call, a QUIC download)
+    udp_stream=dict(kind="udp_stream", up_pps=1, down_pps=2, seconds=500),
     # how late may the first answer be for the return gateway to know the flow?
     ladder=dict(kind="udp_ladder", delays_ms=[0, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]),
 

@@ -70,6 +70,9 @@ def render(run):
     out = ["== %s, %s, fleet %s: %d flows, %d FAIL =="
            % (run["scenario"], run["impl"], run["fleet"], len(run["flows"]),
               sum(1 for r in run["flows"] if r["bad"]))]
+    if not run.get("alone"):
+        out.append("time: production's timers and the scenario's durations divided by %g%s"
+                   % (run["scale"], "".join("; %s (%g s) held at 1 s" % kv for kv in run["clamped"].items())))
     if run.get("ladder"):
         ms = run["sync_ms"]
         out.append("sync latency measured before the flows: %s" % (
