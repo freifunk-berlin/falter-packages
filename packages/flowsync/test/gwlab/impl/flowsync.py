@@ -61,9 +61,11 @@ class IMPL(Impl):
                                                                        "flowsync.o")))
         self.procs = {}
 
+    def pin(self, gw):
+        return "/sys/fs/bpf/gwlab-%d-%s" % (os.getpid(), gw.name)
+
     def base(self, gw):
-        argv = ["-U", gw.uplink_if, "--fw-table", "fw",
-                "--pin-dir", "/sys/fs/bpf/gwlab-%d-%s" % (os.getpid(), gw.name),
+        argv = ["-U", gw.uplink_if, "--fw-table", "fw", "--pin-dir", self.pin(gw),
                 "--bpf-object", self.obj]
         if self.opts.get("nfbypass", "0") not in ("", "0"):
             argv.append("--bypass")
@@ -100,10 +102,16 @@ class IMPL(Impl):
                     break
                 time.sleep(0.05)
             kill(p)
-        # programs and maps outlive the daemon: take them down with the lab
+
+    def uninstall(self, gw):
+        """programs and maps outlive the daemon (that is the design: a restart
+        interrupts nothing): they go with the lab"""
         gw.node.run(self.bin, *map(str, self.base(gw)), "detach", check=False)
 
     def lose_state(self, gw):
-        """as after a reboot: programs off, maps gone, daemon started again"""
+        """every flow forgotten, as conntrack -F does for the others: the
+        daemon restarts without its pinned maps, makes empty ones and swaps
+        the programs on the uplink over to them; the rules stay"""
         self.stop(gw)
+        gw.node.run("rm", "-rf", self.pin(gw), check=False)
         self.start(gw)

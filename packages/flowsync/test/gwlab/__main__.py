@@ -172,6 +172,7 @@ def lab(args, opts):
                           cpu_ms=[c1[0] - cpu0[n][0], c1[1] - cpu0[n][1]] if c1 and cpu0[n] else None)
         for g in lb.gw.values():
             impl.stop(g)
+            impl.uninstall(g)
     finally:
         lb.close()
     res = []

@@ -9,7 +9,8 @@ peers' sync addresses, a policy and a directory) and never looks inside:
                   with ACK or RST; offload: flow offloading, if supported),
                   kernel settings, configuration
   start(gw)       start syncing (processes via gw.spawn, so their CPU is counted)
-  stop(gw)
+  stop(gw)        stop syncing, as a restart or a crash does
+  uninstall(gw)   take down what outlives the processes, when the lab ends
   lose_state(gw)  forget every flow, as a flush or a reboot would
   bypassed(gw)    packets its firewall let through without knowing their flow
                   (the stateless accept), per (source, destination)
@@ -40,6 +41,9 @@ class Impl:
         pass
 
     def stop(self, gw):
+        pass
+
+    def uninstall(self, gw):
         pass
 
     def lose_state(self, gw):
