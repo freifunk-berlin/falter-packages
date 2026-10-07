@@ -15,7 +15,7 @@ started. With flowsync that state is not a conntrack entry:
   *Egress*: every forwarded IPv6 packet leaving through the uplink keeps its
   flow alive in the **local** map. *Ingress*: a packet from the uplink whose
   flow is alive in the local or the **remote** map gets a packet mark. They
-  sit on the device's tcx hooks (kernel 6.6 and later), not on a qdisc: SQM
+  sit on the device's tcx hooks, not on a qdisc: SQM
   or any other qdisc and filter setup on the uplink stays as it is.
 - **The firewall accepts the mark** (one rule in fw4's forward chain) and
   treats everything else from the uplink as before: the stateless rules, then
@@ -589,11 +589,13 @@ Not done or not verified yet:
   mipsel_24kc, aarch64_generic and mips64_octeonplus (what the repository's
   CI builds), the snapshot's bpf-headers (6.12; the kernel is 6.18); the unit
   test built by the SDK's toolchain passes under qemu on mips64 big-endian
-  and mipsel. OpenWrt 24.10 (kernel 6.6, bpf-headers 6.6) has not been
-  built: the programs compile there (`BPF_FIB_LOOKUP_MARK` is left out, so
-  the bypass does not see routing rules on the mark), the heartbeat uses
-  destroy+add for it, nothing has run on it. No built package has been
-  installed anywhere.
+  and mipsel. The gateways run kernel 6.12, which is the minimum this
+  version is written for: the tcx hooks (6.6), the fib lookup with the
+  mark (6.10) and the refresh of a set element's expiration (6.12). The
+  code would also build and run against 6.6 headers and kernels (the mark
+  flag is guarded by the headers' version, the heartbeat is a destroy and
+  an add), but that is untested and not a target. No built package has
+  been installed anywhere.
 - The programs use BPF helpers only, no kfuncs: a kfunc call needs the
   kernel's own BTF, which no OpenWrt target builds, and the MIPS JIT does
   not support kfunc calls. Conntrack kfuncs, dynptr parsing and the
@@ -608,8 +610,8 @@ Not done or not verified yet:
 - Whether the gateways route forwarded traffic by source (policy routing
   rules) has not been checked; if they do, the outbound notrack rule needs
   another predicate (see "Known limits").
-- The tcx attachment needs kernel 6.6 and libbpf 1.3 (OpenWrt 24.10 has
-  6.6 and 1.5). It has run next to an ingress qdisc with an IFB redirect
+- The tcx attachment needs libbpf 1.3 (OpenWrt ships 1.5). It has run
+  next to an ingress qdisc with an IFB redirect
   and fq_codel in the VM (dptest `ingress_qdisc`), not next to sqm-scripts
   on a device.
 - The mark a reassembled packet inherits is kernel behaviour read from the

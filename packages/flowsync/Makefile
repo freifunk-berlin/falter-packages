@@ -19,7 +19,7 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/bpf.mk
 
 # libbpf loads the tc programs and talks to their maps. They attach to the
-# uplink's tcx hooks (kernel 6.6, CONFIG_NET_XGRESS, which BPF_SYSCALL
+# uplink's tcx hooks (CONFIG_NET_XGRESS, which BPF_SYSCALL
 # selects): no qdisc and no scheduler module is involved, SQM and the like
 # keep theirs. The rules are read and written with nft, which firewall4
 # brings (with kmod-nft-fib, for the notrack rule).

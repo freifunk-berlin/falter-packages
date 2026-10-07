@@ -309,7 +309,7 @@ static __always_inline int bypass(struct __sk_buff *skb, const struct fs_key *k,
 	/* routing rules that match the packet mark see what they see on the
 	 * normal path: the mark as it is here, ours included. The flag and the
 	 * field came with kernel 6.10 (an enum, not a macro: the headers'
-	 * version tells); built against older headers (OpenWrt 24.10, 6.6) the
+	 * version tells); built against headers older than that, the
 	 * lookup ignores the mark, and such rules need the bypass off. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 	fib.mark = skb->mark;
