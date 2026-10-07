@@ -46,9 +46,19 @@ void tx_event(const struct flow *f)
 
 static void ring_check(void)
 {
+	static bool seeded;
 	struct fs_stats st;
 
-	if (dp_stats(&st) || st.ev_lost == ring_lost)
+	if (dp_stats(&st))
+		return;
+	/* the counter is in a pinned map and survives restarts: what earlier
+	 * runs lost is not this run's */
+	if (!seeded) {
+		ring_lost = st.ev_lost;
+		seeded = true;
+		return;
+	}
+	if (st.ev_lost == ring_lost)
 		return;
 	cnt.ev_overruns += st.ev_lost - ring_lost;
 	ring_lost = st.ev_lost;

@@ -90,8 +90,11 @@ static inline __u32 fs_age(__u32 now, __u32 seen)
 	return age > 0 ? age : 0;
 }
 
-/* how long a local flow lives after its last packet out */
-static inline __u32 fs_ttl(const struct fs_cfg *c, __u8 proto, __u8 flags)
+/* how long a local flow lives after its last packet out. The program passes
+ * its `const volatile` configuration: with the volatile cast away the
+ * compiler folds the initialisers into the code and the daemon's values
+ * are never read (C11 6.7.3p6). */
+static inline __u32 fs_ttl(const volatile struct fs_cfg *c, __u8 proto, __u8 flags)
 {
 	if (proto == FS_PROTO_UDP)
 		return c->t_udp;

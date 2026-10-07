@@ -43,8 +43,15 @@ $(BPF_OBJ): bpf/flowsync.bpf.c dp.h
 $(TEST): $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TEST_OBJS)
 
-test: $(TEST)
+test: $(TEST) $(BPF_OBJ)
 	$(TEST_RUNNER) ./$(TEST)
+	@# the timeouts must be read from the configuration section, never folded
+	@# into the code (fs_ttl takes the volatile pointer): none of the defaults
+	@# 7440/600/180 may appear as an immediate
+	@if command -v llvm-objdump >/dev/null; then \
+		if llvm-objdump -d $(BPF_OBJ) | grep -Eq '(0x1d10|0x258|0xb4)\b'; then \
+			echo "a timeout default is compiled into $(BPF_OBJ)"; exit 1; fi; \
+		echo "ok: no timeout default folded into $(BPF_OBJ)"; fi
 
 # data path tests in network namespaces (../test/gwlab, see its README.md):
 # the daemon on a fleet of gateways with real traffic over every gateway pair,

@@ -45,7 +45,7 @@ table ip6 flowsync {
 	}
 	chain prerouting {
 		type filter hook prerouting priority raw; policy accept;
-		meta mark & 0x01000000 == 0x01000000 notrack
+		meta mark & 0x01000000 == 0x01000000 notrack accept
 		fib daddr oif @alive notrack
 	}
 	chain defrag {

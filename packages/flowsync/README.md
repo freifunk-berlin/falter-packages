@@ -148,16 +148,23 @@ ruleset changes, and looks every `interval`):
        }
        chain prerouting {
            type filter hook prerouting priority raw; policy accept;
-           meta mark & 0x01000000 == 0x01000000 notrack
+           meta mark & 0x01000000 == 0x01000000 notrack accept
            fib daddr oif @alive notrack
        }
 
    A packet the ingress program marked is untracked: its flow is in the
-   tables. A packet routed out of an interface in `alive` is untracked: that
-   is the uplink, while the daemon vouches for it. The daemon writes the
-   element over netlink (no fork) every `alive_timeout`/3 seconds with
-   `timeout` and `expires` set, right after `dp_tick()` found both programs
-   on the uplink; it deletes it at once when they are not there. Without a
+   tables. `accept` ends this chain only (conntrack and fw4 still run); it
+   spares every accepted packet the route lookup of the second rule, which
+   cannot match it. A packet routed out of an interface in `alive` is
+   untracked: that is the uplink, while the daemon vouches for it. The daemon
+   writes the element over netlink (no fork) every `alive_timeout`/3 seconds,
+   as a destroy and an add with `timeout` and `expires` in one transaction
+   (only kernel 6.12 and later refresh an element that exists; the destroy
+   is no error on a missing one), right after `dp_tick()` found both
+   programs on the uplink; it deletes it at once when they are not there.
+   The chain's place is fixed: after defragmentation (-400, which skips
+   untracked packets) and before conntrack (-200); `raw` is the only named
+   priority in that window. Without a
    refresh the element is gone after `alive_timeout`, and what leaves is
    tracked: conntrack has an entry for the flow when an unmarked reply comes
    back. Family `ip6`, so the rules need no `meta nfproto`; the device's
@@ -407,7 +414,7 @@ The daemon is configured on the command line only. The init script renders
 | `-A, --alive-timeout SEC` | `alive_timeout` | `10` | how long what leaves through the uplink stays untracked after the daemon last saw the programs on it; refreshed every third of it. Expiry tracks, it never rejects |
 | `-m, --mark HEX` | `mark` | `0x01000000` | packet mark of accepted packets; the fw4 include must name the same value |
 | `-F, --max-flows N` | `max_flows` | `131072` | size of the local map. It is an LRU: when full, the flow that has been idle longest makes room. About 100 bytes per entry, allocated at start |
-| `-C, --max-remote N` | `max_remote` | `131072` | size of the remote map; when full, new flows are refused |
+| `-C, --max-remote N` | `max_remote` | `131072` | size of the remote map; when full, new flows are refused. Preallocated like the local map (a map that allocates per entry refills its caches from the timer tick on MIPS and refuses a resync's burst) |
 | `--udp-timeout SEC` etc. | `udp_timeout`, `tcp_timeout`, `tcp_syn_timeout`, `tcp_close_timeout`, `other_timeout` | see above | lifetime of a local flow after its last packet out |
 | `-P, --proto NAME` | `proto` (list) | `udp`, `tcp`, `esp`, `gre`, `ipip`, `ip6ip6`, `l2tp` | synced protocols: these names, `sctp`, or a protocol number. Giving the option replaces the default list |
 | `-S, --skip-server-port N` | `skip_server_port` (list) | `53` | UDP server ports never synced |
@@ -471,6 +478,7 @@ The status file (`flowsync status`), written every `interval`:
 | | meaning |
 |---|---|
 | `attached` | the programs are on the uplink |
+| `jited` | the programs run JIT-compiled (0: interpreted, see "Open points") |
 | `bypass` | the bypass is on |
 | `fw_ok` | the accept rule and the table are in place |
 | `alive` | the uplink's element is in the set: what leaves through it is untracked (0 while conntrack carries) |
@@ -545,8 +553,9 @@ flowsync, which was never deployed, is on branch `flowsync-conntrack`.
 - **Closed connections linger.** The reply gateway learns nothing from the
   server's FIN or RST, and a client that vanishes without a FIN leaves its
   flow for `tcp_timeout`. The local map is an LRU, so a full map evicts the
-  idlest flows first, but an evicted flow that was merely idle loses its way
-  back in.
+  flows idle longest, where idle means no packet in either direction (the
+  ingress lookup counts as use too), in the kernel's approximate order; an
+  evicted flow that was merely idle loses its way back in.
 - **An idle connection lives `tcp_timeout`** after the client's last segment,
   then the server's next push is reset.
 - **Sync is unauthenticated.** Peers are recognised by their source address
@@ -578,9 +587,22 @@ Not done or not verified yet:
 
 - The package builds with the snapshot SDK and its BPF toolchain for x86_64,
   mipsel_24kc, aarch64_generic and mips64_octeonplus (what the repository's
-  CI builds), kernel 6.18 headers; the unit test built by the SDK's toolchain
-  passes under qemu on mips64 big-endian and mipsel. It has not been built
-  against 6.12, and no built package has been installed anywhere.
+  CI builds), the snapshot's bpf-headers (6.12; the kernel is 6.18); the unit
+  test built by the SDK's toolchain passes under qemu on mips64 big-endian
+  and mipsel. OpenWrt 24.10 (kernel 6.6, bpf-headers 6.6) has not been
+  built: the programs compile there (`BPF_FIB_LOOKUP_MARK` is left out, so
+  the bypass does not see routing rules on the mark), the heartbeat uses
+  destroy+add for it, nothing has run on it. No built package has been
+  installed anywhere.
+- The programs use BPF helpers only, no kfuncs: a kfunc call needs the
+  kernel's own BTF, which no OpenWrt target builds, and the MIPS JIT does
+  not support kfunc calls. Conntrack kfuncs, dynptr parsing and the
+  netfilter program type are therefore out of reach, by design.
+- The programs must run JIT-compiled. MIPS boots with
+  `net.core.bpf_jit_enable=0`; base-files sets it to 1 at boot. The daemon
+  logs a warning and shows `jited 0` in its status when they are
+  interpreted. Nothing has been measured on the EdgeRouter 4 yet: first
+  `bpf_stats` per program, then pktgen with conntrack, programs, bypass.
 - The daemon and the programs have not run on kernel 6.12 or on the
   edgerouter-4. The per-packet cost of the programs is unmeasured.
 - Whether the gateways route forwarded traffic by source (policy routing

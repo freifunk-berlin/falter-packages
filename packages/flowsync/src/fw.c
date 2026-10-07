@@ -63,18 +63,25 @@ static bool alive_set = true;	/* ... and not deleted since; an earlier run may h
 				 * left one: taken away at the first look without programs */
 static unsigned int alive_ifindex;	/* the index it was written for */
 
-/* run nft; script goes to its stdin if given, its stdout into out. Returns
- * its exit status, -1 if it could not be run. */
+/* run nft; script goes to its stdin if given, its stdout into out (-1 if it
+ * does not fit: a listing cut short would be acted on). Without out, nft's
+ * stderr is kept and logged with a failure, so that "could not install" says
+ * why. Returns its exit status, -1 if it could not be run. */
 static int nft(char *const argv[], const char *script, char *out, size_t outlen)
 {
 	int in[2] = { -1, -1 }, outp[2] = { -1, -1 }, status, null;
+	static char errbuf[512];
+	bool truncated = false, errs = !out;
 	sigset_t none;
 	size_t len = 0;
 	ssize_t n;
 	pid_t pid;
 
-	if (out)
-		out[0] = 0;
+	if (errs) {
+		out = errbuf;
+		outlen = sizeof(errbuf);
+	}
+	out[0] = 0;
 	if (pipe2(in, O_CLOEXEC) || pipe2(outp, O_CLOEXEC))
 		goto fail;
 	pid = fork();
@@ -87,7 +94,9 @@ static int nft(char *const argv[], const char *script, char *out, size_t outlen)
 		null = open("/dev/null", O_WRONLY);
 		dup2(in[0], 0);
 		dup2(outp[1], 1);
-		if (null >= 0)
+		if (errs)
+			dup2(outp[1], 2);
+		else if (null >= 0)
 			dup2(null, 2);
 		execvp(argv[0], argv);
 		_exit(127);
@@ -101,22 +110,39 @@ static int nft(char *const argv[], const char *script, char *out, size_t outlen)
 		char skip[512];
 
 		/* what does not fit is read and dropped, or nft would block */
-		n = out && len + 1 < outlen ? read(outp[0], out + len, outlen - 1 - len) :
-					       read(outp[0], skip, sizeof(skip));
+		n = len + 1 < outlen ? read(outp[0], out + len, outlen - 1 - len) :
+				       read(outp[0], skip, sizeof(skip));
 		if (n < 0 && errno == EINTR)
 			continue;
 		if (n <= 0)
 			break;
-		if (out && len + 1 < outlen) {
+		if (len + 1 < outlen) {
 			len += n;
 			out[len] = 0;
+		} else {
+			truncated = true;
 		}
 	}
 	close(outp[0]);
 	while (waitpid(pid, &status, 0) < 0)
 		if (errno != EINTR)
 			return -1;
-	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+	status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+	if (errs && status) {
+		while (len && (out[len - 1] == '\n' || out[len - 1] == ' '))
+			out[--len] = 0;
+		logmsg(LOG_WARNING, "nft %s: exit %d%s%s", argv[1], status, len ? ": " : "",
+		       len ? out : "");
+	}
+	if (!errs && truncated) {
+		static uint64_t last_log;
+
+		if (log_ok(&last_log))
+			logmsg(LOG_WARNING, "nft %s: listing longer than %zu bytes, not used",
+			       argv[1], outlen);
+		return -1;
+	}
+	return status;
 fail:
 	logmsg(LOG_WARNING, "nft: %s", strerror(errno));
 	if (in[0] >= 0) {
@@ -135,13 +161,14 @@ fail:
  * no table */
 static int own_table_state(void)
 {
-	char *argv[] = { "nft", "list", "table", "ip6", OWN_TABLE, NULL };
+	char *argv[] = { "nft", "-n", "list", "table", "ip6", OWN_TABLE, NULL };
 	static char buf[8192];
 	char want[64];
 
 	if (nft(argv, NULL, buf, sizeof(buf)))
 		return -1;
-	snprintf(want, sizeof(want), "meta mark & 0x%08lx == 0x%08lx notrack", cfg.mark, cfg.mark);
+	snprintf(want, sizeof(want), "meta mark & 0x%08lx == 0x%08lx notrack accept", cfg.mark,
+		 cfg.mark);
 	return strstr(buf, want) && strstr(buf, "fib daddr oif @" ALIVE_SET " notrack") ? 0 : 1;
 }
 
@@ -174,7 +201,7 @@ static int own_table_apply(void)
 		 "	}\n"
 		 "	chain prerouting {\n"
 		 "		type filter hook prerouting priority raw; policy accept;\n"
-		 "		meta mark & 0x%08lx == 0x%08lx notrack\n"
+		 "		meta mark & 0x%08lx == 0x%08lx notrack accept\n"
 		 "		fib daddr oif @" ALIVE_SET " notrack\n"
 		 "	}\n"
 		 "	chain defrag {\n"
@@ -212,13 +239,20 @@ static int alive_write(bool add, unsigned int ifindex)
 
 	if (alive_fd < 0)
 		return -EBADF;
+	uint32_t first = seq, last;
+
 	len = nfnl_alive_msg(buf, sizeof(buf), add, ifindex, cfg.alive_timeout, seq, alive_port);
-	seq += 3;
+	last = seq + NFNL_ALIVE_MSGS - 1;
+	seq += NFNL_ALIVE_MSGS;
 	if (!len)
 		return -EMSGSIZE;
+	/* an ack that came after an earlier write timed out is not this one's */
+	while (recv(alive_fd, buf, sizeof(buf), MSG_DONTWAIT) > 0)
+		;
 	if (send(alive_fd, buf, len, 0) < 0)
 		return -errno;
-	/* the ack of the one message that asked for it */
+	/* the ack of the one message that asked for it, or an error of any
+	 * message of this batch */
 	for (;;) {
 		if (poll(&pfd, 1, ACK_WAIT_MS) <= 0)
 			return -ETIMEDOUT;
@@ -229,11 +263,13 @@ static int alive_write(bool add, unsigned int ifindex)
 			return -errno;
 		}
 		for (h = (struct nlmsghdr *)buf; NLMSG_OK(h, (size_t)n); h = NLMSG_NEXT(h, n)) {
-			if (h->nlmsg_type != NLMSG_ERROR)
+			if (h->nlmsg_type != NLMSG_ERROR || h->nlmsg_seq < first ||
+			    h->nlmsg_seq > last)
 				continue;
 			e = NLMSG_DATA(h);
 			err = e->error;
-			return err;
+			if (err || h->nlmsg_seq == first + NFNL_ALIVE_ACKED(add))
+				return err;
 		}
 	}
 }
@@ -267,7 +303,7 @@ static const char *rule_next(const char *listing, const char *p, unsigned long *
 /* the forward chain with handles; -1: there is no such chain */
 static int fw_chain_list(char *buf, size_t len)
 {
-	char *argv[] = { "nft", "-a", "list", "chain", "inet", (char *)cfg.fw_table, "forward", NULL };
+	char *argv[] = { "nft", "-na", "list", "chain", "inet", (char *)cfg.fw_table, "forward", NULL };
 
 	return nft(argv, NULL, buf, len) ? -1 : 0;
 }

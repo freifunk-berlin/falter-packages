@@ -87,6 +87,7 @@ void write_status(void)
 		fprintf(f, " tx_errors %llu\n", (unsigned long long)peer_tx_errors[i]);
 	}
 	fprintf(f, "attached %d\n", gauge.attached);
+	fprintf(f, "jited %d\n", gauge.jited);
 	fprintf(f, "fw_ok %d\n", gauge.fw_ok);
 	fprintf(f, "alive %d\n", gauge.alive);
 	fprintf(f, "bypass %d\n", gauge.bypass);

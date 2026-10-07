@@ -26,6 +26,7 @@
 #include <linux/pkt_cls.h>
 #include <stddef.h>
 #include <bpf/bpf_endian.h>
+#include <linux/version.h>
 #include <bpf/bpf_helpers.h>
 
 #include "../dp.h"
@@ -40,7 +41,10 @@
 #define TCP_RST		0x04
 #define TCP_ACK		0x10
 
-/* set by the daemon (dp.c) before the programs are loaded */
+/* set by the daemon (dp.c) before the programs are loaded: it overwrites
+ * the whole section, so these initialisers are documentation, the defaults
+ * live in config.c. Read through the volatile only (fs_ttl): a cast away
+ * would let the compiler fold them into the code. */
 const volatile struct fs_cfg cfg = {
 	.mark = 0x01000000,
 	.t_udp = 180,
@@ -59,9 +63,11 @@ struct {
 } fs_local SEC(".maps");
 
 struct {
+	/* preallocated: a non-preallocated hash refills its per-CPU element
+	 * cache from an irq_work, which on MIPS runs from the 100 Hz tick
+	 * only, and a resync's burst of inserts would fail with ENOMEM */
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 131072);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 	__type(key, struct fs_key);
 	__type(value, struct fs_remote);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
@@ -212,7 +218,7 @@ int fs_egress(struct __sk_buff *skb)
 	struct fs_local *v, nv = {};
 	struct fs_key k;
 	struct pkt pk;
-	__u8 tf = 0, flags;
+	__u8 tf = 0, flags, lost;
 	__u32 now;
 
 	/* forwarded packets only: what the gateway sends itself stays with
@@ -254,10 +260,11 @@ int fs_egress(struct __sk_buff *skb)
 			nv.flags |= FS_F_CLOSING;
 	}
 	bpf_map_update_elem(&fs_local, &k, &nv, BPF_ANY);
-	if (st)
+	lost = bpf_ringbuf_output(&fs_events, &k, sizeof(k), 0) != 0;
+	if (st) {
 		st->out_new++;
-	if (bpf_ringbuf_output(&fs_events, &k, sizeof(k), 0) && st)
-		st->ev_lost++;
+		st->ev_lost += lost;
+	}
 	return TC_ACT_UNSPEC;
 }
 
@@ -283,7 +290,7 @@ static __always_inline int bypass(struct __sk_buff *skb, const struct fs_key *k,
 {
 	struct bpf_fib_lookup fib = {};
 	struct bpf_redir_neigh nh = {};
-	__u32 mtu = 0;
+	__u32 mtu = 0, flags = BPF_FIB_LOOKUP_SKIP_NEIGH;
 	__u8 hop;
 
 	if (skb->pkt_type != PACKET_HOST || !pk->plain || pk->hop_limit <= 1)
@@ -300,18 +307,25 @@ static __always_inline int bypass(struct __sk_buff *skb, const struct fs_key *k,
 	__builtin_memcpy(fib.ipv6_src, k->s, 16);
 	__builtin_memcpy(fib.ipv6_dst, k->c, 16);
 	/* routing rules that match the packet mark see what they see on the
-	 * normal path: the mark as it is here, ours included */
+	 * normal path: the mark as it is here, ours included. The flag and the
+	 * field came with kernel 6.10 (an enum, not a macro: the headers'
+	 * version tells); built against older headers (OpenWrt 24.10, 6.6) the
+	 * lookup ignores the mark, and such rules need the bypass off. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 	fib.mark = skb->mark;
+	flags |= BPF_FIB_LOOKUP_MARK;
+#endif
 	/* the neighbour is resolved by the redirect: tunnel devices have none */
-	if (bpf_fib_lookup(skb, &fib, sizeof(fib),
-			   BPF_FIB_LOOKUP_SKIP_NEIGH | BPF_FIB_LOOKUP_MARK) !=
-	    BPF_FIB_LKUP_RET_SUCCESS)
+	if (bpf_fib_lookup(skb, &fib, sizeof(fib), flags) != BPF_FIB_LKUP_RET_SUCCESS)
 		return -1;
 	if (fib.ifindex == skb->ingress_ifindex)
 		return -1;
 	if (bpf_check_mtu(skb, fib.ifindex, &mtu, 0, BPF_MTU_CHK_SEGS))
 		return -1;
 
+	/* RECOMPUTE_CSUM stays: ip6_forward() may decrement bare because it
+	 * calls skb_forward_csum() first; a redirect does not, and a
+	 * CHECKSUM_COMPLETE skb into a veth or bridge would be flagged bad */
 	hop = pk->hop_limit - 1;
 	if (bpf_skb_store_bytes(skb, ETH_HLEN + offsetof(struct ipv6hdr, hop_limit), &hop, 1,
 				BPF_F_RECOMPUTE_CSUM))
@@ -366,20 +380,22 @@ int fs_ingress(struct __sk_buff *skb)
 	now = now_s();
 
 	v = bpf_map_lookup_elem(&fs_local, &k);
-	if (v && fs_age(now, v->seen) <= fs_ttl((const struct fs_cfg *)&cfg, k.proto, v->flags)) {
+	if (v && fs_age(now, v->seen) <= fs_ttl(&cfg, k.proto, v->flags)) {
 		if (st)
 			st->in_local++;
-		return accepted(skb, &k, &pk, tf, st);
+		goto accept;
 	}
 	r = bpf_map_lookup_elem(&fs_remote, &k);
 	if (r && (__s32)(r->expires - now) > 0) {
 		if (st)
 			st->in_remote++;
-		return accepted(skb, &k, &pk, tf, st);
+		goto accept;
 	}
 	if (st)
 		st->in_miss++;
 	return TC_ACT_UNSPEC;
+accept:	/* one copy of the bypass in the object, not one per lookup */
+	return accepted(skb, &k, &pk, tf, st);
 }
 
 char _license[] SEC("license") = "GPL";

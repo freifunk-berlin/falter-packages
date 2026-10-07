@@ -74,6 +74,11 @@
  * programs are seen on it (fw.c, nfnl.c) */
 #define NFNL_TABLE	"flowsync"
 #define NFNL_ALIVE_SET	"alive"
+/* sequence numbers one element write uses (begin, destroy, add, end), and
+ * the index of the message that asks for the ack: the add, or the destroy
+ * alone when the element is taken away */
+#define NFNL_ALIVE_MSGS		4
+#define NFNL_ALIVE_ACKED(add)	((add) ? 2 : 1)
 
 struct prefix {
 	struct in6_addr addr;
@@ -141,6 +146,7 @@ struct gauges {
 	uint64_t remote;		/* live remote flows, last complete round */
 	bool refresh_running;
 	bool attached;			/* the tc programs are on the uplink */
+	bool jited;			/* ... and compiled to machine code, not interpreted */
 	bool bypass;			/* the bypass is on */
 	bool fw_ok;			/* the nftables rules are in place */
 	bool alive;			/* the uplink's element is in the set: outbound untracked */

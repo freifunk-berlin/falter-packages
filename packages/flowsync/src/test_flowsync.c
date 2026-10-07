@@ -363,14 +363,21 @@ static void test_nfnl(void)
 	uint64_t be;
 	uint32_t idx;
 
+	/* begin, destroy (no ack), add (ack), end */
 	len = nfnl_alive_msg(buf, sizeof(buf), true, 7, 10, 100, 4242);
 	CHECK(len > 0);
 	for (h = (const struct nlmsghdr *)buf; NLMSG_OK(h, len); h = NLMSG_NEXT(h, len), n++) {
 		CHECK(h->nlmsg_pid == 4242 && h->nlmsg_seq == 100 + n);
-		if (n != 1) {
+		if (n == 1) {
+			CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_DESTROYSETELEM));
+			CHECK(h->nlmsg_flags == NLM_F_REQUEST);
+			continue;
+		}
+		if (n != 2) {
 			CHECK(h->nlmsg_type == (n ? NFNL_MSG_BATCH_END : NFNL_MSG_BATCH_BEGIN));
 			continue;
 		}
+		CHECK(n == NFNL_ALIVE_ACKED(true));
 		CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_NEWSETELEM));
 		CHECK(h->nlmsg_flags == (NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE));
 		g = NLMSG_DATA(h);
@@ -409,12 +416,13 @@ static void test_nfnl(void)
 		len = (const char *)buf + nfnl_alive_msg(buf, sizeof(buf), true, 7, 10, 100, 4242) -
 		      (const char *)h;	/* the walk goes on from here */
 	}
-	CHECK(n == 3);
-	/* a delete carries the key only */
+	CHECK(n == NFNL_ALIVE_MSGS);
+	/* a delete is the destroy alone, with the key only, and asks for the ack */
 	len = nfnl_alive_msg(buf, sizeof(buf), false, 7, 10, 200, 4242);
 	h = (const struct nlmsghdr *)(buf + NLMSG_SPACE(sizeof(struct nfgenmsg)));
-	CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_DELSETELEM));
+	CHECK(h->nlmsg_type == ((NFNL_SUBSYS_NFTABLES << 8) | NFT_MSG_DESTROYSETELEM));
 	CHECK(h->nlmsg_flags == (NLM_F_REQUEST | NLM_F_ACK));
+	CHECK(h->nlmsg_seq == 200 + NFNL_ALIVE_ACKED(false));
 	g = NLMSG_DATA(h);
 	a = (const struct nlattr *)((const char *)g + NLMSG_ALIGN(sizeof(*g)));
 	elems = attr_find(a, h->nlmsg_len - NLMSG_LENGTH(sizeof(*g)), NFTA_SET_ELEM_LIST_ELEMENTS);

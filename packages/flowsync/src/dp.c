@@ -266,7 +266,8 @@ static int on_event(void *ctx, void *data, size_t len)
 /*
  * load: the daemon. Loads the programs, creating the maps or taking the
  * pinned ones. A map pinned with another size (max_flows or max_remote
- * changed) cannot be reused: it is dropped and made anew, with what it held.
+ * changed) cannot be reused: it is dropped and made anew, empty (see
+ * drop_unusable_pin).
  * Without load (the flow commands): open the pinned maps of a running or
  * stopped daemon.
  */
@@ -308,6 +309,14 @@ int dp_open(bool load_progs)
 			return -1;
 		}
 		prog_id[i] = info.id;
+		/* readable as root only (the field is zeroed for others): here,
+		 * before the privileges go. MIPS boots with the JIT off and relies
+		 * on base-files' sysctl to turn it on; interpreted, the programs
+		 * cost several times more per packet */
+		gauge.jited = info.jited_prog_len != 0;
+		if (!gauge.jited)
+			logmsg(LOG_WARNING, "%s is not JIT-compiled: the interpreter runs it per packet "
+			       "(net.core.bpf_jit_enable=0?)", prog_name[i]);
 	}
 	rb = ring_buffer__new(bpf_object__find_map_fd_by_name(obj, "fs_events"), on_event, NULL,
 			      NULL);
