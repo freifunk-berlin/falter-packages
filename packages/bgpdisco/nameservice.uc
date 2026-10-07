@@ -123,6 +123,8 @@ function write_hostnames(data) {
     let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
     push(lines, ip + ' ' + join(' ', hostnames));
   }
+  // the order of the data can change, keep the file and its hash stable
+  sort(lines);
   let contents = join('\n', lines) + '\n\n# Written by ffnameservice\n';
   let data_hash = digest.md5(contents);
 
