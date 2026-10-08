@@ -1,0 +1,7 @@
+"""gw2 loses every flow it knows a third into the run (a flush, a reboot): the flows through
+it have to be back as fast as the implementation syncs, and no connection may break."""
+from ..scenario import grid
+from .gw5 import FLEETS, GW, TOPOLOGY  # noqa: F401
+
+FLOWS = grid(traffic=["tcp_talk", "udp_stream"], client="A", server="B", fwd=GW, rev=GW)
+EVENTS = [dict(at=200, do="lose_state", gw="gw2")]
