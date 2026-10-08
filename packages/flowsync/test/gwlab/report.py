@@ -1,0 +1,134 @@
+"""The two tables of a lab run, and the failures."""
+import statistics
+
+from .expect import sustained, sync_latency
+
+
+def table(rows, head):
+    w = [max(len(str(r[i])) for r in [head] + rows) for i in range(len(head))]
+    out = ["  ".join(str(c).ljust(w[i]) for i, c in enumerate(head)).rstrip(),
+           "  ".join("-" * n for n in w)]
+    out += ["  ".join(str(c).ljust(w[i]) for i, c in enumerate(r)).rstrip() for r in rows]
+    return "\n".join(out)
+
+
+def connects(res):
+    c = res["client"] or {}
+    return [r["connect_ms"] for r in c.get("conns", [c]) if r.get("connect_ms") is not None]
+
+
+def measured(r):
+    """a measurement's result in words"""
+    f, c, s = r["flow"], r["client"] or {}, r["server"] or {}
+    kind = f["p"]["kind"]
+    if kind == "udp_flood":
+        return "%d kpps" % ((s if f["p"]["dir"] == "up" else c).get("delivered_pps", 0) / 1000)
+    if kind == "tcp_bulk":
+        return "%s Mbit/s, connect %d ms" % (c.get("mbit"), c.get("connect_ms") or 0)
+    steps = c.get("steps", [])
+    return "%d flows/s sustained (%s)" % (
+        sustained(steps), ", ".join("%d: %d%%" % (st["achieved"], 100 * st["answered"] / max(1, st["sent"]))
+                                    for st in steps))
+
+
+def per_packet(r):
+    """a flood's cost in the kernel of the gateway that forwarded it"""
+    f, p = r["flow"], r["flow"]["p"]
+    if p["kind"] != "udp_flood":
+        return "-"
+    up = p["dir"] == "up"
+    pps = ((r["server"] if up else r["client"]) or {}).get("delivered_pps", 0)
+    k = ((r["cpu_ms"] or {}).get(f["fwd"] if up else f["rev"]) or {}).get("kernel")
+    return "%d" % (k * 1e6 / (pps * p["seconds"])) if pps and k is not None else "n/a"
+
+
+def render_alone(run):
+    out = ["== %s, %s, fleet %s ==" % (run["scenario"], run["impl"], run["fleet"])]
+    rows = []
+    for r in run["flows"]:
+        f, cpu = r["flow"], r["cpu_ms"] or {}
+        others = [n for n in cpu if n not in (f["fwd"], f["rev"])]
+
+        def show(n):
+            """user / system time of the implementation's processes + the kernel's packet path"""
+            w = cpu.get(n) or {}
+            return "%s + %s" % ("%d / %d" % tuple(w["cpu"]) if w.get("cpu") else "n/a",
+                                w["kernel"] if w.get("kernel") is not None else "n/a")
+        rows.append([f["traffic"], "asym" if f["asym"] else "sym",
+                     "FAIL: " + "; ".join(r["bad"]) if r["bad"] else measured(r), per_packet(r),
+                     show(f["fwd"]), show(f["rev"]) if f["asym"] else "-",
+                     show(others[0]) if others else "-"])
+    out.append(table(rows, ["traffic", "path", "result", "kernel ns/packet",
+                            "ms user / sys + kernel: fwd gw", "return gw", "idle peer"]))
+    return "\n".join(out)
+
+
+def render(run):
+    """run: what a lab wrote to results.json"""
+    if run.get("alone"):
+        return render_alone(run)
+    out = ["== %s, %s, fleet %s: %d flows, %d FAIL =="
+           % (run["scenario"], run["impl"], run["fleet"], len(run["flows"]),
+              sum(1 for r in run["flows"] if r["bad"]))]
+    if not run.get("alone"):
+        out.append("time: production's timers and the scenario's durations divided by %g%s"
+                   % (run["scale"], "".join("; %s (%g s) held at 1 s" % kv for kv in run["clamped"].items())))
+    if run.get("ladder"):
+        ms = run["sync_ms"]
+        out.append("sync latency measured before the flows: %s" % (
+            "not every answer passed, even %g ms late: nothing is accepted on asymmetric paths (passed: %s)"
+            % (run["ladder"]["delays_ms"][-1], ", ".join(
+                "%g ms: %d/%d" % (d, n, run["ladder"]["flows"])
+                for d, n in zip(run["ladder"]["delays_ms"], run["ladder"]["passed"]))) if ms is None else
+            "at most %g ms; a flow whose answer takes a shorter detour than that may lose its start" % ms))
+    groups = {}
+    for r in run["flows"]:
+        f = r["flow"]
+        key = (f["traffic"], "asym" if f["asym"] else "sym",
+               "bypass" if run["gateways"][f["rev"]]["policy"]["bypass"] else "strict")
+        groups.setdefault(key, []).append(r)
+    rows = []
+    for key, rs in sorted(groups.items()):
+        cl = [r["client"] or {} for r in rs]
+        sv = [r["server"] or {} for r in rs]
+        cms = [x for r in rs for x in connects(r)]
+        rows.append(list(key) + [
+            len(rs), sum(1 for r in rs if not r["bad"]), sum(1 for r in rs if r["bad"]),
+            sum(1 for r in rs if r["retry"]),
+            sum(len(s.get("lost", [])) for s in sv),
+            sum(len(c.get("lost", [])) + c.get("answered", []).count(False) for c in cl),
+            max([c.get("outage_ms", 0) for c in cl] + [0]),
+            sum(r.get("bypassed", 0) for r in rs),
+            "%d / %d" % (statistics.median(cms), max(cms)) if cms else "-",
+        ])
+        if run.get("events"):
+            rec = [r["recovery"] for r in rs if r.get("recovery") is not None]
+            rows[-1].append("%.1f / %.1f (%d flows)" % (statistics.median(rec), max(rec), len(rec))
+                            if rec else "-")
+    out.append(table(rows, ["traffic", "path", "return gw", "flows", "pass", "FAIL", "needed retry",
+                            "lost c>s", "lost s>c", "worst gap ms", "bypassed pkts", "connect ms p50 / max"]
+                     + (["recovery s p50 / max"] if run.get("events") else [])))
+    out.append("")
+    rows = []
+    for name, g in run["gateways"].items():
+        cpu = g["cpu_ms"]
+        rows.append([name, "bypass" if g["policy"]["bypass"] else "strict",
+                     "yes" if g["policy"]["offload"] else "no",
+                     "%.0f / %.0f" % tuple(cpu) if cpu else "n/a",
+                     g["sync_tx"][0], "%.0f" % (g["sync_tx"][1] / 1000)])
+    out.append(table(rows, ["gateway", "rules", "offload", "cpu ms user / sys", "sync pkts", "sync kB"]))
+    lat = sync_latency(run["flows"])
+    if lat:
+        out.append("")
+        out.append("sync latency, %d asymmetric paths: answers passed by delay: %s"
+                   % (lat["flows"], ", ".join("%g ms: %d" % (d, n)
+                                              for d, n in zip(lat["delays_ms"], lat["passed"]))))
+        out.append("every answer passed from %s on" % ("%g ms" % lat["all_from_ms"]
+                                                       if lat["all_from_ms"] is not None else "no delay"))
+    bad = [r for r in run["flows"] if r["bad"]]
+    for r in bad[:12]:
+        out.append("FAIL %s (path RTT %d ms): %s" % (r["flow"]["id"], r["flow"]["rtt_ms"],
+                                                     "; ".join(r["bad"])))
+    if len(bad) > 12:
+        out.append("... and %d more, see %s" % (len(bad) - 12, run["dir"]))
+    return "\n".join(out)
