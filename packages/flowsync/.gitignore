@@ -1,0 +1,7 @@
+src/*.o
+src/bpf/*.o
+src/flowsync
+src/test_flowsync
+src/local.mk
+src/flowsync.o
+__pycache__/

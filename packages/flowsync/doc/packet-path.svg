@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 704" width="1120" height="704" role="img" aria-label="Outbound packets on gateway A skip conntrack and are recorded by a tc egress program in a local map. Daemon A announces the flow to daemon B, which writes it to a remote map. On gateway B a tc ingress program marks reply packets whose flow is in a map, and the firewall accepts the mark.">
+  <title>flowsync packet path</title>
+  <style>
+    svg { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .bg { fill: #ffffff; }
+    .frame { fill: #eef1f5; stroke: #c9d1dc; }
+    .box { fill: #ffffff; stroke: #c9d1dc; stroke-width: 1.5; }
+    .box.own { fill: #fdf1df; stroke: #e0a04a; }
+    .box.skip { fill: none; stroke-dasharray: 5 4; }
+    .end { fill: #ffffff; stroke: #17212e; stroke-width: 1.5; }
+    .t { fill: #17212e; font-size: 13px; font-weight: 600; }
+    .s { fill: #5d6b7c; font-size: 10.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .b { fill: #17212e; font-size: 12px; }
+    .m { fill: #5d6b7c; font-size: 12px; }
+    .cap { fill: #5d6b7c; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+    .lab { fill: #b25a00; font-size: 11.5px; font-weight: 500; }
+    .stop { fill: #b3261e; }
+    .path { stroke: #17212e; stroke-width: 2; fill: none; }
+    .own-path { stroke: #b25a00; stroke-width: 2; fill: none; }
+    .own-path.dash { stroke-dasharray: 6 5; }
+    .head { fill: #17212e; }
+    .own-head { fill: #b25a00; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #19212b; }
+      .frame { fill: #141b24; stroke: #3a4656; }
+      .box { fill: #19212b; stroke: #3a4656; }
+      .box.own { fill: #33260f; stroke: #8f6220; }
+      .box.skip { fill: none; }
+      .end { fill: #19212b; stroke: #e6ebf2; }
+      .t, .b { fill: #e6ebf2; }
+      .s, .m, .cap { fill: #93a1b3; }
+      .lab { fill: #f2a541; }
+      .stop { fill: #ff8a80; }
+      .path { stroke: #e6ebf2; }
+      .own-path { stroke: #f2a541; }
+      .head { fill: #e6ebf2; }
+      .own-head { fill: #f2a541; }
+    }
+  </style>
+  <rect class="bg" x="0" y="0" width="1120" height="704" rx="10"/>
+
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker>
+        <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="own-head"/></marker>
+      </defs>
+
+      <!-- gateway frames -->
+      <rect class="frame" x="130" y="40" width="800" height="218" rx="10"/>
+      <rect class="frame" x="130" y="402" width="800" height="242" rx="10"/>
+      <text class="cap" x="148" y="61">GATEWAY A · OUTBOUND, CLIENT → INTERNET</text>
+      <text class="cap" x="148" y="423">GATEWAY B · REPLY, INTERNET → CLIENT</text>
+
+      <!-- endpoints shared by both lanes -->
+      <rect class="end" x="10" y="72" width="100" height="528" rx="8"/>
+      <text class="t" x="60" y="328" text-anchor="middle">Mesh</text>
+      <text class="m" x="60" y="346" text-anchor="middle">client</text>
+      <rect class="end" x="950" y="72" width="160" height="528" rx="8"/>
+      <text class="t" x="1030" y="328" text-anchor="middle">Internet</text>
+      <text class="m" x="1030" y="346" text-anchor="middle">via the uplink device</text>
+
+      <!-- lane 1: outbound on A -->
+      <rect class="box" x="150" y="72" width="170" height="88" rx="6"/>
+      <text class="t" x="164" y="96">prerouting, raw</text>
+      <text class="s" x="164" y="113">table ip6 flowsync</text>
+      <text class="b" x="164" y="133">route leads out of the</text>
+      <text class="b" x="164" y="149">uplink → notrack</text>
+
+      <rect class="box skip" x="350" y="72" width="170" height="88" rx="6"/>
+      <text class="t" x="364" y="96">conntrack</text>
+      <text class="m" x="364" y="133">skipped: the packet</text>
+      <text class="m" x="364" y="149">is untracked</text>
+
+      <rect class="box" x="550" y="72" width="170" height="88" rx="6"/>
+      <text class="t" x="564" y="96">forward chain</text>
+      <text class="s" x="564" y="113">firewall (fw4)</text>
+      <text class="b" x="564" y="133">zone rules accept,</text>
+      <text class="b" x="564" y="149">as before</text>
+
+      <rect class="box own" x="750" y="72" width="170" height="88" rx="6"/>
+      <text class="t" x="764" y="96">tc egress program</text>
+      <text class="s" x="764" y="113">BPF on the uplink</text>
+      <text class="b" x="764" y="133">records the flow,</text>
+      <text class="b" x="764" y="149">each packet refreshes it</text>
+
+      <line class="path" x1="110" y1="116" x2="148" y2="116" marker-end="url(#ah)"/>
+      <line class="path" x1="320" y1="116" x2="348" y2="116" marker-end="url(#ah)"/>
+      <line class="path" x1="520" y1="116" x2="548" y2="116" marker-end="url(#ah)"/>
+      <line class="path" x1="720" y1="116" x2="748" y2="116" marker-end="url(#ah)"/>
+      <line class="path" x1="920" y1="116" x2="948" y2="116" marker-end="url(#ah)"/>
+
+      <!-- state on A -->
+      <rect class="box own" x="750" y="196" width="170" height="46" rx="6"/>
+      <text class="t" x="764" y="216">local map</text>
+      <text class="s" x="764" y="232">flows A forwarded out</text>
+      <rect class="box own" x="550" y="196" width="170" height="46" rx="6"/>
+      <text class="t" x="564" y="216">flowsync daemon</text>
+      <text class="s" x="564" y="232">on gateway A</text>
+      <line class="own-path" x1="835" y1="160" x2="835" y2="194" marker-end="url(#ao)"/>
+      <text class="lab" x="843" y="182">writes</text>
+      <line class="own-path" x1="750" y1="219" x2="722" y2="219" marker-end="url(#ao)"/>
+      <text class="lab" x="735" y="188" text-anchor="middle">reads</text>
+
+      <!-- sync between the gateways -->
+      <line class="own-path" x1="635" y1="242" x2="635" y2="434" marker-end="url(#ao)"/>
+      <text class="lab" x="647" y="322">announces the flow over UDP 3994</text>
+      <text class="m" x="647" y="339">new flows at once, all flows every 30 s</text>
+
+      <!-- state on B -->
+      <rect class="box own" x="550" y="436" width="170" height="46" rx="6"/>
+      <text class="t" x="564" y="456">flowsync daemon</text>
+      <text class="s" x="564" y="472">on gateway B</text>
+      <rect class="box own" x="750" y="436" width="170" height="46" rx="6"/>
+      <text class="t" x="764" y="456">remote map</text>
+      <text class="s" x="764" y="472">announced by the peers</text>
+      <line class="own-path" x1="720" y1="459" x2="748" y2="459" marker-end="url(#ao)"/>
+      <text class="lab" x="735" y="430" text-anchor="middle">writes</text>
+      <line class="own-path" x1="835" y1="510" x2="835" y2="484" marker-end="url(#ao)"/>
+      <text class="lab" x="843" y="501">looks up</text>
+
+      <!-- lane 2: reply on B, right to left -->
+      <rect class="box own" x="750" y="512" width="170" height="88" rx="6"/>
+      <text class="t" x="764" y="536">tc ingress program</text>
+      <text class="s" x="764" y="553">BPF on the uplink</text>
+      <text class="b" x="764" y="573">flow alive in a map?</text>
+      <text class="b" x="764" y="589">→ set the packet mark</text>
+
+      <rect class="box" x="550" y="512" width="170" height="88" rx="6"/>
+      <text class="t" x="564" y="536">prerouting, raw</text>
+      <text class="s" x="564" y="553">table ip6 flowsync</text>
+      <text class="b" x="564" y="573">marked → notrack</text>
+
+      <rect class="box skip" x="350" y="512" width="170" height="88" rx="6"/>
+      <text class="t" x="364" y="536">conntrack</text>
+      <text class="m" x="364" y="573">skipped for</text>
+      <text class="m" x="364" y="589">marked packets</text>
+
+      <rect class="box" x="150" y="512" width="170" height="88" rx="6"/>
+      <text class="t" x="164" y="536">forward chain</text>
+      <text class="s" x="164" y="553">firewall (fw4)</text>
+      <text class="b" x="164" y="573">marked → accept</text>
+      <text class="b stop" x="164" y="589">no mark → reject</text>
+
+      <line class="path" x1="950" y1="556" x2="922" y2="556" marker-end="url(#ah)"/>
+      <line class="path" x1="750" y1="556" x2="722" y2="556" marker-end="url(#ah)"/>
+      <line class="path" x1="550" y1="556" x2="522" y2="556" marker-end="url(#ah)"/>
+      <line class="path" x1="350" y1="556" x2="322" y2="556" marker-end="url(#ah)"/>
+      <line class="path" x1="150" y1="556" x2="112" y2="556" marker-end="url(#ah)"/>
+
+      <!-- optional bypass -->
+      <polyline class="own-path dash" points="835,600 835,628 60,628 60,603" marker-end="url(#ao)"/>
+      <text class="lab" x="448" y="621" text-anchor="middle">optional bypass: known TCP and UDP flows go straight to the mesh device, past netfilter</text>
+
+      <!-- legend -->
+      <rect class="box own" x="130" y="664" width="22" height="14" rx="3"/>
+      <text class="m" x="160" y="676">added by flowsync</text>
+      <rect class="box" x="300" y="664" width="22" height="14" rx="3"/>
+      <text class="m" x="330" y="676">kernel and firewall, as before</text>
+      <rect class="box skip" x="540" y="664" width="22" height="14" rx="3"/>
+      <text class="m" x="570" y="676">no longer on the path</text>
+</svg>
