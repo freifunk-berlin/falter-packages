@@ -1,0 +1,109 @@
+"""Implementations: what makes a gateway forward a flow it did not see start.
+
+An implementation is one class in one file. The lab gives it a gateway (a
+namespace with mesh0 towards the clients and wan0 towards the Internet, the
+peers' sync addresses, a policy and a directory) and never looks inside:
+
+  install(gw)     everything the gateway needs before traffic: its firewall
+                  for gw.policy (bypass: the stateless accept for TCP segments
+                  with ACK or RST; offload: flow offloading, if supported),
+                  kernel settings, configuration
+  start(gw)       start syncing (processes via gw.spawn, so their CPU is counted)
+  stop(gw)        stop syncing, as a restart or a crash does
+  uninstall(gw)   take down what outlives the processes, when the lab ends
+  lose_state(gw)  forget every flow, as a flush or a reboot would
+  bypassed(gw)    packets its firewall let through without knowing their flow
+                  (the stateless accept), per (source, destination)
+
+Options come from the command line (--set key=value), e.g. the binary to test.
+"""
+import importlib
+import json
+import os
+import signal
+import time
+
+from ..ns import kill
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TEST = os.path.dirname(os.path.dirname(HERE))       # packages/flowsync/test
+
+NAMES = ("none", "flowsync", "flowsync_conntrack", "conntrackd")
+
+
+class Impl:
+    needs_root = False          # cannot run in an unprivileged user namespace
+    offload = True              # can do flow offloading
+
+    def __init__(self, opts):
+        self.opts = opts
+
+    def install(self, gw):
+        raise NotImplementedError
+
+    def start(self, gw):
+        pass
+
+    def stop(self, gw):
+        pass
+
+    def uninstall(self, gw):
+        pass
+
+    def lose_state(self, gw):
+        raise NotImplementedError
+
+    def bypassed(self, gw):
+        """{(source, destination): packets} from the set the firewalls here
+        keep for their stateless accept"""
+        try:
+            out = json.loads(gw.node.run("nft", "-j", "list", "set", "inet", "fw", "bypassed"))
+        except (RuntimeError, ValueError):
+            return {}
+        res = {}
+        for item in out["nftables"]:
+            for e in item.get("set", {}).get("elem", []):
+                e = e["elem"]
+                res[tuple(e["val"]["concat"])] = e.get("counter", {}).get("packets", 0)
+        return res
+
+    def broken(self, timers):
+        """reasons why this implementation's own timers no longer relate to
+        the others as in production at this scale (see Timers.broken)"""
+        return []
+
+
+def load(name, opts):
+    if name not in NAMES:
+        raise SystemExit("unknown implementation %r (%s)" % (name, ", ".join(NAMES)))
+    return importlib.import_module("." + name, __name__).IMPL(opts)
+
+
+def children(pid):
+    """pids whose parent is pid"""
+    out = []
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            try:
+                with open("/proc/%s/stat" % d) as f:
+                    st = f.read()
+                if int(st[st.rindex(")") + 2:].split()[1]) == pid:
+                    out.append(int(d))
+            except (OSError, ValueError):
+                pass
+    return out
+
+
+def stop_wrapped(p):
+    """SIGTERM to the daemon behind ptyrun.py (its child, in a session of its
+    own), then the wrapper goes"""
+    for pid in children(p.pid):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    for _ in range(40):
+        if not children(p.pid):
+            break
+        time.sleep(0.05)
+    kill(p)
