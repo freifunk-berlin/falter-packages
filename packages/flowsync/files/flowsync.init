@@ -1,0 +1,186 @@
+#!/bin/sh /etc/rc.common
+
+# shellcheck disable=SC2034
+# shellcheck disable=SC3043
+
+USE_PROCD=1
+# right after the network (20), long before bird (70) attracts traffic: the
+# programs should be on the uplink and the peers' flows in place when replies
+# start to arrive. The daemon waits for its devices and binds its address
+# before netifd has set it.
+START=21
+STOP=10
+EXTRA_COMMANDS="check announce flows flow bypass detach"
+EXTRA_HELP="	check	Print the configuration as the daemon parses it
+	announce <client> <cport> <server> <sport> [proto]	Send one record to all peers
+	flows [local|remote]	List the flow tables
+	flow <client> <cport> <server> <sport> [proto]	Look one flow up in both tables
+	bypass [on|off]	Show or switch the bypass until the next restart
+	detach	Stop, take the programs off the uplink, drop the tables and rules"
+
+PROG=/usr/sbin/flowsync
+
+. /lib/functions/network.sh
+
+# render UCI into command line options; $1 is the function that takes
+# each option (procd_append_param command, or append_arg for the commands)
+_opt() {
+	local val
+	config_get val main "$2"
+	[ -n "$val" ] && "$1" "--$3" "$val"
+}
+
+# a list option; config_get also returns one written as a plain option (which
+# config_list_foreach would skip silently), list values joined by spaces. None
+# of the values (addresses, prefixes, ports, protocol names) contains a space.
+_list() {
+	local vals v
+	config_get vals main "$2"
+	for v in $vals; do
+		"$1" "--$3" "$v"
+	done
+}
+
+# a logical interface (uplink) or a device (eth0.1301): the daemon works on
+# devices. A logical interface that is not up yet (at boot) is taken from its
+# configuration; anything else is a device name.
+_dev() {
+	local iface dev
+	config_get iface main "$2"
+	[ -n "$iface" ] || return 0
+	network_get_device dev "$iface" 2> /dev/null ||
+		dev="$(uci -q get "network.$iface.device")"
+	"$1" "--$3" "${dev:-$iface}"
+}
+
+# the keys of the sync datagrams' tag. They go to the daemon through its
+# environment, never as an option: a command line is readable by every user
+# on the system, the environment by root and the daemon's own user only
+KEYS=""
+
+render_options() {
+	local add="$1"
+	local debug bypass
+
+	config_load flowsync
+	config_get_bool debug main debug 0
+	[ "$debug" = 1 ] && "$add" --debug
+	config_get_bool bypass main bypass 0
+	[ "$bypass" = 1 ] && "$add" --bypass
+	_opt "$add" bind_address bind
+	_dev "$add" interface interface
+	_dev "$add" uplink uplink
+	_opt "$add" port port
+	_opt "$add" interval interval
+	_opt "$add" element_timeout element-timeout
+	_opt "$add" batch_lines batch-lines
+	_opt "$add" tx_rate tx-rate
+	_opt "$add" rcvbuf rcvbuf
+	_opt "$add" alive_timeout alive-timeout
+	_opt "$add" mark mark
+	_opt "$add" fw_table fw-table
+	_opt "$add" max_flows max-flows
+	_opt "$add" max_remote max-remote
+	_opt "$add" udp_timeout udp-timeout
+	_opt "$add" tcp_timeout tcp-timeout
+	_opt "$add" tcp_syn_timeout tcp-syn-timeout
+	_opt "$add" tcp_close_timeout tcp-close-timeout
+	_opt "$add" other_timeout other-timeout
+	_opt "$add" resync_rate resync-rate
+	_list "$add" proto proto
+	_list "$add" skip_server_port skip-server-port
+	_list "$add" peer peer
+	_list "$add" prefix prefix
+	_list "$add" exclude exclude
+	_list "$add" exclude_dst exclude-dst
+	_opt "$add" key_file key-file
+	config_get KEYS main key
+}
+
+start_service() {
+	local enabled
+
+	config_load flowsync
+	config_get_bool enabled main enabled 0
+	[ "$enabled" = 1 ] || return 0
+
+	procd_open_instance
+	procd_set_param command "$PROG"
+	render_options procd_append_param_command
+	# root only until the programs are loaded and the sockets open, then
+	# user flowsync with CAP_NET_ADMIN only (the package creates the user)
+	procd_append_param command --user flowsync run
+	[ -n "$KEYS" ] && procd_set_param env FLOWSYNC_KEY="$KEYS"
+	# the daemon takes its config from the command line: restart on change
+	procd_set_param file /etc/config/flowsync
+	# a daemon that cannot start (bad config) gives up after 5 tries an hour
+	# instead of filling the log every 5 s; a missing interface is waited for
+	# by the daemon itself
+	procd_set_param respawn 3600 5 5
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+procd_append_param_command() {
+	procd_append_param command "$@"
+}
+
+service_triggers() {
+	procd_add_reload_trigger flowsync
+}
+
+status_service() {
+	_procd_status flowsync
+	"$PROG" status
+}
+
+# collect options into $ARGS, quoted for eval
+ARGS=""
+append_arg() {
+	local a
+	for a in "$@"; do
+		ARGS="$ARGS '$(printf '%s' "$a" | sed "s/'/'\\\\''/g")'"
+	done
+}
+
+# a subcommand with the configured options; its arguments are quoted like the
+# options, so eval sees them as plain words
+_run() {
+	local cmd="$1" opts
+
+	shift
+	render_options append_arg
+	export FLOWSYNC_KEY="$KEYS"
+	opts="$ARGS"
+	ARGS=""
+	append_arg "$@"
+	eval "$PROG" "$opts" "$cmd" "$ARGS"
+}
+
+check() {
+	_run check
+}
+
+announce() {
+	_run announce "$@"
+}
+
+flows() {
+	_run flows "$@"
+}
+
+flow() {
+	_run flow "$@"
+}
+
+bypass() {
+	_run bypass "$@"
+}
+
+# stopping the service leaves the programs on the uplink and the tables in
+# place (replies keep passing across a restart); this takes them away, and
+# forwarded IPv6 is conntrack's again
+detach() {
+	stop
+	_run detach
+}

@@ -1,0 +1,5 @@
+# Accept what flowsync's ingress program marked: packets from the uplink
+# whose flow is in the gateway's flow tables. The mark must be the daemon's
+# (option mark, default 0x01000000); the daemon looks for this rule by its
+# comment and puts it back if a ruleset is loaded without it.
+meta nfproto ipv6 meta mark & 0x01000000 == 0x01000000 accept comment "flowsync"
