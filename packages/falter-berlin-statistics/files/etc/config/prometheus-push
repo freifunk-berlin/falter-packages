@@ -3,3 +3,8 @@ config server 'server'
 	option port '9091'
 	option path '/metrics/job/nodes/instance/'
 
+
+config statistics 'ping'
+	list server '9.9.9.9'
+	list server 'ping.berlin.freifunk.net'
+	list server '194.150.168.168'
