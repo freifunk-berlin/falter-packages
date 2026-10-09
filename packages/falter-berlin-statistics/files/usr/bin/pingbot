@@ -1,0 +1,72 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+const uci = require("uci").cursor();
+import { popen, writefile, rename } from "fs";
+import { rand } from "math";
+
+const TTL = 127;
+const INTERVAL = 10;
+
+let servers = uci.get("prometheus-push", "ping", "server");
+let iface = uci.get("prometheus-push", "ping", "interface");
+
+let cmd = "/bin/ping -q -w " + INTERVAL + " -t " + TTL + " ";
+
+if (iface && type(iface) == "string") {
+	cmd += "-I " + iface + " ";
+}
+
+let fds = [];
+let result = [];
+for (let i = 0; i < length(servers) ; i++) {
+	let fd = popen(cmd + servers[i]);
+	push(fds, fd);
+}
+
+for (let i = 0; i < length(fds) ; i++) {
+	let transmitted = 0;
+	let received = 0;
+	let min = 0;
+	let max = 0;
+	let avg = 0;
+
+	while (true) {
+		if (!fds[i]) break;
+
+		let line = fds[i].read('line');
+		if (!line) break;
+		let m = match(trim(line), /^(\d+) packets transmitted, (\d+) packets received.*/);
+		if (m) {
+			transmitted = +m[1];
+			received = +m[2];
+		}
+
+		m = match(trim(line), /(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)\s*(ms)$/);
+		if (m) {
+			min = m[1];
+			avg = m[2];
+			max = m[3];
+		}
+	}
+	fds[i].close();
+
+	let packetloss = 0;
+	if (transmitted == 0)
+		packetloss = 1;
+	else
+		packetloss = (transmitted - received)/transmitted;
+
+	push(result, {
+		server: servers[i],
+		packetloss: packetloss,
+		avg: avg,
+		min: min,
+		max: max,
+	});
+}
+
+let filename = "/tmp/pingbot.json" + sprintf("%04x", rand(hex("ffff")));
+writefile(filename, sprintf("%J", result));
+rename(filename, "/tmp/pingbot.json");
