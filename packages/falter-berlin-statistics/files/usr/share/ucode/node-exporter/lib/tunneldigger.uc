@@ -26,7 +26,7 @@ function get_td_established(port, pid) {
 			push(matches, {src: src[0],
 				sport: src[1],
 				dst: dst[0],
-				dport: dst[1], 
+				dport: dst[1],
 			});
 		}
 	}
