@@ -9,16 +9,17 @@ PUSHPATH=$(uci get prometheus-push.server.path)
 URL="http://${PUSHHOST}:${PUSHPORT}${PUSHPATH}${HOSTNAME}"
 
 while true; do
-    # 1. Execute the ucode node exporter and save to /tmp
+    # execute the ucode node exporter and save to /tmp
     prometheus-node-exporter-ucode | tail -n +4 > "$TMP_FILE"
 
-    # 2. Upload to Grafana Pushgateway using wget
-    # Includes standard Basic Auth header encoding
+    # upload to pushgateway
     wget -q -O - \
         --header="Content-Type: application/x-www-form-urlencoded" \
         --post-file="$TMP_FILE" \
         "$URL"
 
-    # 3. Wait until the next interval
+    # start background process to gather ping stats
+    /usr/bin/pingbot &
+
     sleep "$INTERVAL"
 done
