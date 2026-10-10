@@ -23,9 +23,9 @@ filter bgpdisco_export_v6 {
 	accept;
 }
 
-{% let i = 0; %}
+{# The name only depends on the neighbor itself: bird restarts a session whose protocol got another name #}
 {% for (let neigh in neighbors): %}
-protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', '_') }} {
+protocol bgp bgpdisco_{{ replace(neigh.iface + '_' + neigh.ip, /[^A-Za-z0-9_]/g, '_') }} {
 	local as 65000;
 {% if (vrf): %}
 	vrf "{{ vrf }}";
