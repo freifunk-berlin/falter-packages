@@ -5,6 +5,7 @@ import * as digest from 'digest';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
 const PLUGIN_UID = 0;
+const CMD_TIMEOUT_MS = 5000;
 
 let cfg = {
   domain: 'ff',
@@ -171,7 +172,8 @@ function write_hostnames(data) {
   INFO('Writing hostnames to %s', cfg.hosts_file);
 
   if (cfg.cmd_on_update) {
-    let res = system(cfg.cmd_on_update);
+    // we must not block for long, the BGP session has a hold time
+    let res = system(cfg.cmd_on_update, CMD_TIMEOUT_MS);
     INFO('Launch command on update: %s => %d', cfg.cmd_on_update, res);
   }
 }
