@@ -16,17 +16,35 @@ let plugins;
 
 let monitor_interfaces = [];
 
+// How often we look for babel neighbors after a link came up, and how many times
+const FAST_PEER_SYNC_MS = 1000;
+const FAST_PEER_SYNCS = 30;
+
+// not in the constants of the rtnl module
+const IFF_UP = 0x1;
+const IFF_LOWER_UP = 0x10000;
+
 let cache_neighbors;
+// Interfaces that are up, and the fast comparisons that are left
+let links_up = {};
+let fast_peer_syncs = 0;
+// A neighbor that babel has lost keeps its session for a while, see sync_peers()
+let peer_removal_pending = false;
+let peer_removal_due = false;
 let cache_hash = '';
 
 let timer_refresh_remote_data;
 let timer_sync_debounce;
+let timer_sync_peers;
+let timer_peer_removal;
 
 let cfg = {
     // General
     general_debug: false,
     general_plugin_directory: '/usr/share/ucode/bgpdisco/plugins/',
     general_refresh_remote_data_interval: 60,
+    general_peer_sync_interval: 30,
+    general_peer_removal_delay: 300,
     // Bird
     bird_control_socket: '/var/run/bird.ctl',
     bird_config_target: '/dev/shm/bird_bgpdisco.conf',
@@ -101,27 +119,108 @@ function retrieve_data_from_bird() {
   return parsed_data;
 }
 
-function neighbors_equal(a, b) {
-  if (length(a) != length(b))
-    return false;
-  let sa = sort(map(a, n => n.ip + '/' + n.iface));
-  let sb = sort(map(b, n => n.ip + '/' + n.iface));
-  for (let i = 0; i < length(sa); i++)
-    if (sa[i] != sb[i])
-      return false;
-  return true;
+function neighbor_key(n) {
+  return n.iface + '/' + n.ip;
 }
 
+// Makes the BGP sessions follow the babel neighbors of bird.
+//
+// A new neighbor gets its session at once. One that babel has lost keeps it
+// for peer_removal_delay seconds: on a bad link babel loses a neighbor long
+// before the BGP session is gone, and every removal is a reconfiguration of
+// bird and a new session later. One delay for all of them: it starts with
+// the first neighbor that is missing, and takes what is missing when it ends.
 function sync_peers() {
   DBG('sync_peers()');
   let neighbors = bird.get_babel_neighbors();
-  if (neighbors_equal(neighbors, cache_neighbors)) {
+  if (neighbors == null) {
+    WARN('Could not get the babel neighbors from bird - keeping the BGP sessions as they are');
+    return;
+  }
+
+  let wanted = {};
+  for (let n in neighbors)
+    wanted[neighbor_key(n)] = n;
+
+  let added = 0, lost = 0;
+  for (let n in cache_neighbors) {
+    let key = neighbor_key(n);
+    if (key in wanted)
+      continue;
+    lost++;
+    if (!peer_removal_due)
+      wanted[key] = n;
+  }
+  let known = {};
+  for (let n in cache_neighbors)
+    known[neighbor_key(n)] = true;
+  for (let key in wanted)
+    if (!(key in known))
+      added++;
+
+  if (lost > 0 && !peer_removal_due && !peer_removal_pending) {
+    DBG('%d babel neighbors are gone - their sessions stay for %d s', lost, cfg.general_peer_removal_delay);
+    peer_removal_pending = true;
+    if (!timer_peer_removal)
+      timer_peer_removal = uloop.timer(cfg.general_peer_removal_delay * 1000, function() {
+        peer_removal_pending = false;
+        peer_removal_due = true;
+        sync_peers();
+        peer_removal_due = false;
+      });
+    else
+      timer_peer_removal.set(cfg.general_peer_removal_delay * 1000);
+  }
+
+  let removed = peer_removal_due ? lost : 0;
+  if (cache_neighbors != null && added == 0 && removed == 0) {
     DBG('No change in babel neighbors - no sync required');
     return;
   }
-  INFO('Babel neighbors have changed - sync to BGP');
-  cache_neighbors = neighbors;
+
+  INFO('Babel neighbors have changed (%d new, %d removed) - sync to BGP', added, removed);
+  // sorted, so that the config only changes when the neighbors do
+  cache_neighbors = map(sort(keys(wanted)), key => wanted[key]);
   configure_bird();
+}
+
+// The kernel only tells us about neighbors it resolves. Tunnels have none
+// (wireguard is NOARP), and interfaces that show up later are not in
+// monitor_interfaces: the neighbor events only make it faster, this is what
+// makes sure that every babel neighbor gets its session.
+function trigger_sync_peers() {
+  sync_peers();
+  if (fast_peer_syncs > 0) {
+    fast_peer_syncs--;
+    timer_sync_peers.set(FAST_PEER_SYNC_MS);
+  } else {
+    timer_sync_peers.set(cfg.general_peer_sync_interval * 1000);
+  }
+}
+
+function link_is_up(flags) {
+  // an event has the flags together with the mask of the changed ones
+  if (type(flags) == 'array')
+    flags = flags[0];
+  return (flags & IFF_UP) && (flags & IFF_LOWER_UP);
+}
+
+// A link that came up is where a new neighbor shows up, a tunnel most of
+// all. bird has it once the first hello is in: look every second for a while.
+function cb_nl_link(ev) {
+  let dev = ev.msg.ifname;
+  if (ev.cmd == rtnl.const.RTM_DELLINK || !link_is_up(ev.msg.flags)) {
+    delete links_up[dev];
+    return;
+  }
+  if (links_up[dev])
+    return;
+  links_up[dev] = true;
+
+  DBG('Link %s came up - looking for new neighbors every second', dev);
+  fast_peer_syncs = FAST_PEER_SYNCS;
+  if (timer_sync_peers)
+    timer_sync_peers.set(FAST_PEER_SYNC_MS);
 }
 
 function cb_refresh_remote_data() {
@@ -200,6 +299,8 @@ function uci_config() {
       case 'general':
         OPT(s, 'debug', bool);
         OPT(s, 'refresh_remote_data_interval', int);
+        OPT(s, 'peer_sync_interval', int);
+        OPT(s, 'peer_removal_delay', int);
         break;
       case 'bird':
         OPT(s, 'control_socket', string);
@@ -242,8 +343,19 @@ if (length(monitor_interfaces) == 0)
 INFO('Enabling monitoring for new neighbors');
 rtnl.listener(cb_nl_newneigh, [rtnl.const.RTM_NEWNEIGH], [rtnl.const.RTNLGRP_NEIGH], {});
 
-// sync peers right away
+// sync peers right away, and keep looking
 sync_peers();
+if (cache_neighbors == null) {
+  // bird did not answer: write the config without neighbors for now
+  cache_neighbors = [];
+  configure_bird();
+}
+timer_sync_peers = uloop.timer(cfg.general_peer_sync_interval * 1000, trigger_sync_peers);
+
+for (let link in rtnl.request(rtnl.const.RTM_GETLINK, rtnl.const.NLM_F_DUMP, {}))
+  if (link_is_up(link.flags))
+    links_up[link.ifname] = true;
+rtnl.listener(cb_nl_link, [rtnl.const.RTM_NEWLINK, rtnl.const.RTM_DELLINK], [rtnl.const.RTNLGRP_LINK], {});
 
 // get the party started :)
 uloop.run();
