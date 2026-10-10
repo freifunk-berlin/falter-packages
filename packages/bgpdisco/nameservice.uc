@@ -116,12 +116,32 @@ function get_local_hosts() {
 }
 
 
+// The names come from any node in the mesh and end up in a file that dnsmasq
+// reads: only what looks like a hostname gets there.
+function valid_hostname(name) {
+  if (type(name) != 'string' || length(name) > 253)
+    return false;
+  // the regex stops at a NUL byte: what it matched has to be the whole string
+  let m = match(name, /^[A-Za-z0-9_]([A-Za-z0-9_.-]*[A-Za-z0-9_])?$/);
+  return m != null && length(m[0]) == length(name);
+}
+
 // data = { ip: [hostname1, ..], }
 function write_hostnames(data) {
   let lines = [];
-  for (ip in data){
-    let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
-    push(lines, ip + ' ' + join(' ', hostnames));
+  for (let ip, names in data) {
+    let addr = iptoarr(ip);
+    if (!addr || type(names) != 'array')
+      continue;
+    let hostnames = [];
+    for (let name in names) {
+      if (valid_hostname(name))
+        push(hostnames, name + '.' + cfg.domain);
+      else
+        DBG('Ignoring invalid hostname of %s', ip);
+    }
+    if (length(hostnames) > 0)
+      push(lines, arrtoip(addr) + ' ' + join(' ', hostnames));
   }
   // the order of the data can change, keep the file and its hash stable
   sort(lines);
