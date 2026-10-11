@@ -131,8 +131,18 @@ function commit()
     sys.init.enable("qos")
   end
 
+  local enableStats = uci:get("ffwizard", "settings", "enableStats") or "0"
+  --  handle prometheus-node-exporter-ucode statistics
+  if (enableStats == "1") then
+    local dhcpip = uci:get("ffwizard","settings","dhcpmesh")
+    dhcpip = ip.IPv4(dhcpip):minhost()
+    uci:set("prometheus-push", "ping", "interface", dhcpip:string())
+    uci:save("prometheus-push")
+    uci:commit("prometheus-push")
+    sys.init.enable("prometheus-push")
+  end
+  -- handle luci_statistics  
   if (sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") == "0") then
-    local enableStats = uci:get("ffwizard", "settings", "enableStats") or "0"
     uci:foreach("luci_statistics", "statistics",
       function(s)
         if (s['.name'] ~= 'collectd' and s['.name'] ~= 'rrdtool') then
