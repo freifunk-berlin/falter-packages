@@ -1,0 +1,45 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Sun, 11 Oct 2026 10:15:30 +0200
+Subject: [PATCH] Conf: Free a dropped config instead of finishing reconfiguration
+
+Every config arms the same obstacles_cleared callback, and the callback
+assumes that only old_config can lose its last reference. A queued config
+that is replaced by a newer one ("Queueing new configuration, ignoring the
+one already queued"), or one refused during shutdown, loses its last
+reference too. Its callback then ran config_done() while the real old
+config was still held by a running show route. When that show route
+finished, the old config's callback ran outside any reconfiguration and
+bird died on "Assertion 'configuring' failed", or the next configure freed
+the still referenced old config and died on the obstacle count assertion.
+
+Free such a config in the callback instead; it was leaked before.
+
+Reproduced with 8 well-behaved clients that run configure or show route
+and read every reply to its end.
+---
+--- a/conf/conf.c
++++ b/conf/conf.c
+@@ -81,9 +81,22 @@ int undo_available;			/* Undo was not re
+ /* Note that both shutting_down and undo_available are related to requests, not processing */
+ 
+ static void
+-config_obstacles_cleared(struct callback *cb UNUSED)
++config_obstacles_cleared(struct callback *cb)
+ {
+   ASSERT_DIE(birdloop_inside(&main_birdloop));
++
++  /*
++   * A config that never became active lost its last reference: a queued
++   * config replaced by a newer one, or one refused during shutdown. It is
++   * not the one being replaced, so it must not finish the reconfiguration.
++   */
++  struct config *c = SKIP_BACK(struct config, obstacles_cleared, cb);
++  if (c != old_config)
++  {
++    config_free(c);
++    return;
++  }
++
+   ASSERT_DIE(configuring);
+ 
+   config_done();
