@@ -1362,6 +1362,18 @@ r1_6_0_radius() {
     cp /rom/etc/config/radius /etc/config
 }
 
+r1_6_0_falter_berlin_statistics() {
+    # Set up the new package falter-berlin-statistics
+    local stats=$(uci get ffwizard.settings.enableStats)
+    if [ "$stats" = "1" ]; then
+        local ip=$(uci get network.dhcp.ipaddr)
+        uci set prometheus-push.ping.interface="${ip}"
+        uci commit prometheus-push
+        /etc/init.d/prometheus-push enable
+        /etc/init.d/prometheus-push start
+    fi 
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1531,6 +1543,7 @@ migrate() {
         r1_6_0_firewall
         r1_6_0_loopback
         r1_6_0_radius
+        r1_6_0_falter_berlin_statistics
     fi
     # overwrite version with the new version
     log "Setting new system version to ${VERSION}."
