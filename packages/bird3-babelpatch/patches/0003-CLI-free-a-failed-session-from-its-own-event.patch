@@ -1,0 +1,94 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Sun, 11 Oct 2026 10:15:30 +0200
+Subject: [PATCH] CLI: Free a failed session from its own event
+
+The error hook of a CLI socket freed the whole CLI right away. The hook
+also runs from inside sk_send() when a write fails, and show route flushes
+its output every 64 routes while it walks the table. A client that hangs up
+during a long show route therefore had its CLI freed under the running
+command, which kept writing into the freed CLI and its rt_show_data. The
+event scheduled afterwards read the freed socket buffer and crashed bird
+with a NULL dereference in cli_get_command().
+
+Mark the CLI as closing in the error hook and let cli_event() free it once
+no command runs on it. Writes to a closing CLI are dropped.
+
+Reproduced with 8 clients that run configure or show route on a 20000
+route table and hang up without reading the reply: AddressSanitizer
+reports a heap-use-after-free in cli_vprintf() from rt_show_cont().
+---
+--- a/nest/cli.h
++++ b/nest/cli.h
+@@ -50,6 +50,7 @@ typedef struct cli {
+   uint log_threshold;			/* When free < log_threshold, store only important messages */
+   uint async_msg_size;			/* Total size of async messages queued in tx_buf */
+   uint tx_pending_count;		/* How many blocks are pending */
++  bool closing;				/* The socket has failed, cli_event() frees the CLI */
+ } cli;
+ 
+ struct cli_config {
+@@ -97,6 +98,7 @@ static inline void cli_separator(cli *c)
+ cli *cli_new(struct birdsock *, struct cli_config *);
+ void cli_init(void);
+ void cli_free(cli *);
++void cli_close(cli *);
+ void cli_kick(cli *);
+ void cli_written(cli *);
+ 
+--- a/nest/cli.c
++++ b/nest/cli.c
+@@ -279,6 +279,14 @@ cli_event(void *data)
+   cli *c = data;
+   int err;
+ 
++  if (c->closing)
++    {
++      /* With a deferred cleanup, cli_free() has already closed the socket */
++      if (c->sock)
++	cli_free(c);
++      return;
++    }
++
+   if (c->tx_pos)
+     ;
+   else if (c->cont)
+@@ -369,6 +377,19 @@ cli_set_timeformat(cli *c, const struct
+ /* Hack for scheduled undo notification */
+ extern cli *cmd_reconfig_stored_cli;
+ 
++/*
++ * The socket has failed. Its error hook may run from inside a write that a
++ * command still running on this CLI started (show route flushes its output
++ * every few routes), so freeing the CLI here would pull it out from under that
++ * command. Let cli_event() free it once nothing is using it.
++ */
++void
++cli_close(cli *c)
++{
++  c->closing = 1;
++  ev_schedule(c->event);
++}
++
+ void
+ cli_free(cli *c)
+ {
+--- a/sysdep/unix/main.c
++++ b/sysdep/unix/main.c
+@@ -479,7 +479,7 @@ void
+ cli_write_trigger(cli *c)
+ {
+   sock *s = c->sock;
+-  if (!s)
++  if (!s || c->closing)
+     return;
+ 
+   if (s->tbuf == NULL)
+@@ -548,7 +548,7 @@ cli_err(sock *s, int err)
+ 	log(L_INFO "CLI connection closed");
+     }
+ 
+-  cli_free(s->data);
++  cli_close(s->data);
+ }
+ 
+ static void
