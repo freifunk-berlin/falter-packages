@@ -1,0 +1,14 @@
+# This file is executed by /etc/init.d/10Sboot and
+# deleted after a successfull execution.
+#
+# The first-boot setup for Freifunk is written in ucode and
+# all scripts ending in .uc will be executed in alphanumeric order
+
+FIRSTBOOT_DIR="/etc/freifunk/firstboot"
+
+cd "$FIRSTBOOT_DIR" || return 0
+files="$(ls *.uc)"
+[ -z "$files" ] && return 0
+for file in $files; do
+        /usr/bin/ucode "./$(basename $file)"
+done
