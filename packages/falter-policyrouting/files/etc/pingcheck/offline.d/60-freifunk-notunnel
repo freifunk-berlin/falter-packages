@@ -11,6 +11,6 @@ config_get ffuplink preset current
 
 [ "$ffuplink" = notunnel ] || exit
 
-# Internet connectivity via WAN is up, start the ffuplink interface
+# Internet connectivity via WAN is down, stop the ffuplink interface
 logger -t freifunk-pingcheck "WAN is down, stopping ffuplink"
 ifdown ffuplink
