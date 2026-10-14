@@ -27,7 +27,6 @@ define Package/falter-berlin-statistics
 	$(Package/falter-berlin-statistics/default)
 	EXTRA_DEPENDS:=prometheus-node-exporter-ucode (>=0),
 	EXTRA_DEPENDS+= prometheus-node-exporter-ucode-openwrt (>=0),
-	EXTRA_DEPENDS+= prometheus-node-exporter-ucode-wifi (>=0),
 	EXTRA_DEPENDS+= ucode-mod-fs (>=0),
 	EXTRA_DEPENDS+= ucode-mod-math (>=0),
 	EXTRA_DEPENDS+= ucode-mod-ubus (>=0),
