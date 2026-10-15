@@ -3,23 +3,23 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=falter-policyrouting
-PKG_RELEASE:=2
+PKG_NAME:=falter-policyrouting-olsr
+PKG_RELEASE:=3
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/falter-policyrouting
-  SECTION:=luci
-  CATEGORY:=LuCI
+define Package/falter-policyrouting-olsr
+  SECTION:=falter-berlin
+  CATEGORY:=falter-berlin
   SUBMENU:=9. Freifunk
-  TITLE:=Freifunk policy routing addon
-  EXTRA_DEPENDS:=ip (>=0), pingcheck (>=0)
+  TITLE:=Freifunk policy routing for olsr
+  EXTRA_DEPENDS:=ip (>=0), olsrd (>=0), pingcheck (>=0)
   PKGARCH:=all
 endef
 
-define Package/falter-policyrouting/description
+define Package/falter-policyrouting-olsr/description
   Allows you to send your own traffic via your own default gateway while sending traffic received from the mesh to a gateway in the mesh.
 endef
 
@@ -33,8 +33,8 @@ endef
 define Build/Compile
 endef
 
-define Package/falter-policyrouting/install
+define Package/falter-policyrouting-olsr/install
 	$(CP) ./files/* $(1)/
 endef
 
-$(eval $(call BuildPackage,falter-policyrouting))
+$(eval $(call BuildPackage,falter-policyrouting-olsr))
