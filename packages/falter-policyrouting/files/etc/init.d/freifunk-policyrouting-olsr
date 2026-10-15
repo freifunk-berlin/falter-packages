@@ -11,7 +11,7 @@ start_service() {
     procd_set_param command "$CMD" start
     procd_set_param stdout 1
     procd_set_param stderr 1
-    prod_close_instance
+    procd_close_instance
 }
 
 stop_service() {
@@ -27,5 +27,10 @@ reload_service() {
 }
 
 service_triggers() {
-    procd_add_reload_trigger "olsrd" "network" "firewall"
+    procd_add_reload_trigger "freifunk-policyrouting"
+}
+
+restart() {
+    logger -t "freifunk-policyrouting-olsr restart called "
+    default_restart
 }

@@ -66,14 +66,14 @@ handle_disable_dyngw() {
                 config_set "$cfg" ignore '1'
                 uci set $olsrd_cfg.$cfg.ignore="1"
                 uci commit $olsrd_cfg
-                logger -s -t policyrouting -p info "dyngw_plain plugin disabled."
+                logger -t policyrouting -p info "dyngw_plain plugin disabled."
             fi
             ;;
         olsrd_dyn_gw.so*)
-            logger -s -t policyrouting -p info "$cfg"
+            logger -t policyrouting -p info "$cfg"
             uci set $olsrd_cfg.$cfg.ignore="1"
             uci commit $olsrd_cfg
-            logger -s -t policyrouting -p info "dyngw plugin disabled."
+            logger -t policyrouting -p info "dyngw plugin disabled."
             ;;
     esac
 }
@@ -88,7 +88,7 @@ disable_dyngw() {
 }
 
 restart_services() {
-    logger -s -t policyrouting -p info "Restarting services"
+    logger -t policyrouting -p info "Restarting services"
     reload_config
 #    /etc/init.d/network restart 2 &>/dev/null
 #    for cfg in $cfgs; do
@@ -100,7 +100,7 @@ ensure_boot_state() {
     if [ "$enable" = "1" ]; then
         [ -d /var/state ] || mkdir -p /var/state
         touch /var/state/freifunk-policyrouting
-        start noservicerestart
+#        start noservicerestart
     else
         olsrd_rmtables
     fi
@@ -114,7 +114,7 @@ add_lookup_rule() {
     name="${name}_${in:-allif}_"
 
     if [ -z "$name" ] || [ -z "$lookup" ] || [ -z "$prio" ]; then
-        logger -s -t policyrouting "Missing parameters for add_rule!"
+        logger -t policyrouting "Missing parameters for add_rule!"
     else
         for p in $proto; do
             rule="rule"
@@ -139,7 +139,7 @@ add_action_rule() {
     name="${name}_${in:-allif}_"
 
     if [ -z "$name" ] || [ -z "$action" ] || [ -z "$prio" ]; then
-        logger -s -t policyrouting "Missing parameters for add_action!"
+        logger -t policyrouting "Missing parameters for add_action!"
     else
         for p in $proto; do
             rule="rule"
@@ -169,7 +169,7 @@ del_rule() {
 start() {
     ensure_boot_state
     if [ $enable = "1" ]; then
-        logger -s -t policyrouting "Starting policy routing."
+        logger -t policyrouting "Starting policy routing."
         rt_tables
         olsrd_intalltables
         #disable_dyngw
@@ -208,7 +208,7 @@ start() {
 }
 
 stop() {
-    logger -s -t policyrouting "Stopping policy routing"
+    logger -t policyrouting "Stopping policy routing"
     olsrd_rmtables
     del_rule olsr-default
     del_rule olsr
@@ -238,6 +238,6 @@ stop() {
 }
 
 restart() {
-    logger -s -t policyrouting "Restarting policy routing"
+    logger -t policyrouting "Restarting policy routing"
     start
 }
