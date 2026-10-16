@@ -80,7 +80,7 @@ endef
 define Package/falter-more
 	$(call Package/falter-standard/template)
 	TITLE:=Falter more packages
-	EXTRA_DEPENDS:=falter-common (>=0), falter-profiles (>=0), luci-app-ffwizard-falter (>=0), falter-berlin-migration (>=0),
+	EXTRA_DEPENDS:=falter-common (>=0), falter-profiles (>=0), falter-berlin-migration (>=0),
 	EXTRA_DEPENDS+= falter-berlin-tunneldigger (>=0), falter-policyrouting-olsr (>=0), falter-berlin-ssid-changer (>=0),
 	EXTRA_DEPENDS+= qos-scripts (>=0), firewall4 (>=0), iptables-nft (>=0), ip6tables-nft (>=0), luci-app-firewall (>=0),
 	EXTRA_DEPENDS+= falter-berlin-autoupdate (>=0), falter-berlin-autoupdate-keys (>=0), luci-app-falter-autoupdate (>=0),
