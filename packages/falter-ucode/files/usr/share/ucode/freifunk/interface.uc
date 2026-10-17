@@ -65,27 +65,9 @@ function disable(interface) {
 	return result;
 }
 
-function generate_hex_string(len, prefix) {                    
-        // we assume any prefix is in the form XX:YY:ZZ      
-        let result = prefix ? prefix + ":" : "";                           
-        let start = (length(result)+1)/3;                                  
-        for (let i = start; i < len ; i++) {                   
-                result = result + sprintf("%02x", rand(hex("ff")+1)) + ":";    
-        }                                           
-        return substr(result, 0, -1); //drop the last ":"      
-}
-
-function generate_mac(prefix) {                              
-        let result = generate_hex_string(mac_octets, prefix); 
-        // ensure the MAC is unicast and locally administered  
-        let first_octet = hex(substr(result, 0, 2));           
-        first_octet = (first_octet | 0x02) & 0xFE; 
-        return sprintf("%02x", first_octet) + substr(result, 2);
-}                                                             
-
 return {
+	get,
+	create,
 	enable,
 	disable,
-	generate_hex_string,
-	generate_mac
 };
