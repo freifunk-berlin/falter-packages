@@ -1,0 +1,81 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+import { basename, glob, readfile } from "fs";
+let ffutils = require("freifunk.utils");
+
+const config_file = "/etc/ffwizard3.json";
+
+const import_base = "/usr/share/ucode/freifunk/wizard";
+const import_config = import_base + "/config";
+const import_services = import_base + "/services";
+
+const require_base = "freifunk.wizard";
+
+function configure(config) {
+	let files = glob(import_config + "/*.uc");
+	let processed = [];
+	for (let file in files) {
+		let filename = basename(file);
+		let modname = require_base + ".config." + replace(filename, /\.uc$/, "");
+		let module = require(modname);
+		let result = module.process(config);
+		if (!result) {
+			printf("Wizard Error: Could not process config module %s\n", filename);
+			printf("Previously processed config modules %J\n", processed);
+			printf("Canceling the following config changes\n%.J\n", global.cursor.changes());
+			global.cursor.revert();
+			return false;
+		}
+		push(processed, filename);
+	}
+	return true;
+}
+
+function services(config) {
+	let files = glob(import_services + "/*.uc");
+        let processed = [];
+        for (let file in files) {
+                let filename = basename(file);
+                let modname = require_base + ".services." + replace(filename, /\.uc$/, "");
+                let module = require(modname);
+                let result = module.process(config);
+                if (!result) {
+                        printf("Wizard Error: Could not process services module %s\n", filename);
+                        printf("Previously processed services modules %J\n", processed);
+			// undo 
+                        return false;
+                }
+                push(processed, filename);
+        }
+        return true;
+}
+
+// get the config file
+let config = json(readfile(config_file));
+if (!config) {
+	printf("error reading config file %s\n", config_file);
+	exit(1);
+}
+
+// process the uci configuration
+let result = configure(config);
+if (!result) {
+	printf("error running configure\n");
+	exit(1);
+}
+
+printf("commiting the following changes\n%J\n", global.cursor.changes());
+global.cursor.commit();
+system(["reload_config"]);
+
+// now that uci config is done, process services
+result = services(config);
+if (!result) {
+	printf("error enabling services\n"),
+	exit(1);
+}
+
+printf("finish running the wizard\n");
+exit(0);
