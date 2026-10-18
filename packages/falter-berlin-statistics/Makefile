@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-statistics
 PKG_VERSION:=2028.10.09
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_LICENSE:=GPL-2.0-only
 
@@ -29,6 +29,7 @@ define Package/falter-berlin-statistics
 	EXTRA_DEPENDS+= prometheus-node-exporter-ucode-openwrt (>=0),
 	EXTRA_DEPENDS+= ucode-mod-fs (>=0),
 	EXTRA_DEPENDS+= ucode-mod-math (>=0),
+	EXTRA_DEPENDS*= ucode-mod-nl80211 (>=0),
 	EXTRA_DEPENDS+= ucode-mod-ubus (>=0),
 	EXTRA_DEPENDS+= ucode-mod-uci (>=0)
 endef
