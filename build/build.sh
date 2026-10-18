@@ -94,7 +94,7 @@ unbuf="stdbuf --output=0 --error=0"
 (
   # pick the right URL
   dlurl="$owmirror/snapshots/targets"
-  [ "$branch" == "openwrt-25.12" ] && dlurl="$owmirror/releases/25.12.5/targets"
+  [ "$branch" == "openwrt-25.12" ] && dlurl="$owmirror/releases/25.12.6/targets"
   [ "$branch" == "openwrt-24.10" ] && dlurl="$owmirror/releases/24.10.8/targets"
   [ "$branch" == "openwrt-23.05" ] && dlurl="$owmirror/releases/23.05.6/targets"
   [ "$branch" == "openwrt-22.03" ] && dlurl="$owmirror/releases/22.03.7/targets"
