@@ -1,0 +1,12 @@
+{ 
+  "freifunk": {
+    "community": { 
+      "name": "Freifunk Fürstenwalde",
+      "homepage": "http://fuerstenwalde.freifunk.net",
+      "latitude": 52.35844,
+      "longitude": 14.063696,
+      "owm_api": "http://util.berlin.freifunk.net",
+      "ssid": "fuerstenwalde.freifunk.net"
+    }
+  }
+}

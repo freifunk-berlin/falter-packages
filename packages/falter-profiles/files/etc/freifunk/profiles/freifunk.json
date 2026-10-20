@@ -1,0 +1,102 @@
+{
+  "freifunk": {
+    "community": {
+      "name": "Freifunk",
+      "homepage": "http://freifunk.net",
+      "latitude": 52.000,
+      "longitude": 10.000,
+      "ssid": "freifunk.net"
+    }
+  },
+  "dhcp": {
+    "@dnsmasq[0]": {
+      "server": [
+        "194.150.168.168",
+        "9.9.9.10",
+        "149.112.112.10"
+      ]
+    },
+    "dhcp": {
+      "leasetime": "5m",
+      "dhcp_option": [ "119,ff" ]
+    }
+  },
+  "system": {
+    "@system[0]": {
+      "zonename": "Europe/Berlin",
+      "timezone": "CET-1CEST,M3.5.0,M10.5.0/3"
+    }
+  },
+  "tunneldigger": {
+    "ffuplink": {
+      "srv": "_tunnel._udp.berlin.freifunk.net",
+      "interface": "ffuplink",
+      "broker_selection": "usage",
+      "bind_interface": "wan",
+      "enabled": 1
+    },
+    "bbbdigger": {
+      "srv": "_bbb-vpn._udp.berlin.freifunk.net",
+      "interface": "bbbdigger",
+      "broker_selection": "usage",
+      "bind_interface": "wan",
+      "enabled": 1
+    }
+  },
+  "wireless": {
+    "wifi-device": {
+      "2g": {
+        "channel": 13
+      },
+      "5g": {
+        "channel": 36
+      }
+    },
+    "mesh": {
+      "2g": {
+        "mode": "mesh",
+        "encryption": "none",
+        "mesh_id": "Mesh-Freifunk",
+        "mesh_fwding": 0,
+        "mcast_rate": 12000
+      },
+      "5g": {
+        "mode": "mesh",
+        "encryption": "none",
+        "mesh_id": "Mesh-Freifunk",
+        "mesh_fwding": 0,
+        "mcast_rate": 12000
+      }
+    },
+    "adhoc": {
+      "2g": {
+        "mode": "adhoc",
+        "encryption": "none",
+        "mcast_rate": 6000
+      }, 
+      "5g": {
+        "mode": "adhoc",
+        "encryption": "none",
+        "mcast_rate": 6000
+      },
+      "channel": {
+        "1": {
+          "bssid": "12:CA:FF:EE:BA:BE",
+          "ssid": "intern-ch1.freifunk.net"
+        },
+        "10": {
+          "bssid": "02:CA:FF:EE:BA:BE",
+          "ssid": "intern-ch10.freifunk.net"
+        },
+        "13": {
+          "bssid": "D2:CA:FF:EE:BA:BE",
+          "ssid": "intern-ch13.freifunk.net"
+        },
+        "36": {
+          "bssid": "02:36:CA:FF:EE:EE",
+          "ssid": "intern-ch36.freifunk.net"
+        }
+      }
+    }
+  }
+}

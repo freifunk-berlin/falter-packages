@@ -1,0 +1,11 @@
+{ 
+  "freiufnk": {
+    "community": { 
+      "name": "Freifunk Cottbus",
+      "homepage": "http://cottbus.freifunk.net",
+      "latitude": 51.757689,
+      "longitude": 13.40948,
+      "ssid": "cottbus.freifunk.net"
+    }
+  }
+}
