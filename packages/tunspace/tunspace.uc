@@ -248,8 +248,13 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
 }
 
 function wg_interface_ok(st, ifname) {
-  return st.interfaces[ifname]
-    && 0 == shell_command("ping -c 3 -w 3 -A fe80::1%"+ifname+" >/dev/null");
+  for (let i = 0; i<3; i++){
+    if (0 == shell_command("ping -c 1 -w 3 fe80::1%"+ifname+" >/dev/null")){
+      return st.interfaces[ifname]
+    }
+    sleep (3);
+  }
+  return false;
 }
 
 function wg_replace_endpoint(ifname, cfg, next) {
