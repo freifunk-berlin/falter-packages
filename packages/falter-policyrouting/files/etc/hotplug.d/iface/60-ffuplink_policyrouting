@@ -9,8 +9,8 @@
 [ "$INTERFACE" = ffuplink ] || exit
 
 config_load ffwizard
-config_get sharenet settings sharenet
-[ "$sharenet" = 1 ] || exit
+config_get ffuplink settings ffuplink
+[ "$ffuplink" != "nouplink" ] || exit
 
 config_load freifunk-policyrouting
 config_get pr_enable pr enable

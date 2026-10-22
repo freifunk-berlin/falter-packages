@@ -6,8 +6,8 @@
 
 . /lib/functions.sh
 
-config_load ffberlin-uplink
-config_get ffuplink preset current
+config_load ffwizard
+config_get ffuplink setting ffuplink
 
 [ "$ffuplink" = notunnel ] || exit
 
