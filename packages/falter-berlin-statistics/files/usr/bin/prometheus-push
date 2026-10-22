@@ -1,25 +1,40 @@
 #!/bin/sh
 
+. /lib/functions.sh
+
 INTERVAL=60 # How often to push metrics (in seconds)
 TMP_FILE="/tmp/metrics.txt"
-HOSTNAME=$(uci get system.@system[0].hostname)
-PUSHHOST=$(uci get prometheus-push.server.host)
-PUSHPORT=$(uci get prometheus-push.server.port)
-PUSHPATH=$(uci get prometheus-push.server.path)
-URL="http://${PUSHHOST}:${PUSHPORT}${PUSHPATH}${HOSTNAME}"
 
 while true; do
-    # execute the ucode node exporter and save to /tmp
-    prometheus-node-exporter-ucode | tail -n +4 > "$TMP_FILE"
+    ENABLED=""
+    HOSTNAME=""
+    PUSHHOST=""
+    PUSHPORT=""
+    PUSHPATH=""
+    config_load prometheus-push
+    config_get ENABLED statistics enabled "0"
 
-    # upload to pushgateway
-    wget -q -O - \
-        --header="Content-Type: application/x-www-form-urlencoded" \
-        --post-file="$TMP_FILE" \
-        "$URL"
+    if [ "$ENABLED" = "0"]; then
+        HOSTNAME=$(uci_get system @system[0] hostname)
 
-    # start background process to gather ping stats
-    /usr/bin/pingbot &
+        config_get INTERVAL statistics interval 60
+        config_get PUSHHOST server host
+        config_get PUSHPORT server port
+        config_get PUSHPATH server path
+        URL="http://${PUSHHOST}:${PUSHPORT}${PUSHPATH}${HOSTNAME}"
+
+        # execute the ucode node exporter and save to /tmp
+        prometheus-node-exporter-ucode | tail -n +4 > "$TMP_FILE"
+
+        # upload to pushgateway
+        wget -q -O - \
+            --header="Content-Type: application/x-www-form-urlencoded" \
+            --post-file="$TMP_FILE" \
+            "$URL"
+
+        # start background process to gather ping stats
+        /usr/bin/pingbot &
+    fi
 
     sleep "$INTERVAL"
 done
