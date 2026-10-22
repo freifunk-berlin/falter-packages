@@ -137,9 +137,9 @@ function commit()
     local dhcpip = uci:get("ffwizard","settings","dhcpmesh")
     dhcpip = ip.IPv4(dhcpip):minhost()
     uci:set("prometheus-push", "ping", "interface", dhcpip:string())
+    uci:set("prometheus-push", "statistics", "enabled", "1")
     uci:save("prometheus-push")
     uci:commit("prometheus-push")
-    sys.init.enable("prometheus-push")
   end
   -- handle luci_statistics  
   if (sys.exec("apk list --installed luci-app-statistics | grep -q installed ; echo -n $?") == "0") then
