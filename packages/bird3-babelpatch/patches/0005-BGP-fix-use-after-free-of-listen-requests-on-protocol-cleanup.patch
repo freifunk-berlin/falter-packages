@@ -1,0 +1,88 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 20:49:51 +0200
+Subject: [PATCH] BGP: Fix use-after-free of listen requests on protocol cleanup
+
+Triggered by `configure` removing or restarting a BGP protocol, e.g.
+after a change of its config, and by shutting bird down, for every BGP
+protocol without `interface range`. Tools generating BGP sessions, like
+bgpdisco on every babel neighbor change, hit it on each reload.
+
+Since commit 21637833e ("BGP: Block connections on explicitly disabled
+instances"), the default listen request is allocated from the protocol's
+persistent pool and only freed together with it by birdloop_free() in
+proto_cleanup(). The pool frees its resources in allocation order, so the
+birdloop and struct bgp_proto are already gone when bgp_listen_free()
+runs. It then dereferences req->p->p.loop and unlinks the request from
+the freed p->listen list.
+
+On musl this crashes BIRD on reconfiguration removing or restarting a BGP
+protocol, and on shutdown, as soon as the freed memory gets unmapped.
+ASan reports it on every such teardown.
+
+Add a destroy hook called by proto_cleanup() while the protocol and its
+loop are still alive, and free the remaining listen requests there. The
+request still lives while the protocol is just disabled.
+
+Fixes: 21637833e ("BGP: Block connections on explicitly disabled instances")
+---
+--- a/nest/proto.c
++++ b/nest/proto.c
+@@ -2168,6 +2168,11 @@ proto_cleanup(struct proto *p)
+   proto_announce_state(p, NULL);
+ 
+   proto_rem_node(&global_proto_list, p);
++
++  /* The persistent pool is freed in allocation order, the protocol structure
++   * and its loop first; resources referencing them must go away before */
++  CALL(p->proto->destroy, p);
++
+   PD(p, "Cleaned up");
+ 
+   /* Free last remnants of the protocol */
+--- a/nest/protocol.h
++++ b/nest/protocol.h
+@@ -67,6 +67,7 @@ struct protocol {
+   int (*start)(struct proto *);			/* Start the instance */
+   int (*shutdown)(struct proto *);		/* Stop the instance */
+   void (*cleanup)(struct proto *);		/* Cleanup the instance right before tearing it all down */
++  void (*destroy)(struct proto *);		/* Release persistent resources before the instance is freed */
+   void (*get_status)(struct proto *, byte *buf); /* Get instance status (for `show protocols' command) */
+ //  int (*get_attr)(const struct eattr *, byte *buf, int buflen);	/* ASCIIfy dynamic attribute (returns GA_*) */
+   void (*show_proto_info)(struct proto *);	/* Show protocol info (for `show protocols all' command) */
+--- a/proto/bgp/bgp.c
++++ b/proto/bgp/bgp.c
+@@ -412,12 +412,25 @@ bgp_listen_free(resource *_req)
+   SKIP_BACK_DECLARE(struct bgp_listen_request, req, r, _req);
+ 
+   /* Can't check for regular birdloop_inside(), this may be called
+-   * from birdloop_free() on final protocol shutdown */
++   * from bgp_destroy() on final protocol shutdown */
+   ASSERT_DIE(DG_IS_LOCKED(birdloop_domain(req->p->p.loop)));
+ 
+   bgp_listen_unregister(req->p, req);
+ }
+ 
++static void
++bgp_destroy(struct proto *P)
++{
++  struct bgp_proto *p = (struct bgp_proto *) P;
++
++  /* The default listen request lives in the persistent pool to block
++   * connections while disabled. Free the remaining requests now while the
++   * protocol and its loop still exist, their free hook accesses both. */
++  struct bgp_listen_request *req;
++  WALK_LIST_FIRST2(req, pn, p->listen)
++    rfree(req);
++}
++
+ static void
+ bgp_listen_dump(struct dump_request *dreq, resource *_req)
+ {
+@@ -4322,6 +4335,7 @@ struct protocol proto_bgp = {
+   .init = 		bgp_init,
+   .start = 		bgp_start,
+   .shutdown = 		bgp_shutdown,
++  .destroy = 		bgp_destroy,
+   .reconfigure = 	bgp_reconfigure,
+   .copy_config = 	bgp_copy_config,
+   .get_status = 	bgp_get_status,
