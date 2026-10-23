@@ -38,7 +38,7 @@ Changes in v9:
 
 --- a/doc/bird.sgml
 +++ b/doc/bird.sgml
-@@ -2575,6 +2575,11 @@ but must be configured accordingly to us
+@@ -2587,6 +2587,11 @@ but must be configured accordingly to us
  interoperate with non-SADR Babel router, but the later would ignore routes
  with specific (non-zero) source prefix.
  
@@ -50,7 +50,7 @@ Changes in v9:
  <sect1>Configuration
  <label id="babel-config">
  
-@@ -2811,6 +2816,17 @@ protocol babel {
+@@ -2823,6 +2828,17 @@ protocol babel {
  	};
  	ipv6 {
  		export where (source = RTS_DEVICE) || (source = RTS_BABEL);
