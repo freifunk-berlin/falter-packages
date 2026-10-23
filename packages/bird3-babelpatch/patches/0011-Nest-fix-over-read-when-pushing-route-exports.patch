@@ -1,0 +1,45 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 21:22:54 +0200
+Subject: [PATCH] Nest: Fix over-read when pushing route exports
+
+Triggered by every route change in a table where the pushed item is not
+a multiple of the CPU structure alignment, which is the case for struct
+rt_pending_export (40 bytes) on x86_64 with alignof(max_align_t) == 16,
+e.g. a static protocol announcing a route.
+
+lfjour_init() rounds journal.item_size up to the alignment, and
+rt_exporter_push() copies the rounded size from the caller's item. With
+the struct rt_pending_export on the stack of rte_announce_to(), ASan
+reports a stack buffer overflow in rt_exporter_push().
+
+Remember the item size before the alignment and copy just that.
+---
+--- a/nest/route.h
++++ b/nest/route.h
+@@ -214,6 +214,7 @@ struct rt_export_union {
+ 
+ struct rt_exporter {
+   struct lfjour journal;			/* Journal for update keeping */
++  uint item_size;				/* Size of pushed items, journal.item_size gets aligned */
+   TLIST_LIST(rt_export_feeder) feeders;		/* List of active feeder structures */
+   bool _Atomic feeders_lock;			/* Spinlock for the above list */
+   u8 trace_routes;				/* Debugging flags (D_*) */
+--- a/nest/rt-export.c
++++ b/nest/rt-export.c
+@@ -468,6 +468,7 @@ rt_exporter_init(struct rt_exporter *e, struct settle_config *scf)
+   rtex_trace(e, D_STATES, "Exporter init");
+   ASSERT_DIE(e->journal.domain);
+   e->journal.cleanup_done = rt_exporter_cleanup_done;
++  e->item_size = e->journal.item_size;
+   lfjour_init(&e->journal, scf);
+   ASSERT_DIE(e->feed_net);
+   ASSERT_DIE(e->netindex);
+@@ -484,7 +485,7 @@ rt_exporter_push(struct rt_exporter *e, const struct rt_export_item *uit)
+   SKIP_BACK_DECLARE(struct rt_export_item, it, li, lit);
+ 
+   /* Copy the data, keeping the header */
+-  memcpy(&it->data, &uit->data, e->journal.item_size - OFFSETOF(struct rt_export_item, data));
++  memcpy(&it->data, &uit->data, e->item_size - OFFSETOF(struct rt_export_item, data));
+ 
+   /* Commit the update */
+   rtex_trace(e, D_ROUTES, "Announcing change %lu at %N: %p (%u) -> %p (%u)",
