@@ -1,0 +1,34 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 21:19:46 +0200
+Subject: [PATCH] BGP: Fix crash on start with interface range
+
+Triggered by any BGP protocol using `interface range`, e.g.
+`protocol bgp { ...; interface range "eth*"; strict bind; ... }`: bird
+segfaults on startup, or on configure adding such a protocol.
+
+Since commit 21637833e ("BGP: Block connections on explicitly disabled
+instances") bgp_init() registers the default listen request right away.
+bgp_default_listen_request() returns NULL for interface patterns, as
+their requests come from the interface notifier, and
+bgp_listen_register() dereferences it.
+
+Register the default request only if there is one.
+
+Fixes: 21637833e ("BGP: Block connections on explicitly disabled instances")
+---
+--- a/proto/bgp/bgp.c
++++ b/proto/bgp/bgp.c
+@@ -3150,8 +3150,11 @@ bgp_init(struct proto_config *CF)
+   init_list(&p->listen);
+ 
+   /* Create listener request immediately to capture and block
+-   * incoming connections if disabled */
+-  bgp_listen_register(p, bgp_default_listen_request(p));
++   * incoming connections if disabled. There is none for interface
++   * patterns, these get their requests from the interface notifier. */
++  struct bgp_listen_request *req = bgp_default_listen_request(p);
++  if (req)
++    bgp_listen_register(p, req);
+ 
+   /* Hack: We use cf->remote_ip just to pass remote_ip from bgp_spawn() */
+   if (cf->c.parent)
