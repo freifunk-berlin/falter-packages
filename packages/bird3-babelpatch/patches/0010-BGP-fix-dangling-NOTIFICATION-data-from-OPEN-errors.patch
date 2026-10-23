@@ -1,0 +1,49 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 21:19:46 +0200
+Subject: [PATCH] BGP: Fix dangling NOTIFICATION data from OPEN errors
+
+Triggered by a received OPEN with a version other than 4 (Unsupported
+Version Number), or with a peer AS in the AS4 capability that does not
+match the configured one (Bad Peer AS), e.g. a neighbor configured with
+a wrong AS number.
+
+bgp_error() only stores a pointer to the NOTIFICATION data, and the
+NOTIFICATION is built later from the deferred TX. In these two cases the
+data was a local variable of bgp_rx_open(), so the NOTIFICATION carried
+whatever reused that stack by then. ASan reports a stack use after
+return in bgp_create_notification().
+
+Keep the data in the connection instead. This also sends the supported
+version in network byte order as RFC 4271 6.2 requires; it was sent in
+host byte order (04 00 on little-endian).
+---
+--- a/proto/bgp/bgp.h
++++ b/proto/bgp/bgp.h
+@@ -380,6 +380,7 @@ struct bgp_conn {
+   u8 last_channel_count;		/* Number of times the last channel was used in succession */
+   int notify_code, notify_subcode, notify_size;
+   byte *notify_data;
++  byte notify_buf[4];			/* NOTIFICATION data not found in the received packet */
+ 
+   uint hold_time, keepalive_time, send_hold_time;	/* Times calculated from my and neighbor's requirements */
+ };
+--- a/proto/bgp/packets.c
++++ b/proto/bgp/packets.c
+@@ -905,7 +905,7 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, uint len)
+   { bgp_error(conn, 1, 2, pkt+16, 2); return; }
+ 
+   if (pkt[19] != BGP_VERSION)
+-  { u16 val = BGP_VERSION; bgp_error(conn, 2, 1, (byte *) &val, 2); return; }
++  { put_u16(conn->notify_buf, BGP_VERSION); bgp_error(conn, 2, 1, conn->notify_buf, 2); return; }
+ 
+   asn = get_u16(pkt+20);
+   hold = get_u16(pkt+22);
+@@ -974,7 +974,7 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, uint len)
+ 
+     /* When remote ASN is unspecified, it must be external one */
+     if (p->remote_as ? (as4 != p->remote_as) : (as4 == p->local_as))
+-    { as4 = htonl(as4); bgp_error(conn, 2, 2, (byte *) &as4, 4); return; }
++    { put_u32(conn->notify_buf, as4); bgp_error(conn, 2, 2, conn->notify_buf, 4); return; }
+ 
+     conn->received_as = as4;
+   }
