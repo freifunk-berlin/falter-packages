@@ -1,0 +1,26 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 20:49:51 +0200
+Subject: [PATCH] IO Loop: Fix off-by-one in socket info buffer
+
+Triggered whenever the last socket leaves a loop other than the main
+loop, e.g. when a BGP session closes or the listening socket of the
+last BGP protocol using it is closed.
+
+socket_changed() sizes the buffer for the leading "%p " (17 chars) and
+the socket dumps, but leaves no room for the terminating zero. When the
+last socket is removed from a loop, buffer_print() runs out of space,
+sets pos to end, and the final terminator is written one byte past the
+allocation.
+---
+--- a/sysdep/unix/io-loop.c
++++ b/sysdep/unix/io-loop.c
+@@ -404,7 +404,8 @@ socket_changed(struct birdsock *s, bool recalculate_sk_info)
+ 
+   if (loop != &main_birdloop && recalculate_sk_info)
+   {
+-    int size = loop->sock_num * sk_max_dump_len + 17;
++    /* The leading "%p " takes 17 chars, plus the terminating zero */
++    int size = loop->sock_num * sk_max_dump_len + 18;
+     char *new_info = mb_alloc(loop->pool, size);
+ 
+     node *n;
