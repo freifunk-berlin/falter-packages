@@ -1,0 +1,39 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 21:19:46 +0200
+Subject: [PATCH] Nest: Fix use-after-free when reconfiguring a protocol that is down
+
+Triggered by `configure` with a config that enables, changes or removes
+a protocol which is currently down (e.g. disabled) and runs in the main
+loop, i.e. any protocol without its own loop like kernel, device,
+direct or static, and the parent of dynamic BGP. Example: remove
+`disabled;` from `protocol static s1 { disabled; ... }` and run
+`birdc configure` ("Enabling protocol s1").
+
+For such a protocol, proto_rethink_goal() calls proto_cleanup() right
+away, which frees struct proto together with its persistent pool and
+creates the replacement instance. protos_do_commit() then passes the
+freed protocol to proto_announce_state(). ASan reports a heap
+use-after-free in protos_do_commit(); with musl, bird may crash on
+configure.
+
+Skip the announcement when the protocol is cleaned up synchronously;
+proto_cleanup() has already announced its removal.
+---
+--- a/nest/proto.c
++++ b/nest/proto.c
+@@ -2094,9 +2094,14 @@ protos_do_commit(struct config *new, struct config *old, int type)
+       proto_rethink_goal_pending++;
+ 
+       p->reconfiguring = PC_SHUTDOWN;
++
++      /* A protocol which is down in the main loop gets cleaned up
++       * and freed by proto_rethink_goal() right away */
++      bool freed = (p->loop == &main_birdloop) && (p->proto_state == PS_DOWN_XX);
+       proto_rethink_goal(p);
+ 
+-      proto_announce_state(p, p->ea_state);
++      if (!freed)
++	proto_announce_state(p, p->ea_state);
+       PROTO_LEAVE_FROM_MAIN(proto_loop);
+     }
+   }
