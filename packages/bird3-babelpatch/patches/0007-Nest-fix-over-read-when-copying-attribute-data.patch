@@ -1,0 +1,36 @@
+From: Simon Polack <spolack+git@mailbox.org>
+Date: Fri, 23 Oct 2026 20:57:43 +0200
+Subject: [PATCH] Nest: Fix over-read when copying attribute data
+
+Triggered by storing an attribute list with non-embedded data whose
+length is not a multiple of the CPU alignment, e.g. on every BGP
+connection, which stores its socket info (struct bgp_conn_sk_ad) as
+protocol state.
+
+ea_list_copy() copies ADATA_SIZE(length) bytes of every non-embedded
+attribute, which is sizeof(struct adata) + length rounded up to the CPU
+alignment. The source is often only sizeof(struct adata) + length long,
+e.g. lp_alloc_adata() does not round up, or the struct bgp_conn_sk_ad
+which bgp_setup_sk() passes from the stack. ASan reports a stack buffer
+overflow there for every BGP connection.
+
+Copy just the data and zero the padding.
+---
+--- a/nest/rt-attr.c
++++ b/nest/rt-attr.c
+@@ -1235,11 +1235,14 @@ ea_list_copy(ea_list *n, ea_list *o, uint elen)
+       eattr *a = &n->attrs[i];
+       if (!a->undef && !(a->type & EAF_EMBEDDED))
+ 	{
++	  /* The source may be just as long as the data, without the padding */
++	  unsigned len = sizeof(struct adata) + a->u.ptr->length;
+ 	  unsigned size = ADATA_SIZE(a->u.ptr->length);
+ 	  ASSERT_DIE(adpos + size <= elen);
+ 
+ 	  struct adata *d = ((void *) n) + adpos;
+-	  memcpy(d, a->u.ptr, size);
++	  memcpy(d, a->u.ptr, len);
++	  memset((void *) d + len, 0, size - len);
+ 	  a->u.ptr = d;
+ 
+ 	  adpos += size;
