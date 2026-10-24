@@ -10,7 +10,8 @@ let cfg = {
   domain: 'ff',
   hosts_file: '/var/hosts/ffnameservice',
   cmd_on_update: null,
-  exclude_interface_self: []
+  exclude_interface_self: [],
+  ignore_interface_self: []
 };
 
 let static_entries = [];
@@ -65,6 +66,9 @@ function get_local_hosts() {
   let first_v6;
   let result = {};
   for (let ip,dev in ips) {
+    if (dev in cfg.ignore_interface_self)
+      continue;
+
     result[ip] ??= [];
     let name = replace(dev, '.', '_') + '.' + hostname;
     let v4 = is_v4(ip);
@@ -119,6 +123,8 @@ function write_hostnames(data) {
     let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
     push(lines, ip + ' ' + join(' ', hostnames));
   }
+  // the order of the data can change, keep the file and its hash stable
+  sort(lines);
   let contents = join('\n', lines) + '\n\n# Written by ffnameservice\n';
   let data_hash = digest.md5(contents);
 
@@ -127,7 +133,9 @@ function write_hostnames(data) {
     return;
   }
 
-  let tmp_file = cfg.hosts_file + '.tmp';
+  // dnsmasq watches the directory and skips dotfiles, so it doesn't read
+  // the half-written file
+  let tmp_file = fs.dirname(cfg.hosts_file) + '/.' + fs.basename(cfg.hosts_file) + '.tmp';
   if (!fs.writefile(tmp_file, contents)) {
     ERR('Could not write hostnames to %s', tmp_file);
     return;
@@ -168,6 +176,8 @@ function uci_config() {
             return;
           }
           cfg.exclude_interface_self = s.exclude_interface_self;
+        if (type(s.ignore_interface_self) == 'array')
+          cfg.ignore_interface_self = s.ignore_interface_self;
         break;
       case 'static-entry':
         INFO('Loading static host entry - Host: %s, IPs: %s', s.host, s.ip);

@@ -20,13 +20,21 @@ function log(severity, msg) {
 	if (severity === "debug" && !cfg.debug) {
 		return;
 	}
-	system(sprintf("logger -t owm -p daemon.%s '%s'", severity, msg));
+	// no shell, msg can contain data from other nodes
+	system(["logger", "-t", "owm", "-p", "daemon." + severity, msg]);
 }
 
 function exec(cmd) {
 	let fh = fs.popen(cmd, 'r');
 	if (fh) { let r = trim(fh.read('all')); fh.close(); return r; }
 	return '';
+}
+
+function olsrd_running() {
+	let services = ubus.call('service', 'list', { name: 'olsrd' });
+	for (let name, instance in services?.olsrd?.instances)
+		if (instance.running) return true;
+	return false;
 }
 
 function parse_olsr_links(json_str) {
@@ -118,10 +126,25 @@ function resolve_hostname(ip) {
 
 function send_to_server(json_str, hostname) {
 	let server = 'api.openwifimap.net';
-	
+	let body_file = '/tmp/owm-update.json';
+
+	// The command runs in a shell and the data contains names of other
+	// nodes, so pass it in a file and only accept a plain hostname.
+	if (!match(hostname, /^[A-Za-z0-9._-]+$/)) {
+		log('err', 'OWM update failed: invalid hostname');
+		return false;
+	}
+	let fh = fs.open(body_file, 'w');
+	if (!fh) {
+		log('err', 'OWM update failed: cannot write ' + body_file);
+		return false;
+	}
+	fh.write(json_str);
+	fh.close();
+
 	let try_ip = (ip) => {
 		log('debug', 'trying OWM server ' + ip);
-		let resp = exec('uclient-fetch -q --method=PUT --header="Content-Type: application/json" --body-data=\'' + json_str + '\' -O - "http://' + ip + '/update_node/' + hostname + '.olsr" 2>&1');
+		let resp = exec('uclient-fetch -q --method=PUT --header="Content-Type: application/json" --body-file=' + body_file + ' -O - "http://' + ip + '/update_node/' + hostname + '.olsr" 2>&1');
 		if (index(resp, '200') >= 0 || index(resp, 'OK') >= 0) { log('info', 'OWM update successful'); return true; }
 		log('debug', 'OWM upload to ' + ip + ' failed');
 		return false;
@@ -193,7 +216,9 @@ function build_json_data() {
 		return null;
 	}
 	
-	let olsr_links = parse_olsr_links(exec('uclient-fetch -q -O - http://127.0.0.1:9090/links'));
+	let olsr_links = [];
+	if (olsrd_running())
+		olsr_links = parse_olsr_links(exec('uclient-fetch -q -O - http://127.0.0.1:9090/links'));
 	let local_ips = {};
 	let babel_links = [];
 	let bird_status = exec('birdc show status');
@@ -251,7 +276,7 @@ function build_json_data() {
 		if (v) json_data.freifunk.community[community_keys[i]] = v;
 	}
 	
-	let olsr_cfg = exec('uclient-fetch -q -O - http://127.0.0.1:9090/config');
+	let olsr_cfg = olsrd_running() ? exec('uclient-fetch -q -O - http://127.0.0.1:9090/config') : '';
 	if (olsr_cfg) {
 		let cfg_json = json(olsr_cfg);
 		if (cfg_json) json_data.olsr.ipv4Config = cfg_json;
