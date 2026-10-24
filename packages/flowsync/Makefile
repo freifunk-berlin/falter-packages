@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=flowsync
 PKG_VERSION:=2.0
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_MAINTAINER:=Simon Polack <spolack+git@mailbox.org>
 PKG_LICENSE:=GPL-2.0-only
@@ -32,12 +32,16 @@ include $(INCLUDE_DIR)/bpf.mk
 # name; the module's version is the kernel's, whose minimum is 6.12 (see
 # README.md). No firewall is required: the accept rule goes into the forward
 # chain of whatever inet table fw_table names (fw4 by default).
+#
+# Only built for the gateways' architectures (Octeon, x86_64): on others
+# the tc programs can fail to build against bpf-headers, whose MIPS kernel
+# configuration need not have the target kernel's HZ (at91 sam9x: 128).
 define Package/flowsync
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=Flow tables for active-active gateways without conntrack
 	URL:=https://github.com/freifunk-berlin/falter-packages
-	DEPENDS:=+libbpf $(BPF_DEPENDS)
+	DEPENDS:=@(mips64||x86_64) +libbpf $(BPF_DEPENDS)
 	EXTRA_DEPENDS:=nftables (>=1.0.0), kmod-nft-fib (>=6.12)
 	# the daemon drops to this user (CAP_NET_ADMIN only) once the programs
 	# are loaded and its sockets open, see --user in the README
