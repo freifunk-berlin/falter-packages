@@ -5,6 +5,7 @@ import * as digest from 'digest';
 import { DBG, INFO, WARN, ERR } from 'bgpdisco.logger';
 
 const PLUGIN_UID = 0;
+const CMD_TIMEOUT_MS = 5000;
 
 let cfg = {
   domain: 'ff',
@@ -116,12 +117,32 @@ function get_local_hosts() {
 }
 
 
+// The names come from any node in the mesh and end up in a file that dnsmasq
+// reads: only what looks like a hostname gets there.
+function valid_hostname(name) {
+  if (type(name) != 'string' || length(name) > 253)
+    return false;
+  // the regex stops at a NUL byte: what it matched has to be the whole string
+  let m = match(name, /^[A-Za-z0-9_]([A-Za-z0-9_.-]*[A-Za-z0-9_])?$/);
+  return m != null && length(m[0]) == length(name);
+}
+
 // data = { ip: [hostname1, ..], }
 function write_hostnames(data) {
   let lines = [];
-  for (ip in data){
-    let hostnames = map(data[ip], function (v) {return v + '.' + cfg.domain;});
-    push(lines, ip + ' ' + join(' ', hostnames));
+  for (let ip, names in data) {
+    let addr = iptoarr(ip);
+    if (!addr || type(names) != 'array')
+      continue;
+    let hostnames = [];
+    for (let name in names) {
+      if (valid_hostname(name))
+        push(hostnames, name + '.' + cfg.domain);
+      else
+        DBG('Ignoring invalid hostname of %s', ip);
+    }
+    if (length(hostnames) > 0)
+      push(lines, arrtoip(addr) + ' ' + join(' ', hostnames));
   }
   // the order of the data can change, keep the file and its hash stable
   sort(lines);
@@ -151,7 +172,8 @@ function write_hostnames(data) {
   INFO('Writing hostnames to %s', cfg.hosts_file);
 
   if (cfg.cmd_on_update) {
-    let res = system(cfg.cmd_on_update);
+    // we must not block for long, the BGP session has a hold time
+    let res = system(cfg.cmd_on_update, CMD_TIMEOUT_MS);
     INFO('Launch command on update: %s => %d', cfg.cmd_on_update, res);
   }
 }
