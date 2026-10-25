@@ -58,12 +58,14 @@ define Package/bgpdisco/install
 
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./bgpdisco.uc $(1)/usr/bin/bgpdisco
+	$(INSTALL_BIN) ./bgpdisco-resolver.uc $(1)/usr/bin/bgpdisco-resolver
 
 	$(INSTALL_DIR) $(1)/usr/share/ucode/bgpdisco
 	$(INSTALL_BIN) ./birdctl.uc $(1)/usr/share/ucode/bgpdisco/birdctl.uc
 	$(INSTALL_BIN) ./plugin.uc $(1)/usr/share/ucode/bgpdisco/plugin.uc
 	$(INSTALL_BIN) ./logger.uc $(1)/usr/share/ucode/bgpdisco/logger.uc
 	$(INSTALL_BIN) ./mrtdump.uc $(1)/usr/share/ucode/bgpdisco/mrtdump.uc
+	$(INSTALL_BIN) ./resolver.uc $(1)/usr/share/ucode/bgpdisco/resolver.uc
 	$(INSTALL_BIN) ./bird_config_template.ut $(1)/usr/share/ucode/bgpdisco/bird_config_template.ut
 
 	$(INSTALL_DIR) $(1)/usr/share/ucode/bgpdisco/plugins
