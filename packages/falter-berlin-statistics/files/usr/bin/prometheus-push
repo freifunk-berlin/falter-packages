@@ -24,7 +24,7 @@ while true; do
         URL="http://${PUSHHOST}:${PUSHPORT}${PUSHPATH}${HOSTNAME}"
 
         # execute the ucode node exporter and save to /tmp
-        prometheus-node-exporter-ucode | tail -n +4 > "$TMP_FILE"
+        prometheus-node-exporter-ucode | tail -n +4 >"$TMP_FILE"
 
         # upload to pushgateway
         wget -q -O - \
