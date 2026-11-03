@@ -248,7 +248,7 @@ function create_wg_interface(nsid, ifname, ifcfg, netns) {
 }
 
 function wg_interface_ok(st, ifname) {
-  if (!st.interface[ifname]) return false;
+  if (!st.interfaces[ifname]) return false;
   for (let i = 0; i<3; i++){
     if (0 == shell_command("ping -c 1 -w 3 fe80::1%"+ifname+" >/dev/null")){
       return true;
