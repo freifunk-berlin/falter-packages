@@ -1374,6 +1374,19 @@ r1_6_0_falter_berlin_statistics() {
     fi 
 }
 
+r1_6_1_falter_berlin_statistics() {
+    # add the enabled option to prometheus-push
+    local stats=$(uci get ffwizard.settings.enableStats)
+    uci -q set prometheus-push.statistics='statistics'
+    local enabled="0"
+    if [ "$stats" = "1" ]; then
+        enabled="1"
+    fi
+    uci -q set prometheus-push.statistics.enabled="${enabled}"
+    uci -q reorder prometheus-push.statistics="0"
+    uci commit prometheus-push
+}
+
 migrate() {
     log "Migrating from ${OLD_VERSION} to ${VERSION}."
 
@@ -1545,6 +1558,11 @@ migrate() {
         r1_6_0_radius
         r1_6_0_falter_berlin_statistics
     fi
+
+    if semverLT "{OLD_VERSION}" "1.6.1"; then
+        r1_6_1_falter_berlin_statistics
+    fi
+
     # overwrite version with the new version
     log "Setting new system version to ${VERSION}."
     uci set "system.@system[0].version=${VERSION}"
