@@ -4,28 +4,37 @@ ipv4 table v4_bgpdisco;
 # Define BGP attribute 250 for our custom nameservice extension :)
 attribute bgp 250 bytestring bgpdisco;
 
-protocol static static_bgpdisco_v4 {
-	ipv4 { table v4_bgpdisco; };
-{% for (let _rt in data): if (index(_rt, ':') == -1): %}
-        route {{ _rt }}/32 blackhole { bgpdisco = hex:{{ hexenc(data[_rt]) }}; };
-{% endif; endfor %}
-};
-
-protocol static static_bgpdisco_v6 {
-	ipv6 { table v6_bgpdisco; };
-{% for (let _rt in data): if (index(_rt, ':') != -1): %}
-	route {{ _rt }}/128 blackhole { bgpdisco = hex:{{ hexenc(data[_rt]) }}; };
-{% endif; endfor %}
-}
-
 filter bgpdisco_export_v6 {
 	bgp_next_hop = 2001:db8::;
 	accept;
 }
 
-{% let i = 0; %}
+# The session to bgpdisco itself: it announces the data of this node and
+# receives the data of all others. bgpdisco connects to us.
+protocol bgp bgpdisco_local {
+	local as 65000;
+	debug { states };
+	neighbor {{ bgp_address }} as 65000 internal;
+	passive;
+	rr client yes;
+	ipv4 {
+		table v4_bgpdisco;
+		import all;
+		export all;
+		gateway recursive;
+		next hop address 192.0.2.0;
+	};
+	ipv6 {
+		table v6_bgpdisco;
+		import all;
+		export filter bgpdisco_export_v6;
+		gateway recursive;
+	};
+}
+
+{# The name only depends on the neighbor itself: bird restarts a session whose protocol got another name #}
 {% for (let neigh in neighbors): %}
-protocol bgp bgpdisco_{{ i++ }}_{{ replace(replace(neigh.iface, '.', '_'), '-', '_') }} {
+protocol bgp bgpdisco_{{ replace(neigh.iface + '_' + neigh.ip, /[^A-Za-z0-9_]/g, '_') }} {
 	local as 65000;
 {% if (vrf): %}
 	vrf "{{ vrf }}";

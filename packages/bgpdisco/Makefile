@@ -6,8 +6,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bgpdisco
-PKG_VERSION:=1.4
-PKG_RELEASE:=6
+PKG_VERSION:=1.5
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Simon Polack <spolack+git@mailbox.org>
 PKG_LICENSE:=GPL-2.0-only
@@ -29,7 +29,7 @@ define Package/bgpdisco
 	$(Package/bgpdisco/default)
 	EXTRA_DEPENDS:= \
 		ucode (>=0), ucode-mod-rtnl (>=0), ucode-mod-debug (>=0), ucode-mod-fs (>=0), \
-		ucode-mod-uloop (>=0), ucode-mod-log (>=0), ucode-mod-struct (>=0), \
+		ucode-mod-uloop (>=0), ucode-mod-log (>=0), \
 		ucode-mod-digest (>=0), ucode-mod-socket (>=0)
 endef
 
@@ -63,7 +63,7 @@ define Package/bgpdisco/install
 	$(INSTALL_BIN) ./birdctl.uc $(1)/usr/share/ucode/bgpdisco/birdctl.uc
 	$(INSTALL_BIN) ./plugin.uc $(1)/usr/share/ucode/bgpdisco/plugin.uc
 	$(INSTALL_BIN) ./logger.uc $(1)/usr/share/ucode/bgpdisco/logger.uc
-	$(INSTALL_BIN) ./mrtdump.uc $(1)/usr/share/ucode/bgpdisco/mrtdump.uc
+	$(INSTALL_BIN) ./bgp.uc $(1)/usr/share/ucode/bgpdisco/bgp.uc
 	$(INSTALL_BIN) ./bird_config_template.ut $(1)/usr/share/ucode/bgpdisco/bird_config_template.ut
 
 	$(INSTALL_DIR) $(1)/usr/share/ucode/bgpdisco/plugins

@@ -96,9 +96,12 @@ function get_babel_interfaces() {
   return result;
 }
 
+// Returns null if bird did not answer: that is not the same as no neighbors
 function get_babel_neighbors() {
   DBG('get_babel_neighbors()');
   let response = cmd('show babel neighbors');
+  if (response == '')
+    return null;
   let matches = match(response, RE_BABEL_NEIGHBORS);
   let result = [];
   for (let _m in matches)
