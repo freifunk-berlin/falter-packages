@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=falter-berlin-statistics
-PKG_VERSION:=2028.10.09
-PKG_RELEASE:=5
+PKG_VERSION:=314159
+PKG_RELEASE:=6
 
 PKG_LICENSE:=GPL-2.0-only
 
